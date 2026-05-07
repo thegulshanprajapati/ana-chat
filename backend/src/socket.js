@@ -1,5 +1,7 @@
 import { Server } from "socket.io";
 import cookie from "cookie";
+import { createClient } from "redis";
+import { createAdapter } from "@socket.io/redis-adapter";
 import { verifyToken } from "./services/tokens.js";
 import { getDb, getNextSequence } from "./db.js";
 import {
@@ -45,8 +47,19 @@ function normalizeWatchRate(rawRate) {
   return Math.max(0.25, Math.min(2, Math.round(value * 100) / 100));
 }
 
-export function initSocket(httpServer) {
-  const allowedOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173,http://localhost:5174")
+async function createRedisAdapterIfConfigured(io) {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) return null;
+
+  const pubClient = createClient({ url: redisUrl });
+  const subClient = pubClient.duplicate();
+  await Promise.all([pubClient.connect(), subClient.connect()]);
+  io.adapter(createAdapter(pubClient, subClient));
+  return { pubClient, subClient };
+}
+
+export async function initSocket(httpServer) {
+  const allowedOrigins = (process.env.CLIENT_ORIGIN || "https://chat.myana.site,https://www.chat.myana.site")
     .split(",")
     .map((v) => v.trim())
     .filter(Boolean);
@@ -64,9 +77,13 @@ export function initSocket(httpServer) {
         if (originAllowed(origin)) return callback(null, true);
         return callback(new Error("CORS blocked"));
       },
-      credentials: true
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE"]
     }
   });
+
+  await createRedisAdapterIfConfigured(io);
+
   const watchSessions = new Map();
 
   io.use(async (socket, next) => {

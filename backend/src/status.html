@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Server Status</title>
+  <style>
+    body { font-family: Inter, system-ui, sans-serif; background: #f3f4f6; color: #111827; margin: 0; padding: 0; display: flex; min-height: 100vh; align-items: center; justify-content: center; }
+    .card { width: min(680px, 90vw); background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12); padding: 36px; }
+    h1 { margin: 0 0 12px; font-size: clamp(1.75rem, 2.5vw, 2.5rem); }
+    p { margin: 0 0 24px; color: #4b5563; line-height: 1.7; }
+    .status { display: flex; align-items: center; gap: 12px; font-size: 1rem; }
+    .badge { width: 10px; height: 10px; border-radius: 9999px; background: #22c55e; display: inline-block; }
+    .loading .badge { animation: pulse 1s infinite; background: #60a5fa; }
+    .details { margin-top: 24px; padding: 18px; background: #f8fafc; border-radius: 14px; border: 1px solid #e2e8f0; }
+    .details code { color: #0f172a; font-weight: 600; }
+    @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Backend Status</h1>
+    <p>This page verifies that your backend is running and returns the health-check response from the API.</p>
+    <div id="status" class="status loading">
+      <span class="badge"></span>
+      <strong>Checking server...</strong>
+    </div>
+    <div class="details" id="details"></div>
+  </div>
+  <script>
+    const statusEl = document.getElementById('status');
+    const detailsEl = document.getElementById('details');
+
+    async function checkHealth() {
+      try {
+        const res = await fetch('/api/health', { cache: 'no-store' });
+        const data = await res.json();
+
+        statusEl.classList.remove('loading');
+        statusEl.innerHTML = '<span class="badge"></span><strong>Server is running</strong>';
+        detailsEl.innerHTML = `<p><strong>API Response:</strong> <code>${JSON.stringify(data)}</code></p><p><strong>HTTP status:</strong> ${res.status}</p>`;
+      } catch (error) {
+        statusEl.classList.remove('loading');
+        statusEl.innerHTML = '<span class="badge" style="background:#ef4444"></span><strong>Server error</strong>';
+        detailsEl.innerHTML = `<p>Unable to reach <code>/api/health</code>. Please check backend logs and connection.</p><p><strong>Error:</strong> ${error.message}</p>`;
+      }
+    }
+
+    checkHealth();
+  </script>
+</body>
+</html>

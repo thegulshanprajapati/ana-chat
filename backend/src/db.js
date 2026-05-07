@@ -1,56 +1,65 @@
-import { MongoClient } from "mongodb";
+import mongoose from "mongoose";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
+const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/chat_secure";
 const dbName = process.env.MONGO_DB_NAME || "chat_secure";
 
-let client;
-let db;
+mongoose.set("strictQuery", false);
 
-async function getClient() {
-  if (!client) {
-    client = new MongoClient(mongoUri, { useUnifiedTopology: true });
-    await client.connect();
-    console.log("[MongoDB] Database connected!");
+function buildConnectionUri() {
+  const hasDatabase = /\/[^/?]+/.test(mongoUri.replace(/^mongodb(\+srv)?:\/\//, ""));
+  if (hasDatabase) {
+    return mongoUri;
   }
-  return client;
+  return mongoUri.replace(/\/?$/, "") + "/" + dbName;
 }
 
-export async function getDb() {
+export async function connectDb() {
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection.db;
+  }
+
+  const uri = buildConnectionUri();
+  await mongoose.connect(uri, {
+    autoIndex: false,
+    maxPoolSize: 10,
+    serverSelectionTimeoutMS: 5000
+  });
+
+  console.log("[MongoDB] Connected to database", mongoose.connection.name);
+  return mongoose.connection.db;
+}
+
+export function getDb() {
+  const db = mongoose.connection.db;
   if (!db) {
-    const c = await getClient();
-    db = c.db(dbName);
+    throw new Error("MongoDB is not connected. Call connectDb() before using getDb().");
   }
   return db;
 }
 
 export async function withDb(cb) {
-  const d = await getDb();
+  const d = getDb();
   const result = await cb(d);
-  console.log("[MongoDB] Data operation (store/fetch) executed.");
+  console.log("[MongoDB] Data operation executed.");
   return result;
 }
 
 export async function getNextSequence(name) {
-  const d = await getDb();
+  const d = getDb();
   const result = await d.collection("counters").findOneAndUpdate(
     { _id: name },
     { $inc: { seq: 1 } },
     { upsert: true, returnDocument: "after" }
   );
-  console.log("[MongoDB] Sequence updated and fetched.");
   return result.value.seq;
 }
 
 export async function closeDb() {
-  if (client) {
-    await client.close();
-    client = null;
-    db = null;
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
   }
 }
-
-export const mongodb = { getDb, withDb, getNextSequence, closeDb };
 
