@@ -1,0 +1,486 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --body-bg: #f8fafc;
+  /* Avoid pure black for a more premium layered dark. */
+  --body-bg-dark: #050506;
+  --chat-bg-light: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+  --chat-bg-dark: linear-gradient(180deg, #0b0b0c 0%, #050506 100%);
+  --selection-bg: rgba(168, 85, 247, 0.30);
+  --selection-text: #0f172a;
+  --accent: #a855f7;
+  --accent-rgb: 168 85 247;
+  --accent-50-rgb: 245 235 254;
+  --accent-100-rgb: 236 218 253;
+  --accent-200-rgb: 225 196 252;
+  --accent-300-rgb: 210 167 251;
+  --accent-400-rgb: 189 126 249;
+  --accent-500-rgb: 168 85 247;
+  --accent-600-rgb: 155 78 227;
+  --accent-700-rgb: 141 71 207;
+  --accent-800-rgb: 128 65 188;
+  --accent-900-rgb: 111 56 163;
+  --accent-950-rgb: 94 48 138;
+  --accent-contrast: #ffffff;
+  --accent-soft-10: rgba(168, 85, 247, 0.10);
+  --accent-soft-14: rgba(168, 85, 247, 0.14);
+  --accent-soft-18: rgba(168, 85, 247, 0.18);
+  --accent-ring: rgba(168, 85, 247, 0.35);
+  --accent-shadow: rgba(168, 85, 247, 0.30);
+}
+
+/* Legacy: data-theme variants were replaced by runtime theme vars in ThemeContext. */
+
+.dark {
+  color-scheme: dark;
+  --selection-text: #f5f3ff;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  min-height: 100%;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  overflow: hidden;
+  @apply text-slate-900 dark:text-slate-100;
+  background: var(--body-bg);
+}
+
+.dark body {
+  background: var(--body-bg-dark);
+}
+
+::selection {
+  background: var(--selection-bg);
+  color: var(--selection-text);
+}
+
+::-moz-selection {
+  background: var(--selection-bg);
+  color: var(--selection-text);
+}
+
+input::selection,
+textarea::selection {
+  background: var(--selection-bg);
+  color: var(--selection-text);
+}
+
+input::-moz-selection,
+textarea::-moz-selection {
+  background: var(--selection-bg);
+  color: var(--selection-text);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Poppins", "Inter", system-ui, sans-serif;
+}
+
+.chat-surface {
+  background-image: var(--chat-bg-light);
+}
+
+.dark .chat-surface {
+  background-image: var(--chat-bg-dark);
+}
+
+.chat-noise {
+  background-image: radial-gradient(rgba(15, 23, 42, 0.06) 0.6px, transparent 0.6px);
+  background-size: 3px 3px;
+}
+
+.dark .chat-noise {
+  background-image: radial-gradient(rgba(148, 163, 184, 0.05) 0.6px, transparent 0.6px);
+}
+
+/* Scrollbars: hide thumb across the project (keep scrolling functional). */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.twemoji-icon {
+  display: inline-block;
+  height: 1.15em;
+  width: 1.15em;
+  margin: 0 0.03em;
+  vertical-align: -0.19em;
+}
+
+.twemoji-icon--composer {
+  height: 1em;
+  width: 1em;
+  margin: 0 0.02em;
+  vertical-align: -0.18em;
+}
+
+.twemoji-icon--list {
+  height: 0.95em;
+  width: 0.95em;
+  margin: 0 0.02em;
+  vertical-align: -0.16em;
+}
+
+.message-body--emoji .twemoji-icon {
+  height: 1.25em;
+  width: 1.25em;
+  margin: 0 0.05em;
+  vertical-align: -0.14em;
+}
+
+.message-link,
+.message-link:visited {
+  color: inherit;
+  text-decoration: none;
+  text-underline-offset: 2px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.message-link:hover {
+  opacity: 0.95;
+  text-decoration: underline;
+}
+
+.message-code {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: rgba(15, 23, 42, 0.06);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.92em;
+  line-height: 1.2;
+}
+
+.dark .message-code {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.message-glow {
+  font-weight: 650;
+  text-shadow: 0 0 18px rgb(var(--accent-500-rgb) / 0.55);
+}
+
+.message-color {
+  font-weight: 650;
+}
+
+.chat-message-in {
+  animation: chatMessageIn 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes chatMessageIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.panel-in {
+  animation: panelIn 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.chat-sparkle {
+  position: absolute;
+  border-radius: 999px;
+  opacity: 0;
+  transform: translate3d(0, 0, 0) rotate(0deg) scale(0.7);
+  filter: drop-shadow(0 8px 16px rgb(var(--accent-500-rgb) / 0.22));
+  animation: chatSparkle var(--dur) ease-out var(--delay) both;
+}
+
+@keyframes chatSparkle {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(0.6);
+  }
+  16% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--sx), var(--sy), 0) rotate(var(--rot)) scale(1);
+  }
+}
+
+.chat-menu-in {
+  transform-origin: top left;
+  animation: chatMenuIn 160ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes chatMenuIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-message-in {
+    animation: none !important;
+  }
+
+  .chat-menu-in {
+    animation: none !important;
+  }
+
+  .chat-sparkle {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+}
+
+@layer components {
+  .ring-accent {
+    --tw-ring-color: var(--accent-ring);
+  }
+
+  .text-accent {
+    color: var(--accent);
+  }
+
+  .bg-accent {
+    background-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+
+  .bg-accent-soft {
+    background-color: var(--accent-soft-14);
+  }
+
+  .border-accent {
+    border-color: var(--accent-soft-18);
+  }
+
+  .shadow-accent {
+    box-shadow: 0 10px 25px var(--accent-shadow);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-contrast);
+    box-shadow: 0 10px 25px var(--accent-shadow);
+  }
+
+  .btn-primary:hover {
+    filter: brightness(0.95);
+  }
+
+  .btn-primary:active {
+    filter: brightness(0.90);
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-400/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-violet-500;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-[13px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-[13px] font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800;
+  }
+
+  .glass-bar {
+    @apply border border-slate-200/70 bg-white/65 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/35;
+    box-shadow: 0 14px 46px rgba(0, 0, 0, 0.10);
+  }
+
+  .glass-icon-btn {
+    @apply rounded-xl border border-transparent p-2 text-slate-600 transition focus-visible:outline-none focus-visible:ring-2 ring-accent hover:-translate-y-0.5 hover:scale-[1.03] hover:border-slate-200/70 hover:bg-white/35 hover:text-slate-900 dark:text-slate-200/85 dark:hover:border-white/10 dark:hover:bg-white/5 dark:hover:text-white;
+  }
+
+  .btn-send {
+    background-image: linear-gradient(135deg, rgb(var(--accent-600-rgb) / 1), rgb(var(--accent-300-rgb) / 1));
+    box-shadow: 0 14px 38px rgb(var(--accent-500-rgb) / 0.30);
+  }
+
+  .btn-send:hover {
+    filter: brightness(1.06);
+  }
+}
+
+.thread-surface {
+  background-image: var(--thread-bg-1, var(--thread-bg)), var(--thread-bg-2, none), var(--thread-pattern-1, none), var(--thread-pattern-2, none);
+  background-size: cover, cover, var(--thread-pattern-1-size, 18px 18px), var(--thread-pattern-2-size, 140px 140px);
+  background-repeat: no-repeat, no-repeat, repeat, repeat;
+  background-position: center, center, 0 0, 0 0;
+}
+
+@layer utilities {
+  /* Ensure readable text on solid accent backgrounds (auto contrast) */
+  .bg-violet-500,
+  .bg-violet-600,
+  .bg-violet-700 {
+    color: var(--accent-contrast) !important;
+  }
+
+  /* Tint the default dark surfaces so the whole UI follows the chosen color */
+  .dark .dark\:bg-slate-950 {
+    background-color: var(--panel-bg) !important;
+  }
+
+  .dark .dark\:bg-slate-900 {
+    background-color: var(--panel-bg-2) !important;
+  }
+
+  .dark .dark\:bg-slate-800 {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+  }
+
+  /* Admin / misc surfaces that use neutral/black tokens */
+  .dark .dark\:bg-black {
+    background-color: var(--panel-bg) !important;
+  }
+
+  .dark .bg-neutral-950,
+  .dark .bg-neutral-900 {
+    background-color: var(--panel-bg) !important;
+  }
+
+  .dark .bg-black,
+  .dark .bg-black\/70,
+  .dark .bg-black\/60,
+  .dark .bg-black\/50,
+  .dark .bg-black\/40,
+  .dark .bg-black\/30,
+  .dark .bg-black\/20,
+  .dark .bg-black\/10 {
+    background-color: var(--panel-bg) !important;
+  }
+
+  .dark .dark\:bg-slate-900\/80,
+  .dark .dark\:bg-slate-900\/95 {
+    background-color: var(--panel-bg-2) !important;
+  }
+
+  .dark .dark\:bg-slate-950\/30,
+  .dark .dark\:bg-slate-950\/40,
+  .dark .dark\:bg-slate-950\/45,
+  .dark .dark\:bg-slate-950\/96 {
+    background-color: var(--panel-bg) !important;
+  }
+
+  /* Many components use non-`dark:` slate backgrounds even in dark mode.
+     Tailwind slate-950/900 carry a blue-ish tint; remap them to themed neutrals. */
+  .dark .bg-slate-950,
+  .dark .bg-slate-950\/85,
+  .dark .bg-slate-950\/80,
+  .dark .bg-slate-950\/75,
+  .dark .bg-slate-950\/70,
+  .dark .bg-slate-950\/65,
+  .dark .bg-slate-950\/60,
+  .dark .bg-slate-950\/55,
+  .dark .bg-slate-950\/50,
+  .dark .bg-slate-950\/45,
+  .dark .bg-slate-950\/40,
+  .dark .bg-slate-950\/35,
+  .dark .bg-slate-950\/30 {
+    background-color: var(--panel-bg) !important;
+  }
+
+  .dark .bg-slate-900,
+  .dark .bg-slate-900\/95,
+  .dark .bg-slate-900\/90,
+  .dark .bg-slate-900\/85,
+  .dark .bg-slate-900\/80,
+  .dark .bg-slate-900\/70,
+  .dark .bg-slate-900\/65,
+  .dark .bg-slate-900\/60,
+  .dark .bg-slate-900\/50,
+  .dark .bg-slate-900\/45,
+  .dark .bg-slate-900\/40,
+  .dark .bg-slate-900\/35,
+  .dark .bg-slate-900\/30,
+  .dark .bg-slate-900\/20 {
+    background-color: var(--panel-bg-2) !important;
+  }
+
+  .dark .bg-slate-800,
+  .dark .bg-slate-800\/80,
+  .dark .bg-slate-800\/70,
+  .dark .bg-slate-800\/65,
+  .dark .bg-slate-800\/60,
+  .dark .bg-slate-800\/50,
+  .dark .bg-slate-800\/45,
+  .dark .bg-slate-800\/40,
+  .dark .bg-slate-800\/35 {
+    background-color: rgb(var(--accent-500-rgb) / 0.08) !important;
+  }
+
+  .dark .bg-slate-900\/5 {
+    background-color: rgb(var(--accent-500-rgb) / 0.08) !important;
+  }
+
+  .dark .dark\:border-slate-700,
+  .dark .dark\:border-slate-800 {
+    border-color: var(--panel-border-soft) !important;
+  }
+
+  .dark .dark\:border-neutral-800,
+  .dark .border-neutral-800 {
+    border-color: var(--panel-border-soft) !important;
+  }
+
+  .dark .dark\:divide-neutral-800 > :not([hidden]) ~ :not([hidden]),
+  .dark .divide-neutral-800 > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--panel-border-soft) !important;
+  }
+
+  .dark .dark\:text-slate-400,
+  .dark .dark\:text-slate-300 {
+    color: var(--panel-muted) !important;
+  }
+
+  .dark .text-neutral-400,
+  .dark .text-neutral-500 {
+    color: var(--panel-muted) !important;
+  }
+}

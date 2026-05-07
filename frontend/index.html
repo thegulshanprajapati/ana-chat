@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="application-name" content="AnaChat" />
+    <meta name="apple-mobile-web-app-title" content="AnaChat" />
+    <meta name="theme-color" content="#04112f" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AnaChat</title>
+    <script>
+      (function () {
+        try {
+          var mode = (localStorage.getItem("chat_color_mode") || "").toLowerCase();
+          if (mode === "light") document.documentElement.classList.remove("dark");
+          else document.documentElement.classList.add("dark"); // default to dark
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

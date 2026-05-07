@@ -1,0 +1,21 @@
+{
+  "name": "LockHub",
+  "short_name": "LockHub",
+  "description": "Secure private chat platform",
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#04112f",
+  "background_color": "#04112f",
+  "display": "standalone",
+  "start_url": "/"
+}

@@ -1,0 +1,67 @@
+{
+  "hash": "78812402",
+  "configHash": "9129b4ee",
+  "lockfileHash": "88d76921",
+  "browserHash": "dd54e50c",
+  "optimized": {
+    "axios": {
+      "src": "../../node_modules/axios/index.js",
+      "file": "axios.js",
+      "fileHash": "74465488",
+      "needsInterop": false
+    },
+    "emoji-picker-react": {
+      "src": "../../node_modules/emoji-picker-react/dist/emoji-picker-react.esm.js",
+      "file": "emoji-picker-react.js",
+      "fileHash": "38ccf8bf",
+      "needsInterop": false
+    },
+    "lucide-react": {
+      "src": "../../node_modules/lucide-react/dist/esm/lucide-react.js",
+      "file": "lucide-react.js",
+      "fileHash": "c6ac65a1",
+      "needsInterop": false
+    },
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "339f82db",
+      "needsInterop": true
+    },
+    "react-dom": {
+      "src": "../../node_modules/react-dom/index.js",
+      "file": "react-dom.js",
+      "fileHash": "6a1e5a36",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "105a260b",
+      "needsInterop": true
+    },
+    "socket.io-client": {
+      "src": "../../node_modules/socket.io-client/build/esm/index.js",
+      "file": "socket__io-client.js",
+      "fileHash": "187c180f",
+      "needsInterop": false
+    },
+    "twemoji": {
+      "src": "../../node_modules/twemoji/dist/twemoji.esm.js",
+      "file": "twemoji.js",
+      "fileHash": "50dd44fc",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-YUX7XKCT": {
+      "file": "chunk-YUX7XKCT.js"
+    },
+    "chunk-3O5KNQLG": {
+      "file": "chunk-3O5KNQLG.js"
+    },
+    "chunk-G3PMV62Z": {
+      "file": "chunk-G3PMV62Z.js"
+    }
+  }
+}
