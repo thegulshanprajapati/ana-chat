@@ -11,7 +11,7 @@ export function AuthProvider({ children }) {
 
   const reload = useCallback(async () => {
     try {
-      const { data } = await api.get("/me");
+      const { data } = await api.get("/auth/me");
       if (data?.id) setUser(data);
       else setUser(null);
     } catch {

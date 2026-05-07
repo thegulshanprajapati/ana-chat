@@ -37,9 +37,9 @@ function normalizeTheme(theme) {
 }
 
 function preferredTheme() {
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
   const saved = normalizeTheme(window.localStorage.getItem(THEME_STORAGE_KEY));
-  return saved || "dark";
+  return saved || "light";
 }
 
 function normalizeDoodleStyle(style) {

@@ -103,14 +103,41 @@ app.use(`${apiPrefix}/*`, (_req, res) => {
 
 app.use(errorHandler);
 
-const PORT = Number(process.env.PORT || 5000);
+const basePort = Number(process.env.PORT || 5000);
+const isLocalDev = process.env.NODE_ENV !== "production";
+const maxPortAttempts = 10;
 
-const server = createServer(app);
+function startServer(port, attempts = 0) {
+  const server = createServer(app);
 
-server.listen(PORT, () => {
-  console.log(`[Server] Listening on port ${PORT} - API base path: ${apiPrefix}`);
-  console.log(`[Server] Health checks available at /healthz and ${apiPrefix}/health`);
-});
+  server.on("error", (error) => {
+    if (error.code === "EADDRINUSE" && isLocalDev && attempts < maxPortAttempts) {
+      const nextPort = port + 1;
+      console.warn(`[Server] Port ${port} is already in use. Trying ${nextPort} instead...`);
+      startServer(nextPort, attempts + 1);
+      return;
+    }
+
+    console.error("[Server] Startup failed:", error);
+    process.exit(1);
+  });
+
+  server.listen(port, () => {
+    console.log(`[Server] Listening on port ${port} - API base path: ${apiPrefix}`);
+    console.log(`[Server] Health checks available at /healthz and ${apiPrefix}/health`);
+  });
+
+  initSocket(server)
+    .then((io) => {
+      app.set("io", io);
+      console.log("[Socket.IO] Initialized successfully");
+    })
+    .catch((err) => {
+      console.error("[Socket.IO] Initialization failed:", err.message);
+    });
+}
+
+startServer(basePort);
 
 connectDb()
   .then(() => {
@@ -119,13 +146,4 @@ connectDb()
   .catch((err) => {
     console.error("[Database] Connection failed (non-blocking):", err.message);
     console.error("[Database] Some features may not work until database connection is restored");
-  });
-
-initSocket(server)
-  .then((io) => {
-    app.set("io", io);
-    console.log("[Socket.IO] Initialized successfully");
-  })
-  .catch((err) => {
-    console.error("[Socket.IO] Initialization failed:", err.message);
   });
