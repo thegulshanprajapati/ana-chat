@@ -5,12 +5,11 @@ import { navigateTo } from "../utils/nav";
 import { useTheme } from "../context/ThemeContext";
 
 const labelClass =
-  "mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400";
+  "mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-red-300";
 const fieldClass =
-  "w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-violet-500";
+  "w-full rounded-lg border border-red-700 bg-black px-4 py-3 text-sm text-white outline-none transition placeholder:text-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/30";
 const primaryButtonClass =
-  "btn-primary ring-accent inline-flex w-full items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold shadow-sm transition focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60";
-
+  "inline-flex w-full items-center justify-center rounded-lg bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-red-500/20 transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-60";
 export default function AuthPage({ onAuthed }) {
   const { theme } = useTheme();
   const [mode, setMode] = useState("signup");
@@ -143,58 +142,58 @@ export default function AuthPage({ onAuthed }) {
   }
 
   return (
-    <div className="relative min-h-[100dvh] overflow-x-hidden bg-slate-50 px-3 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-6 dark:bg-slate-950">
+    <div className="relative min-h-[100dvh] overflow-x-hidden bg-black px-3 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-6 text-white">
 
       <div className="relative mx-auto w-full max-w-[1200px]">
-        <div className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+        <div className="rounded-3xl border border-red-700 bg-[#090909] shadow-[0_20px_80px_rgba(255,0,0,0.12)]">
           <div className="p-4 sm:p-6">
             <div className="grid gap-8 lg:grid-cols-[1fr_1.2fr] lg:items-start">
               {/* Hero Section */}
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 sm:p-8 dark:border-slate-800 dark:bg-slate-900">
+              <div className="rounded-3xl border border-red-700 bg-[#111111] p-5 sm:p-8">
                 <div className="mb-6">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-purple-300/80 bg-purple-50 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-purple-700 dark:border-pink-500/35 dark:bg-pink-500/10 dark:text-pink-300">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-red-500/50 bg-red-500/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-red-300">
                     <ShieldCheck size={14} />
-                    AnaChat Platform
+                    AnaChat Secure
                   </div>
-                  <h1 className="mt-3 font-display text-[30px] font-bold leading-[1.12] text-slate-900 sm:text-[36px] dark:text-white">
-                    Connect Instantly
+                  <h1 className="mt-3 font-display text-[30px] font-bold leading-[1.12] text-white sm:text-[36px]">
+                    Red. Fast. Private.
                   </h1>
-                  <p className="mt-2 text-base text-slate-600 dark:text-slate-300">
+                  <p className="mt-2 text-base text-red-200">
                     {mode === "login"
-                      ? "Welcome back to your secure chat experience."
-                      : "Join AnaChat with instant signup - no OTP required."}
+                      ? "Sign in and continue your chat sessions instantly."
+                      : "Create your account now and join the secure AnaChat network."}
                   </p>
                 </div>
 
                 {/* Feature highlights */}
                 <div className="hidden space-y-3 sm:block">
-                  <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/50">
-                      <Zap size={16} className="text-purple-600 dark:text-purple-400" />
+                  <div className="flex items-center gap-3 rounded-2xl border border-red-700 bg-black/80 p-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600/10">
+                      <Zap size={16} className="text-red-400" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-900 dark:text-white">Lightning Fast</p>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">Real-time messaging with instant delivery</p>
+                      <p className="text-sm font-semibold text-white">Lightning Fast</p>
+                      <p className="text-xs text-red-200">Real-time messaging with instant delivery.</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-fuchsia-100 dark:bg-fuchsia-900/50">
-                      <ShieldCheck size={16} className="text-fuchsia-600 dark:text-fuchsia-400" />
+                  <div className="flex items-center gap-3 rounded-2xl border border-red-700 bg-black/80 p-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600/10">
+                      <ShieldCheck size={16} className="text-red-400" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-900 dark:text-white">Secure & Private</p>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">End-to-end encrypted conversations</p>
+                      <p className="text-sm font-semibold text-white">Secure & Private</p>
+                      <p className="text-xs text-red-200">Encrypted chats and trusted privacy controls.</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-100 dark:bg-pink-900/50">
-                      <Users size={16} className="text-pink-600 dark:text-pink-400" />
+                  <div className="flex items-center gap-3 rounded-2xl border border-red-700 bg-black/80 p-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600/10">
+                      <Users size={16} className="text-red-400" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-900 dark:text-white">Group Chats</p>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">Create and manage group conversations</p>
+                      <p className="text-sm font-semibold text-white">Group Chat Ready</p>
+                      <p className="text-xs text-red-200">Create rooms, invite friends, and stay connected.</p>
                     </div>
                   </div>
                 </div>
@@ -329,15 +328,15 @@ export default function AuthPage({ onAuthed }) {
                           </div>
 
                           {!googleClientId ? (
-                            <p className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-400/35 dark:bg-amber-500/10 dark:text-amber-200">
+                            <p className="rounded-2xl border border-red-700 bg-[#110000] px-3 py-2 text-xs text-red-200">
                               Google OAuth not configured. Add VITE_GOOGLE_CLIENT_ID to environment.
                             </p>
                           ) : googleLoadError ? (
-                            <p className="rounded-xl border border-red-300/70 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">
+                            <p className="rounded-2xl border border-red-700 bg-[#110000] px-3 py-2 text-xs text-red-200">
                               Failed to load Google sign-in. Check network connection.
                             </p>
                           ) : !googleReady ? (
-                            <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                            <p className="rounded-2xl border border-red-700 bg-[#110000] px-3 py-2 text-xs text-red-200">
                               Loading Google sign-in...
                             </p>
                           ) : (
@@ -354,15 +353,15 @@ export default function AuthPage({ onAuthed }) {
                   )}
 
                   {error && (
-                    <div className="mt-4 rounded-xl border border-red-300/70 bg-red-50 px-4 py-3 dark:border-red-500/40 dark:bg-red-500/10">
-                      <p className="text-sm text-red-700 dark:text-red-200">{error}</p>
+                    <div className="mt-4 rounded-2xl border border-red-700 bg-[#220000] px-4 py-3">
+                      <p className="text-sm text-red-200">{error}</p>
                     </div>
                   )}
 
                   <button
                     type="button"
                     onClick={() => switchMode(mode === "login" ? "signup" : "login")}
-                    className="mt-6 block text-sm font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 transition hover:text-slate-900 dark:text-slate-300 dark:decoration-slate-600 dark:hover:text-white"
+                    className="mt-6 block text-sm font-semibold text-red-200 underline decoration-red-500 underline-offset-4 transition hover:text-white"
                   >
                     {mode === "login" ? "New to AnaChat? Create account" : "Already have an account? Login"}
                   </button>
@@ -373,8 +372,8 @@ export default function AuthPage({ onAuthed }) {
         </div>
 
         <div className="mt-6 text-center">
-          <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
-            AnaChat - Secure, fast, and beautiful messaging for everyone
+          <p className="text-xs font-medium text-red-200">
+            AnaChat — secure messaging built for speed and privacy.
           </p>
         </div>
       </div>

@@ -48,14 +48,20 @@ function normalizeWatchRate(rawRate) {
 }
 
 async function createRedisAdapterIfConfigured(io) {
-  const redisUrl = process.env.REDIS_URL;
+  const redisUrl = process.env.REDIS_URL?.trim();
   if (!redisUrl) return null;
 
-  const pubClient = createClient({ url: redisUrl });
-  const subClient = pubClient.duplicate();
-  await Promise.all([pubClient.connect(), subClient.connect()]);
-  io.adapter(createAdapter(pubClient, subClient));
-  return { pubClient, subClient };
+  try {
+    const pubClient = createClient({ url: redisUrl });
+    const subClient = pubClient.duplicate();
+    await Promise.all([pubClient.connect(), subClient.connect()]);
+    io.adapter(createAdapter(pubClient, subClient));
+    console.log("[Socket.IO] Redis adapter enabled.");
+    return { pubClient, subClient };
+  } catch (error) {
+    console.warn("[Socket.IO] Redis adapter disabled:", error.message);
+    return null;
+  }
 }
 
 export async function initSocket(httpServer) {

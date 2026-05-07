@@ -76,6 +76,10 @@ app.get("/status", (_req, res) => {
   res.sendFile(path.join(__dirname, "status.html"));
 });
 
+app.get("/healthz", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
 app.get(`${apiPrefix}/health`, (_req, res) => {
   res.json({ status: "ok" });
 });
