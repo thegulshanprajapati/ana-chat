@@ -105,19 +105,27 @@ app.use(errorHandler);
 
 const PORT = Number(process.env.PORT || 5000);
 
-async function startServer() {
-  await connectDb();
+const server = createServer(app);
 
-  const server = createServer(app);
-  const io = await initSocket(server);
-  app.set("io", io);
-
-  server.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT} - API base path ${apiPrefix}`);
-  });
-}
-
-startServer().catch((error) => {
-  console.error("Failed to start server:", error);
-  process.exit(1);
+server.listen(PORT, () => {
+  console.log(`[Server] Listening on port ${PORT} - API base path: ${apiPrefix}`);
+  console.log(`[Server] Health checks available at /healthz and ${apiPrefix}/health`);
 });
+
+connectDb()
+  .then(() => {
+    console.log("[Database] Connected successfully");
+  })
+  .catch((err) => {
+    console.error("[Database] Connection failed (non-blocking):", err.message);
+    console.error("[Database] Some features may not work until database connection is restored");
+  });
+
+initSocket(server)
+  .then((io) => {
+    app.set("io", io);
+    console.log("[Socket.IO] Initialized successfully");
+  })
+  .catch((err) => {
+    console.error("[Socket.IO] Initialization failed:", err.message);
+  });

@@ -1,7 +1,7 @@
 {
-  "name": "LockHub",
-  "short_name": "LockHub",
-  "description": "Secure private chat platform",
+  "name": "AnaChat - Secure Messaging",
+  "short_name": "AnaChat",
+  "description": "Fast, secure, and beautiful real-time chat platform",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",
@@ -14,8 +14,8 @@
       "type": "image/png"
     }
   ],
-  "theme_color": "#04112f",
-  "background_color": "#04112f",
+  "theme_color": "#000000",
+  "background_color": "#000000",
   "display": "standalone",
   "start_url": "/"
 }

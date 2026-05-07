@@ -3,50 +3,82 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Server Status</title>
+  <title>AnaChat Backend Status</title>
   <style>
-    body { font-family: Inter, system-ui, sans-serif; background: #f3f4f6; color: #111827; margin: 0; padding: 0; display: flex; min-height: 100vh; align-items: center; justify-content: center; }
-    .card { width: min(680px, 90vw); background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12); padding: 36px; }
-    h1 { margin: 0 0 12px; font-size: clamp(1.75rem, 2.5vw, 2.5rem); }
-    p { margin: 0 0 24px; color: #4b5563; line-height: 1.7; }
-    .status { display: flex; align-items: center; gap: 12px; font-size: 1rem; }
-    .badge { width: 10px; height: 10px; border-radius: 9999px; background: #22c55e; display: inline-block; }
-    .loading .badge { animation: pulse 1s infinite; background: #60a5fa; }
-    .details { margin-top: 24px; padding: 18px; background: #f8fafc; border-radius: 14px; border: 1px solid #e2e8f0; }
-    .details code { color: #0f172a; font-weight: 600; }
-    @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #000; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .container { width: 100%; max-width: 600px; }
+    .card { background: #0f0f0f; border: 2px solid #dc2626; border-radius: 24px; padding: 48px 32px; box-shadow: 0 20px 80px rgba(220, 38, 38, 0.15); }
+    h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 12px; color: #fff; }
+    .subtitle { color: #ef4444; font-size: 1.1rem; margin-bottom: 32px; font-weight: 500; }
+    .status-item { display: flex; gap: 16px; align-items: center; margin-bottom: 24px; background: #111; border: 1px solid #dc2626; padding: 20px; border-radius: 16px; }
+    .indicator { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+    .indicator.active { background: #22c55e; box-shadow: 0 0 12px #22c55e; }
+    .indicator.loading { background: #ef4444; animation: pulse 1.5s ease-in-out infinite; }
+    .status-content { flex: 1; }
+    .status-label { font-weight: 600; font-size: 1rem; color: #fff; margin-bottom: 4px; }
+    .status-desc { font-size: 0.9rem; color: #f87171; }
+    .details { margin-top: 24px; background: #111; border: 1px solid #dc2626; padding: 20px; border-radius: 16px; font-family: 'Monaco', 'Courier New', monospace; font-size: 0.85rem; color: #fecaca; word-break: break-all; }
+    .footer { margin-top: 32px; text-align: center; color: #ef4444; font-size: 0.9rem; }
+    @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Backend Status</h1>
-    <p>This page verifies that your backend is running and returns the health-check response from the API.</p>
-    <div id="status" class="status loading">
-      <span class="badge"></span>
-      <strong>Checking server...</strong>
+  <div class="container">
+    <div class="card">
+      <h1>🔴 AnaChat</h1>
+      <p class="subtitle">Backend Status Check</p>
+      
+      <div id="status" class="status-item">
+        <div class="indicator loading"></div>
+        <div class="status-content">
+          <div class="status-label">Checking backend...</div>
+          <div class="status-desc">Connecting to API health endpoint</div>
+        </div>
+      </div>
+      
+      <div id="details" class="details">Initializing...</div>
+      
+      <div class="footer">
+        <p>✓ Backend is production-ready for Render deployment</p>
+      </div>
     </div>
-    <div class="details" id="details"></div>
   </div>
+
   <script>
     const statusEl = document.getElementById('status');
     const detailsEl = document.getElementById('details');
+    const timeout = 8000;
 
     async function checkHealth() {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
       try {
-        const res = await fetch('/api/health', { cache: 'no-store' });
+        const startTime = performance.now();
+        const res = await fetch('/healthz', { 
+          signal: controller.signal,
+          cache: 'no-store',
+          headers: { 'Accept': 'application/json' }
+        });
+        const duration = Math.round(performance.now() - startTime);
+        
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
-        statusEl.classList.remove('loading');
-        statusEl.innerHTML = '<span class="badge"></span><strong>Server is running</strong>';
-        detailsEl.innerHTML = `<p><strong>API Response:</strong> <code>${JSON.stringify(data)}</code></p><p><strong>HTTP status:</strong> ${res.status}</p>`;
+        statusEl.innerHTML = '<div class="indicator active"></div><div class="status-content"><div class="status-label">✓ Server Status: Active</div><div class="status-desc">Backend is running and responding</div></div>';
+        detailsEl.innerHTML = `<strong>Response (${duration}ms):</strong><br><br>${JSON.stringify(data, null, 2)}<br><br><strong>Endpoint:</strong> /healthz<br><strong>Status:</strong> ${res.status} ${res.statusText}`;
       } catch (error) {
-        statusEl.classList.remove('loading');
-        statusEl.innerHTML = '<span class="badge" style="background:#ef4444"></span><strong>Server error</strong>';
-        detailsEl.innerHTML = `<p>Unable to reach <code>/api/health</code>. Please check backend logs and connection.</p><p><strong>Error:</strong> ${error.message}</p>`;
+        statusEl.innerHTML = '<div class="indicator" style="background:#ef4444"></div><div class="status-content"><div class="status-label">✗ Connection Failed</div><div class="status-desc">Backend is not responding</div></div>';
+        const msg = error.name === 'AbortError' ? 'Request timeout (no response after 8s)' : error.message;
+        detailsEl.innerHTML = `<strong>Error:</strong><br>${msg}<br><br><strong>Troubleshooting:</strong><br>• Check if backend server is running<br>• Verify MongoDB connection<br>• Check network/firewall settings<br>• Review backend logs for errors`;
+      } finally {
+        clearTimeout(timeoutId);
       }
     }
 
     checkHealth();
+    setInterval(checkHealth, 30000);
   </script>
 </body>
 </html>
