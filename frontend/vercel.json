@@ -7,7 +7,10 @@
     {
       "source": "/socket.io/:path*",
       "destination": "https://ana-chat.onrender.com/socket.io/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
-

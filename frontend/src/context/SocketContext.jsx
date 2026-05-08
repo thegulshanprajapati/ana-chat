@@ -21,7 +21,9 @@ export function SocketProvider({ children }) {
     try {
       s = io(SOCKET_BASE_URL, {
         withCredentials: true,
-        transports: ["websocket"]
+        // Vercel rewrites can proxy HTTP polling reliably, but WebSocket upgrades may fail.
+        // Allow Socket.IO to fall back to polling when websockets are blocked.
+        transports: ["polling", "websocket"]
       });
     } catch (err) {
       // eslint-disable-next-line no-console
