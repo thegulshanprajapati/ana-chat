@@ -13,8 +13,11 @@ function runtimeBaseUrl(rawBaseUrl, fallbackPort = "5173", isApiUrl = false) {
   // For API URLs, if no custom URL is provided and not in localhost, use relative path
   const fallback = (!hasHost || isFile)
     ? `http://localhost:${fallbackPort}`
-    : isApiUrl ? "/api" // Default to relative path for API
-    : `${protocol}//${hostname}:${fallbackPort}`;
+    : isApiUrl
+      ? "/api" // Default to relative path for API
+      : hostname === "localhost" || hostname === "127.0.0.1"
+        ? `${protocol}//${hostname}:${fallbackPort}`
+        : `${protocol}//${hostname}`;
     
   if (!rawBaseUrl) return fallback;
   if (rawBaseUrl.startsWith("/")) return rawBaseUrl.replace(/\/$/, "");
