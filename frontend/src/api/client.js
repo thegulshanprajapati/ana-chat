@@ -14,6 +14,7 @@ function runtimeBaseUrl(rawBaseUrl, fallbackPort = "5173") {
     ? `http://localhost:${fallbackPort}`
     : `${protocol}//${hostname}:${fallbackPort}`;
   if (!rawBaseUrl) return fallback;
+  if (rawBaseUrl.startsWith("/")) return rawBaseUrl.replace(/\/$/, "");
 
   try {
     const parsed = new URL(rawBaseUrl);
@@ -39,7 +40,7 @@ function runtimeBaseUrl(rawBaseUrl, fallbackPort = "5173") {
   }
 }
 
-export const API_BASE_URL = runtimeBaseUrl(import.meta.env.VITE_API_URL, "5000");
+export const API_BASE_URL = runtimeBaseUrl(import.meta.env.VITE_API_URL || "/api", "5000");
 export const SOCKET_BASE_URL = runtimeBaseUrl(import.meta.env.VITE_SOCKET_URL || API_BASE_URL, "5000");
 
 export const api = axios.create({

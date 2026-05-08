@@ -22,12 +22,14 @@ const DEFAULT_SETTINGS = {
   notificationsEnabled: true
 };
 
+const adminSecureCookies = process.env.NODE_ENV === "production" || process.env.FORCE_SECURE_COOKIES === "true";
 function adminCookieOptions() {
   return {
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 1000 * 60 * 60 * 24 * 30
+    sameSite: adminSecureCookies ? "none" : "lax",
+    secure: adminSecureCookies,
+    maxAge: 1000 * 60 * 60 * 24 * 30,
+    path: "/"
   };
 }
 

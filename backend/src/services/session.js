@@ -2,26 +2,30 @@ import { getDb } from "../db.js";
 import { signAccessToken, signRefreshToken } from "./tokens.js";
 import { sha256 } from "../utils/hash.js";
 
-const secureCookies = process.env.NODE_ENV === "production";
+const secureCookies = process.env.NODE_ENV === "production" || process.env.FORCE_SECURE_COOKIES === "true";
+const sameSitePolicy = secureCookies ? "none" : "lax";
+
+const cookieOptions = {
+  httpOnly: true,
+  sameSite: sameSitePolicy,
+  secure: secureCookies,
+  path: "/"
+};
 
 export function setAuthCookies(res, accessToken, refreshToken) {
   res.cookie("access_token", accessToken, {
-    httpOnly: true,
-    sameSite: secureCookies ? "none" : "lax",
-    secure: secureCookies,
+    ...cookieOptions,
     maxAge: 1000 * 60 * 15
   });
   res.cookie("refresh_token", refreshToken, {
-    httpOnly: true,
-    sameSite: secureCookies ? "none" : "lax",
-    secure: secureCookies,
+    ...cookieOptions,
     maxAge: 1000 * 60 * 60 * 24 * 365
   });
 }
 
 export function clearAuthCookies(res) {
-  res.clearCookie("access_token", { httpOnly: true, sameSite: secureCookies ? "none" : "lax", secure: secureCookies });
-  res.clearCookie("refresh_token", { httpOnly: true, sameSite: secureCookies ? "none" : "lax", secure: secureCookies });
+  res.clearCookie("access_token", cookieOptions);
+  res.clearCookie("refresh_token", cookieOptions);
 }
 
 function requestMeta(req) {
