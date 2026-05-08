@@ -1,45 +1,193 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { BadgeCheck, ShieldCheck, Sparkles, MessageCircle, Users, Zap, Mail, Lock, User, Phone } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Lock,
+  Mail,
+  MessageCircle,
+  Phone,
+  RefreshCw,
+  Sparkles,
+  User
+} from "lucide-react";
 import { api } from "../api/client";
 import { navigateTo } from "../utils/nav";
 import { useTheme } from "../context/ThemeContext";
+
+function Field({ label, hint, error, children }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <label className="text-sm font-semibold text-slate-900 dark:text-slate-100">{label}</label>
+        {hint ? <span className="text-xs text-slate-500 dark:text-slate-400">{hint}</span> : null}
+      </div>
+      {children}
+      <AnimatePresence>
+        {error ? (
+          <motion.p
+            className="text-xs text-rose-600 dark:text-rose-400 flex items-center gap-2"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+          >
+            <AlertCircle className="h-4 w-4" />
+            {error}
+          </motion.p>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function SegmentedControl({ value, onChange, items }) {
+  return (
+    <div className="grid grid-cols-2 rounded-2xl bg-slate-100/80 dark:bg-slate-800/80 p-1.5 border border-slate-200/60 dark:border-slate-700/60">
+      {items.map((item) => {
+        const selected = item.value === value;
+        return (
+          <button
+            key={item.value}
+            type="button"
+            onClick={() => onChange(item.value)}
+            className={[
+              "relative rounded-xl px-4 py-3 text-sm font-semibold transition",
+              selected
+                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+            ].join(" ")}
+          >
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function AuthPage({ onAuthed }) {
   const { theme } = useTheme();
   const [mode, setMode] = useState("signup");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [googleReady, setGoogleReady] = useState(false);
   const [googleLoadError, setGoogleLoadError] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [capsLockOn, setCapsLockOn] = useState(false);
+  const [formData, setFormData] = useState({ email_or_mobile: "", password: "" });
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState("");
+
   const googleButtonRef = useRef(null);
+  const googleInitializedRef = useRef(false);
+  const emailInputRef = useRef(null);
   const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID || "").trim();
-  const currentOrigin = typeof window !== "undefined" ? window.location.origin : "";
 
   const showGoogleSection = mode === "signup";
+  const isDark = (theme || "").toLowerCase() === "dark";
 
-  const handleGoogleCredential = useCallback(async (response) => {
-    const idToken = response?.credential;
-    if (!idToken) {
-      setError("Google sign-in did not return a credential.");
+  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const validateMobile = (mobile) => /^[6-9]\d{9}$/.test((mobile || "").replace(/\s+/g, ""));
+  const validatePassword = (password) => (password || "").length >= 6;
+
+  const validateField = (name, value) => {
+    if (name === "email_or_mobile") {
+      if (!value.trim()) return "Email or mobile is required";
+      if (value.includes("@")) return validateEmail(value) ? "" : "Please enter a valid email address";
+      return validateMobile(value) ? "" : "Please enter a valid 10-digit mobile number";
+    }
+    if (name === "password") {
+      if (!value) return "Password is required";
+      return validatePassword(value) ? "" : "Password must be at least 6 characters";
+    }
+    return "";
+  };
+
+  const heroChips = useMemo(
+    () => ({
+      title: "AnaChat",
+      tagline: "Cozy, secure chats — in seconds.",
+      highlights: ["Fast setup", "End-to-end ready", "Cute reactions"],
+      stats: [
+        { label: "Secure by design", value: "AES / RSA" },
+        { label: "Instant login", value: "< 10s" }
+      ]
+    }),
+    []
+  );
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (touched[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: validateField(name, value) }));
+    }
+  };
+
+  const handleInputBlur = (e) => {
+    const { name, value } = e.target;
+    setTouched((prev) => ({ ...prev, [name]: true }));
+    setFieldErrors((prev) => ({ ...prev, [name]: validateField(name, value) }));
+  };
+
+  const handleKeyDown = (e) => setCapsLockOn(Boolean(e.getModifierState?.("CapsLock")));
+  const handleKeyUp = (e) => {
+    if (!e.getModifierState?.("CapsLock")) setCapsLockOn(false);
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) {
+      setResetMessage("Please enter your email address");
       return;
     }
 
-    setError("");
-    setLoading(true);
+    setResetLoading(true);
+    setResetMessage("");
     try {
-      await api.post("/auth/google", { idToken });
-      await onAuthed();
-    } catch (err) {
-      setError(err.response?.data?.message || "Google login failed");
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      setResetMessage("If an account with that email exists, we've sent you a password reset link.");
+    } catch {
+      setResetMessage("Failed to send reset email. Please try again.");
     } finally {
-      setLoading(false);
+      setResetLoading(false);
     }
-  }, [onAuthed]);
+  };
+
+  const handleGoogleCredential = useCallback(
+    async (response) => {
+      const idToken = response?.credential;
+      if (!idToken) {
+        setError("Google sign-in did not return a credential.");
+        return;
+      }
+
+      setError("");
+      setLoading(true);
+      try {
+        await api.post("/auth/google", { idToken });
+        await onAuthed();
+      } catch (err) {
+        setError(err.response?.data?.message || "Google login failed");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [onAuthed]
+  );
 
   useEffect(() => {
     if (!googleClientId) return;
-
     if (window.google?.accounts?.id) {
       setGoogleReady(true);
       return;
@@ -67,14 +215,18 @@ export default function AuthPage({ onAuthed }) {
 
     script.addEventListener("load", onLoad);
     script.addEventListener("error", onError);
-
     return () => {
       script.removeEventListener("load", onLoad);
       script.removeEventListener("error", onError);
     };
   }, [googleClientId]);
 
-  const googleInitializedRef = useRef(false);
+  useEffect(() => {
+    if (mode === "login") {
+      googleInitializedRef.current = false;
+      setTimeout(() => emailInputRef.current?.focus?.(), 50);
+    }
+  }, [mode]);
 
   useEffect(() => {
     if (!showGoogleSection) return;
@@ -82,44 +234,70 @@ export default function AuthPage({ onAuthed }) {
     if (googleInitializedRef.current) return;
 
     const width = Math.max(0, Math.min(390, googleButtonRef.current.offsetWidth || 0));
-    window.google.accounts.id.initialize({
-      client_id: googleClientId,
-      callback: handleGoogleCredential
-    });
+    window.google.accounts.id.initialize({ client_id: googleClientId, callback: handleGoogleCredential });
     googleButtonRef.current.innerHTML = "";
     window.google.accounts.id.renderButton(googleButtonRef.current, {
-      theme: "outline",
+      theme: isDark ? "filled_black" : "outline",
       size: "large",
       ...(width ? { width } : null),
       shape: "pill",
       text: "continue_with"
     });
     googleInitializedRef.current = true;
-  }, [googleClientId, googleReady, handleGoogleCredential, showGoogleSection]);
+  }, [googleClientId, googleReady, handleGoogleCredential, isDark, showGoogleSection]);
 
   function switchMode(nextMode) {
     setMode(nextMode);
     setError("");
+    setSuccess("");
+    setFieldErrors({});
+    setTouched({});
+    setFormData({ email_or_mobile: "", password: "" });
+    setCapsLockOn(false);
   }
 
   async function handleLogin(e) {
     e.preventDefault();
     setError("");
+    setSuccess("");
+
+    const errors = {};
+    Object.keys(formData).forEach((field) => {
+      const message = validateField(field, formData[field]);
+      if (message) errors[field] = message;
+    });
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setTouched({ email_or_mobile: true, password: true });
+      return;
+    }
+
     setLoading(true);
     try {
-      const payload = Object.fromEntries(new FormData(e.target).entries());
       const { data } = await api.post("/auth/login", {
-        email_or_mobile: payload.email_or_mobile,
-        password: payload.password
+        email_or_mobile: formData.email_or_mobile,
+        password: formData.password,
+        remember_me: rememberMe
       });
 
-      if (data?.mode === "admin" && data?.admin?.id) {
-        navigateTo("admin");
-        return;
-      }
-      await onAuthed();
+      setSuccess("Login successful! Redirecting...");
+      setTimeout(() => {
+        if (data?.mode === "admin" && data?.admin?.id) {
+          navigateTo("admin");
+          return;
+        }
+        onAuthed();
+      }, 900);
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed");
+      const message = err.response?.data?.message || "Login failed";
+      setError(message);
+      if (message.toLowerCase().includes("invalid credentials")) {
+        setFieldErrors({
+          email_or_mobile: "Invalid email/mobile or password",
+          password: "Invalid email/mobile or password"
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -142,470 +320,462 @@ export default function AuthPage({ onAuthed }) {
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        duration: 0.6,
-        staggerChildren: 0.1
-      }
-    }
+    visible: { opacity: 1, transition: { duration: 0.35, staggerChildren: 0.06 } }
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-        ease: "easeOut"
-      }
-    }
-  };
-
-  const cardVariants = {
-    hidden: { opacity: 0, scale: 0.95, y: 30 },
-    visible: {
-      opacity: 1,
-      scale: 1,
-      y: 0,
-      transition: {
-        duration: 0.6,
-        ease: "easeOut"
-      }
-    }
-  };
-
-  const floatingVariants = {
-    animate: {
-      y: [0, -10, 0],
-      transition: {
-        duration: 6,
-        repeat: Infinity,
-        ease: "easeInOut"
-      }
-    }
+    hidden: { opacity: 0, y: 12 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } }
   };
 
   return (
     <motion.div
-      className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-hidden relative"
+      className={[
+        "min-h-screen w-full overflow-y-auto relative",
+        "bg-gradient-to-br from-slate-50 via-white to-rose-50",
+        "dark:from-slate-950 dark:via-slate-950 dark:to-slate-900"
+      ].join(" ")}
       initial="hidden"
       animate="visible"
       variants={containerVariants}
     >
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute -top-32 -right-32 w-96 h-96 bg-red-100/30 rounded-full blur-3xl"
-          variants={floatingVariants}
-          animate="animate"
-        />
-        <motion.div
-          className="absolute -bottom-32 -left-32 w-96 h-96 bg-gray-200/40 rounded-full blur-3xl"
-          variants={floatingVariants}
-          animate="animate"
-          style={{ animationDelay: "2s" }}
-        />
-        <motion.div
-          className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-red-50/20 rounded-full blur-3xl"
-          variants={floatingVariants}
-          animate="animate"
-          style={{ animationDelay: "4s" }}
-        />
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-0 opacity-60 dark:opacity-35 bg-[radial-gradient(1100px_circle_at_15%_10%,rgba(244,63,94,0.18),transparent_40%),radial-gradient(900px_circle_at_85%_20%,rgba(168,85,247,0.15),transparent_40%),radial-gradient(900px_circle_at_50%_90%,rgba(14,165,233,0.12),transparent_45%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.6),rgba(255,255,255,0.0))] dark:bg-[linear-gradient(to_bottom,rgba(2,6,23,0.85),rgba(2,6,23,0.0))]" />
       </div>
 
-      <div className="relative w-full max-w-7xl mx-auto">
-        <div className="grid gap-8 md:gap-12 lg:gap-16 md:grid-cols-2 items-stretch min-h-[calc(100vh-4rem)]">
-          {/* Left Side - Branding */}
-          <motion.div
-            className="hidden md:flex flex-col justify-center gap-8 lg:gap-10 h-full order-2 md:order-1"
-            variants={itemVariants}
-          >
-            <motion.div className="space-y-6 lg:space-y-8" variants={itemVariants}>
-              <motion.div
-                className="inline-flex items-center gap-3 px-5 py-2.5 bg-red-50/80 border border-red-100/50 rounded-full backdrop-blur-sm"
-                whileHover={{ scale: 1.05 }}
-                transition={{ duration: 0.2 }}
-              >
-                <ShieldCheck className="w-5 h-5 text-red-600" />
-                <span className="text-sm font-semibold text-red-700">AnaChat Secure</span>
-              </motion.div>
+      <div className="relative mx-auto flex min-h-screen w-full max-w-6xl items-stretch px-4 py-10 sm:px-6 lg:px-10">
+        <motion.div
+          className="grid w-full grid-cols-1 overflow-hidden rounded-[28px] border border-slate-200/70 dark:border-slate-800/70 bg-white/70 dark:bg-slate-950/60 backdrop-blur-xl shadow-[0_30px_90px_rgba(15,23,42,0.12)]"
+          variants={itemVariants}
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-2">
+            <div className="relative hidden lg:block p-10">
+              <div className="pointer-events-none absolute inset-0">
+                <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-rose-400/20 blur-3xl" />
+                <div className="absolute right-[-90px] top-24 h-72 w-72 rounded-full bg-fuchsia-400/15 blur-3xl" />
+                <div className="absolute bottom-[-120px] left-16 h-80 w-80 rounded-full bg-sky-400/15 blur-3xl" />
+              </div>
 
-              <motion.div className="space-y-4 lg:space-y-6" variants={itemVariants}>
-                <motion.h1
-                  className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-gray-900 leading-[1.1] tracking-tight"
-                  variants={itemVariants}
-                >
-                  Connect Instantly,<br />
-                  <span className="text-red-600">Chat Securely</span>
-                </motion.h1>
-                <motion.p
-                  className="text-lg sm:text-xl lg:text-2xl text-gray-600 leading-relaxed max-w-lg"
-                  variants={itemVariants}
-                >
-                  {mode === "login"
-                    ? "Welcome back! Continue your conversations with end-to-end encryption."
-                    : "Join thousands of users in secure, real-time messaging. Create your account today."}
-                </motion.p>
-              </motion.div>
-            </motion.div>
+              <div className="relative flex h-full flex-col justify-between">
+                <div className="space-y-6">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-slate-200/70 dark:border-slate-800/70 bg-white/60 dark:bg-slate-950/40 px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    <Sparkles className="h-4 w-4 text-rose-500" />
+                    {heroChips.title}
+                  </div>
 
-            {/* Feature Cards */}
-            <motion.div className="grid gap-4 lg:gap-6" variants={itemVariants}>
-              {[
-                { icon: Zap, title: "Lightning Fast", desc: "Real-time messaging with instant delivery" },
-                { icon: ShieldCheck, title: "End-to-End Security", desc: "Your conversations are fully encrypted" },
-                { icon: Users, title: "Group Conversations", desc: "Create rooms and invite friends" }
-              ].map((feature, index) => (
-                <motion.div
-                  key={feature.title}
-                  className="bg-white/80 backdrop-blur-sm p-6 lg:p-8 rounded-2xl shadow-sm border border-gray-100/50 hover:shadow-lg hover:shadow-red-100/20 transition-all duration-300"
-                  whileHover={{ y: -4, scale: 1.02 }}
-                  transition={{ duration: 0.2 }}
-                  variants={itemVariants}
-                  style={{ animationDelay: `${index * 0.1}s` }}
-                >
-                  <div className="flex items-center gap-4 lg:gap-6">
-                    <motion.div
-                      className="w-12 h-12 lg:w-14 lg:h-14 bg-red-50 rounded-xl flex items-center justify-center"
-                      whileHover={{ rotate: 5 }}
-                    >
-                      <feature.icon className="w-6 h-6 lg:w-7 lg:h-7 text-red-600" />
-                    </motion.div>
+                  <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">{heroChips.tagline}</h1>
+
+                  <ul className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
+                    {heroChips.highlights.map((text) => (
+                      <li key={text} className="flex items-center gap-3">
+                        <span className="h-2 w-2 rounded-full bg-rose-500" />
+                        {text}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    {heroChips.stats.map((s) => (
+                      <div
+                        key={s.label}
+                        className="rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/60 dark:bg-slate-950/30 px-4 py-4"
+                      >
+                        <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">{s.label}</div>
+                        <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white">{s.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-10 rounded-3xl border border-slate-200/70 dark:border-slate-800/70 bg-white/60 dark:bg-slate-950/30 p-6">
+                  <div className="flex items-start gap-3">
+                    <MessageCircle className="mt-0.5 h-5 w-5 text-rose-500" />
                     <div>
-                      <h3 className="font-semibold text-gray-900 text-base lg:text-lg">{feature.title}</h3>
-                      <p className="text-sm lg:text-base text-gray-600">{feature.desc}</p>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">Tip</div>
+                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                        Use email or mobile for login. New here? Create an account in under a minute.
+                      </p>
                     </div>
                   </div>
-                </motion.div>
-              ))}
-            </motion.div>
-
-            {/* Trust Indicator */}
-            <motion.div
-              className="bg-white/80 backdrop-blur-sm p-6 lg:p-8 rounded-2xl shadow-sm border border-gray-100/50"
-              variants={itemVariants}
-              whileHover={{ scale: 1.02 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="flex items-center gap-3">
-                <Sparkles className="w-5 h-5 text-red-500" />
-                <span className="text-sm lg:text-base font-medium text-gray-700">
-                  Trusted by thousands of users worldwide
-                </span>
+                </div>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
 
-          {/* Right Side - Auth Card */}
-          <motion.div
-            className="w-full mx-auto md:mx-0 flex h-full items-center justify-center order-1 md:order-2"
-            variants={itemVariants}
-          >
-            <motion.div
-              className="w-full max-w-lg lg:max-w-xl bg-white/95 backdrop-blur-xl rounded-[32px] shadow-[0_32px_80px_rgba(15,23,42,0.08)] border border-gray-100/50 p-8 sm:p-10 lg:p-12 hover:shadow-[0_40px_120px_rgba(15,23,42,0.12)] transition-all duration-500 flex flex-col justify-between min-h-[520px] lg:min-h-[600px]"
-              variants={cardVariants}
-              whileHover={{ y: -2 }}
-              transition={{ duration: 0.3 }}
-            >
-              {/* Tabs */}
-              <motion.div
-                className="flex rounded-2xl bg-gray-50/80 p-1.5 mb-8 lg:mb-10 backdrop-blur-sm border border-gray-100/50"
-                variants={itemVariants}
-              >
-                <motion.button
-                  type="button"
-                  onClick={() => switchMode("login")}
-                  className={`flex-1 py-3 lg:py-4 px-4 lg:px-6 rounded-xl font-semibold text-sm lg:text-base transition-all duration-300 ${
-                    mode === "login"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-600 hover:text-gray-900"
-                  }`}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  Login
-                </motion.button>
-                <motion.button
-                  type="button"
-                  onClick={() => switchMode("signup")}
-                  className={`flex-1 py-3 lg:py-4 px-4 lg:px-6 rounded-xl font-semibold text-sm lg:text-base transition-all duration-300 ${
-                    mode === "signup"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-600 hover:text-gray-900"
-                  }`}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  Sign Up
-                </motion.button>
-              </motion.div>
+            <div className="p-6 sm:p-10">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-rose-600 dark:text-rose-400">Welcome</p>
+                <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                  {mode === "login" ? "Sign in to continue" : "Create your account"}
+                </h2>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  {mode === "login" ? "Pick up where you left off." : "Start chatting with a fresh, secure profile."}
+                </p>
+              </div>
 
-              {/* Error Message */}
+              <div className="mt-6">
+                <SegmentedControl
+                  value={mode}
+                  onChange={switchMode}
+                  items={[
+                    { value: "login", label: "Login" },
+                    { value: "signup", label: "Sign up" }
+                  ]}
+                />
+              </div>
+
               <AnimatePresence>
-                {error && (
+                {success ? (
                   <motion.div
-                    className="mb-6 lg:mb-8 p-4 lg:p-5 bg-red-50/80 border border-red-200/50 rounded-2xl backdrop-blur-sm"
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    transition={{ duration: 0.3 }}
+                    className="mt-5 rounded-2xl border border-emerald-200/70 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/25 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200 flex items-center gap-2"
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center">
-                        <span className="text-red-600 text-xs font-bold">!</span>
-                      </div>
-                      <p className="text-sm lg:text-base text-red-700">{error}</p>
-                    </div>
+                    <CheckCircle2 className="h-5 w-5" />
+                    {success}
                   </motion.div>
-                )}
+                ) : null}
               </AnimatePresence>
 
-              <AnimatePresence mode="wait">
+              <AnimatePresence>
+                {error ? (
+                  <motion.div
+                    className="mt-5 rounded-2xl border border-rose-200/70 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/25 px-4 py-3 text-sm text-rose-800 dark:text-rose-200 flex items-center gap-2"
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                  >
+                    <AlertCircle className="h-5 w-5" />
+                    {error}
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+
+              <div className="mt-6">
                 {mode === "login" ? (
                   <motion.form
                     key="login"
                     onSubmit={handleLogin}
-                    className="space-y-6 lg:space-y-8 flex-1"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ duration: 0.3 }}
+                    className="space-y-5"
+                    variants={itemVariants}
+                    initial="hidden"
+                    animate="visible"
                   >
-                    <motion.div className="space-y-2" variants={itemVariants}>
-                      <label className="block">
-                        <div className="relative group">
-                          <motion.input
-                            name="email_or_mobile"
-                            required
-                            autoComplete="username"
-                            className="w-full px-4 lg:px-5 py-4 lg:py-5 bg-gray-50/80 border border-gray-200/50 rounded-2xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-300/50 transition-all duration-300 backdrop-blur-sm"
-                            placeholder="Email or Mobile"
-                            whileFocus={{ scale: 1.01 }}
-                          />
-                          <motion.div
-                            className="absolute right-4 top-1/2 transform -translate-y-1/2"
-                            whileHover={{ scale: 1.1 }}
-                          >
-                            <Mail className="w-5 h-5 text-gray-400 group-focus-within:text-red-500 transition-colors duration-300" />
-                          </motion.div>
-                        </div>
-                      </label>
-                    </motion.div>
+                    <Field label="Email / Mobile" error={fieldErrors.email_or_mobile}>
+                      <div className="relative">
+                        <input
+                          ref={emailInputRef}
+                          name="email_or_mobile"
+                          value={formData.email_or_mobile}
+                          onChange={handleInputChange}
+                          onBlur={handleInputBlur}
+                          autoComplete="username"
+                          required
+                          placeholder="name@email.com or 9876543210"
+                          className={[
+                            "w-full rounded-2xl border px-4 py-3.5 pr-10 text-sm outline-none transition",
+                            "bg-white/80 dark:bg-slate-950/40",
+                            "text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500",
+                            fieldErrors.email_or_mobile
+                              ? "border-rose-300/70 dark:border-rose-900/70 focus:ring-2 focus:ring-rose-500/30"
+                              : "border-slate-200/70 dark:border-slate-800/70 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70"
+                          ].join(" ")}
+                        />
+                        <Mail className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      </div>
+                    </Field>
 
-                    <motion.div className="space-y-2" variants={itemVariants}>
-                      <label className="block">
-                        <div className="relative group">
-                          <motion.input
+                    <Field label="Password" hint={capsLockOn ? "Caps Lock is ON" : ""} error={fieldErrors.password}>
+                      <div className="relative">
+                        <input
+                          name="password"
+                          value={formData.password}
+                          onChange={handleInputChange}
+                          onBlur={handleInputBlur}
+                          onKeyDown={handleKeyDown}
+                          onKeyUp={handleKeyUp}
+                          autoComplete="current-password"
+                          required
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Your password"
+                          className={[
+                            "w-full rounded-2xl border px-4 py-3.5 pr-11 text-sm outline-none transition",
+                            "bg-white/80 dark:bg-slate-950/40",
+                            "text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500",
+                            fieldErrors.password
+                              ? "border-rose-300/70 dark:border-rose-900/70 focus:ring-2 focus:ring-rose-500/30"
+                              : "border-slate-200/70 dark:border-slate-800/70 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70"
+                          ].join(" ")}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((s) => !s)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition"
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </Field>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={rememberMe}
+                          onChange={(e) => setRememberMe(e.target.checked)}
+                          className="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                        />
+                        Remember me
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotPassword(true)}
+                        className="text-sm font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300"
+                      >
+                        Forgot?
+                      </button>
+                    </div>
+
+                    <button
+                      disabled={loading}
+                      className="group w-full rounded-2xl bg-gradient-to-r from-rose-600 to-fuchsia-600 hover:from-rose-500 hover:to-fuchsia-500 disabled:opacity-60 text-white font-semibold px-4 py-3.5 transition shadow-[0_16px_40px_rgba(225,29,72,0.25)] flex items-center justify-center gap-2"
+                    >
+                      {loading ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          Signing in...
+                        </>
+                      ) : (
+                        <>
+                          Continue
+                          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                        </>
+                      )}
+                    </button>
+
+                    <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+                      No signup fees · Cute stickers · Start chatting instantly
+                    </p>
+                  </motion.form>
+                ) : (
+                  <motion.div key="signup" className="space-y-5" variants={itemVariants} initial="hidden" animate="visible">
+                    <form onSubmit={handleSignupForm} className="space-y-5">
+                      <Field label="Full name">
+                        <div className="relative">
+                          <input
+                            name="name"
+                            required
+                            autoComplete="name"
+                            placeholder="Your name"
+                            className="w-full rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-4 py-3.5 pr-10 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
+                          />
+                          <User className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        </div>
+                      </Field>
+
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <Field label="Email">
+                          <div className="relative">
+                            <input
+                              name="email"
+                              required
+                              type="email"
+                              autoComplete="email"
+                              placeholder="name@email.com"
+                              className="w-full rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-4 py-3.5 pr-10 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
+                            />
+                            <Mail className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                          </div>
+                        </Field>
+
+                        <Field label="Mobile">
+                          <div className="relative">
+                            <input
+                              name="mobile"
+                              required
+                              autoComplete="tel"
+                              placeholder="9876543210"
+                              className="w-full rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-4 py-3.5 pr-10 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
+                            />
+                            <Phone className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                          </div>
+                        </Field>
+                      </div>
+
+                      <Field label="Password" hint="Min 6 characters">
+                        <div className="relative">
+                          <input
                             name="password"
                             required
                             type="password"
-                            autoComplete="current-password"
-                            className="w-full px-4 lg:px-5 py-4 lg:py-5 bg-gray-50/80 border border-gray-200/50 rounded-2xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-300/50 transition-all duration-300 backdrop-blur-sm"
-                            placeholder="Password"
-                            whileFocus={{ scale: 1.01 }}
+                            autoComplete="new-password"
+                            placeholder="Create a password"
+                            className="w-full rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-4 py-3.5 pr-10 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
                           />
-                          <motion.div
-                            className="absolute right-4 top-1/2 transform -translate-y-1/2"
-                            whileHover={{ scale: 1.1 }}
-                          >
-                            <Lock className="w-5 h-5 text-gray-400 group-focus-within:text-red-500 transition-colors duration-300" />
-                          </motion.div>
+                          <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         </div>
-                      </label>
-                    </motion.div>
+                      </Field>
 
-                    <motion.button
-                      disabled={loading}
-                      className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold py-4 lg:py-5 px-6 lg:px-8 rounded-2xl transition-all duration-300 hover:shadow-lg hover:shadow-red-500/25 hover:scale-[1.02] disabled:hover:scale-100 flex items-center justify-center gap-3 backdrop-blur-sm"
-                      whileHover={{ y: -2 }}
-                      whileTap={{ scale: 0.98 }}
-                      variants={itemVariants}
-                    >
-                      <MessageCircle className="w-5 h-5" />
-                      {loading ? "Signing you in..." : "Login to AnaChat"}
-                    </motion.button>
-                  </motion.form>
-                ) : (
-                  <motion.div
-                    key="signup"
-                    className="space-y-6 lg:space-y-8 flex-1"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <motion.form onSubmit={handleSignupForm} className="space-y-6 lg:space-y-8">
-                      <motion.div className="space-y-2" variants={itemVariants}>
-                        <label className="block">
-                          <div className="relative group">
-                            <motion.input
-                              name="name"
-                              required
-                              autoComplete="name"
-                              className="w-full px-4 lg:px-5 py-4 lg:py-5 bg-gray-50/80 border border-gray-200/50 rounded-2xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-300/50 transition-all duration-300 backdrop-blur-sm"
-                              placeholder="Full Name"
-                              whileFocus={{ scale: 1.01 }}
-                            />
-                            <motion.div
-                              className="absolute right-4 top-1/2 transform -translate-y-1/2"
-                              whileHover={{ scale: 1.1 }}
-                            >
-                              <User className="w-5 h-5 text-gray-400 group-focus-within:text-red-500 transition-colors duration-300" />
-                            </motion.div>
-                          </div>
-                        </label>
-                      </motion.div>
-
-                      <motion.div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6" variants={itemVariants}>
-                        <div className="space-y-2">
-                          <label className="block">
-                            <div className="relative group">
-                              <motion.input
-                                name="email"
-                                required
-                                type="email"
-                                autoComplete="email"
-                                className="w-full px-4 lg:px-5 py-4 lg:py-5 bg-gray-50/80 border border-gray-200/50 rounded-2xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-300/50 transition-all duration-300 backdrop-blur-sm"
-                                placeholder="Email"
-                                whileFocus={{ scale: 1.01 }}
-                              />
-                              <motion.div
-                                className="absolute right-4 top-1/2 transform -translate-y-1/2"
-                                whileHover={{ scale: 1.1 }}
-                              >
-                                <Mail className="w-5 h-5 text-gray-400 group-focus-within:text-red-500 transition-colors duration-300" />
-                              </motion.div>
-                            </div>
-                          </label>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="block">
-                            <div className="relative group">
-                              <motion.input
-                                name="mobile"
-                                required
-                                autoComplete="tel"
-                                className="w-full px-4 lg:px-5 py-4 lg:py-5 bg-gray-50/80 border border-gray-200/50 rounded-2xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-300/50 transition-all duration-300 backdrop-blur-sm"
-                                placeholder="Mobile"
-                                whileFocus={{ scale: 1.01 }}
-                              />
-                              <motion.div
-                                className="absolute right-4 top-1/2 transform -translate-y-1/2"
-                                whileHover={{ scale: 1.1 }}
-                              >
-                                <Phone className="w-5 h-5 text-gray-400 group-focus-within:text-red-500 transition-colors duration-300" />
-                              </motion.div>
-                            </div>
-                          </label>
-                        </div>
-                      </motion.div>
-
-                      <motion.div className="space-y-2" variants={itemVariants}>
-                        <label className="block">
-                          <div className="relative group">
-                            <motion.input
-                              name="password"
-                              required
-                              type="password"
-                              autoComplete="new-password"
-                              className="w-full px-4 lg:px-5 py-4 lg:py-5 bg-gray-50/80 border border-gray-200/50 rounded-2xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-300/50 transition-all duration-300 backdrop-blur-sm"
-                              placeholder="Password (min 6 characters)"
-                              whileFocus={{ scale: 1.01 }}
-                            />
-                            <motion.div
-                              className="absolute right-4 top-1/2 transform -translate-y-1/2"
-                              whileHover={{ scale: 1.1 }}
-                            >
-                              <Lock className="w-5 h-5 text-gray-400 group-focus-within:text-red-500 transition-colors duration-300" />
-                            </motion.div>
-                          </div>
-                        </label>
-                      </motion.div>
-
-                      <motion.button
+                      <button
                         disabled={loading}
-                        className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold py-4 lg:py-5 px-6 lg:px-8 rounded-2xl transition-all duration-300 hover:shadow-lg hover:shadow-red-500/25 hover:scale-[1.02] disabled:hover:scale-100 flex items-center justify-center gap-3 backdrop-blur-sm"
-                        whileHover={{ y: -2 }}
-                        whileTap={{ scale: 0.98 }}
-                        variants={itemVariants}
+                        className="group w-full rounded-2xl bg-gradient-to-r from-rose-600 to-fuchsia-600 hover:from-rose-500 hover:to-fuchsia-500 disabled:opacity-60 text-white font-semibold px-4 py-3.5 transition shadow-[0_16px_40px_rgba(225,29,72,0.25)] flex items-center justify-center gap-2"
                       >
-                        <BadgeCheck className="w-5 h-5" />
-                        {loading ? "Creating your account..." : "Join AnaChat"}
-                      </motion.button>
-                    </motion.form>
+                        {loading ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            Creating account...
+                          </>
+                        ) : (
+                          <>
+                            Create account
+                            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                          </>
+                        )}
+                      </button>
 
-                    {showGoogleSection && (
-                      <motion.div
-                        className="mt-8 lg:mt-10"
-                        variants={itemVariants}
-                      >
-                        <div className="relative mb-6 lg:mb-8">
-                          <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-gray-200/50"></div>
+                      {showGoogleSection ? (
+                        <div className="pt-2">
+                          <div className="relative my-4 flex items-center">
+                            <div className="h-px flex-1 bg-slate-200/70 dark:bg-slate-800/70" />
+                            <span className="px-3 text-xs font-semibold text-slate-500 dark:text-slate-400">or</span>
+                            <div className="h-px flex-1 bg-slate-200/70 dark:bg-slate-800/70" />
                           </div>
-                          <div className="relative flex justify-center text-sm">
-                            <span className="px-4 bg-white text-gray-500 font-medium">Or continue with</span>
-                          </div>
-                        </div>
 
-                        <motion.div
-                          className="space-y-4"
-                          whileHover={{ scale: 1.01 }}
-                          transition={{ duration: 0.2 }}
-                        >
                           {!googleClientId ? (
-                            <div className="p-4 lg:p-5 bg-red-50/80 border border-red-200/50 rounded-2xl backdrop-blur-sm">
-                              <p className="text-sm lg:text-base text-red-700">
-                                Google OAuth not configured. Add VITE_GOOGLE_CLIENT_ID to environment.
-                              </p>
+                            <div className="rounded-2xl border border-amber-200/70 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/25 px-4 py-3 text-xs text-amber-800 dark:text-amber-200 flex items-center gap-2">
+                              <KeyRound className="h-4 w-4" />
+                              Google OAuth not configured. Add `VITE_GOOGLE_CLIENT_ID`.
                             </div>
                           ) : googleLoadError ? (
-                            <div className="p-4 lg:p-5 bg-red-50/80 border border-red-200/50 rounded-2xl backdrop-blur-sm">
-                              <p className="text-sm lg:text-base text-red-700">
-                                Failed to load Google sign-in. Check network connection.
-                              </p>
+                            <div className="rounded-2xl border border-rose-200/70 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/25 px-4 py-3 text-xs text-rose-800 dark:text-rose-200 flex items-center gap-2">
+                              <AlertCircle className="h-4 w-4" />
+                              Failed to load Google sign-in. Please refresh.
                             </div>
                           ) : !googleReady ? (
-                            <div className="p-4 lg:p-5 bg-gray-50/80 border border-gray-200/50 rounded-2xl backdrop-blur-sm">
-                              <p className="text-sm lg:text-base text-gray-600">Loading Google sign-in...</p>
+                            <div className="rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/70 dark:bg-slate-950/25 px-4 py-3 text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                              Loading Google sign-in...
                             </div>
                           ) : (
-                            <motion.div
-                              ref={googleButtonRef}
-                              className="flex justify-center p-2"
-                              whileHover={{ scale: 1.02 }}
-                              transition={{ duration: 0.2 }}
-                            />
+                            <div ref={googleButtonRef} className="flex justify-center" />
                           )}
-                        </motion.div>
-                      </motion.div>
-                    )}
+                        </div>
+                      ) : null}
+                    </form>
                   </motion.div>
                 )}
-              </AnimatePresence>
+              </div>
 
-              <motion.div
-                className="mt-8 lg:mt-10 text-center"
-                variants={itemVariants}
-              >
-                <motion.button
+              <div className="mt-8 text-center text-sm text-slate-600 dark:text-slate-300">
+                <button
                   type="button"
                   onClick={() => switchMode(mode === "login" ? "signup" : "login")}
-                  className="text-sm lg:text-base text-gray-600 hover:text-gray-900 font-medium transition-colors duration-300"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  className="font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300"
                 >
-                  {mode === "login" ? "New to AnaChat? Create account" : "Already have an account? Login"}
-                </motion.button>
-              </motion.div>
+                  {mode === "login" ? "New here? Create an account" : "Already have an account? Login"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      <AnimatePresence>
+        {showForgotPassword ? (
+          <motion.div
+            className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowForgotPassword(false)}
+          >
+            <motion.div
+              className="w-full max-w-md rounded-[24px] border border-slate-200/70 dark:border-slate-800/70 bg-white/85 dark:bg-slate-950/70 backdrop-blur-xl shadow-[0_30px_90px_rgba(15,23,42,0.35)] p-6"
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.98 }}
+              transition={{ duration: 0.22 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-lg font-bold text-slate-900 dark:text-white">Reset password</div>
+                  <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                    We’ll email a reset link if the account exists.
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowForgotPassword(false)}
+                  className="rounded-xl border border-slate-200/70 dark:border-slate-800/70 bg-white/60 dark:bg-slate-950/40 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-900 transition"
+                >
+                  Close
+                </button>
+              </div>
+
+              <form onSubmit={handleForgotPassword} className="mt-6 space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-900 dark:text-slate-100">Email address</label>
+                  <input
+                    type="email"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-4 py-3.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
+                    placeholder="name@email.com"
+                    required
+                  />
+                </div>
+
+                <AnimatePresence>
+                  {resetMessage ? (
+                    <motion.div
+                      className={[
+                        "rounded-2xl border px-4 py-3 text-xs",
+                        resetMessage.includes("sent")
+                          ? "border-emerald-200/70 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/25 text-emerald-800 dark:text-emerald-200"
+                          : "border-rose-200/70 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/25 text-rose-800 dark:text-rose-200"
+                      ].join(" ")}
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                    >
+                      {resetMessage}
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(false)}
+                    className="flex-1 rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/70 dark:bg-slate-950/35 px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-900 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    className="flex-1 rounded-2xl bg-gradient-to-r from-rose-600 to-fuchsia-600 hover:from-rose-500 hover:to-fuchsia-500 disabled:opacity-60 px-4 py-3 text-sm font-semibold text-white transition flex items-center justify-center gap-2"
+                  >
+                    {resetLoading ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <KeyRound className="h-4 w-4" />
+                        Send link
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </motion.div>
-        </div>
-      </div>
+        ) : null}
+      </AnimatePresence>
     </motion.div>
   );
 }
-

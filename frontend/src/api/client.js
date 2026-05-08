@@ -1,6 +1,6 @@
 import axios from "axios";
 
-function runtimeBaseUrl(rawBaseUrl, fallbackPort = "5173") {
+function runtimeBaseUrl(rawBaseUrl, fallbackPort = "5173", isApiUrl = false) {
   if (typeof window === "undefined") {
     return rawBaseUrl || `http://localhost:${fallbackPort}`;
   }
@@ -10,9 +10,12 @@ function runtimeBaseUrl(rawBaseUrl, fallbackPort = "5173") {
   const hasHost = Boolean(hostname && hostname.trim().length);
   const isFile = protocol === "file:";
 
+  // For API URLs, if no custom URL is provided and not in localhost, use relative path
   const fallback = (!hasHost || isFile)
     ? `http://localhost:${fallbackPort}`
+    : isApiUrl ? "/api" // Default to relative path for API
     : `${protocol}//${hostname}:${fallbackPort}`;
+    
   if (!rawBaseUrl) return fallback;
   if (rawBaseUrl.startsWith("/")) return rawBaseUrl.replace(/\/$/, "");
 
@@ -40,8 +43,8 @@ function runtimeBaseUrl(rawBaseUrl, fallbackPort = "5173") {
   }
 }
 
-export const API_BASE_URL = runtimeBaseUrl(import.meta.env.VITE_API_URL || "/api", "5000");
-export const SOCKET_BASE_URL = runtimeBaseUrl(import.meta.env.VITE_SOCKET_URL || API_BASE_URL, "5000");
+export const API_BASE_URL = runtimeBaseUrl(import.meta.env.VITE_API_URL, "5000", true);
+export const SOCKET_BASE_URL = runtimeBaseUrl(import.meta.env.VITE_SOCKET_URL || API_BASE_URL.replace(/\/api$/, ""), "5000");
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
