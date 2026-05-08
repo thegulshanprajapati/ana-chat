@@ -79,9 +79,12 @@ export default function AuthPage({ onAuthed }) {
     };
   }, [googleClientId]);
 
+  const googleInitializedRef = useRef(false);
+
   useEffect(() => {
     if (!showGoogleSection) return;
     if (!googleClientId || !googleReady || !window.google?.accounts?.id || !googleButtonRef.current) return;
+    if (googleInitializedRef.current) return;
 
     const width = Math.max(0, Math.min(390, googleButtonRef.current.offsetWidth || 0));
     window.google.accounts.id.initialize({
@@ -96,6 +99,7 @@ export default function AuthPage({ onAuthed }) {
       shape: "pill",
       text: "continue_with"
     });
+    googleInitializedRef.current = true;
   }, [googleClientId, googleReady, handleGoogleCredential, showGoogleSection, theme]);
 
   function switchMode(nextMode) {
