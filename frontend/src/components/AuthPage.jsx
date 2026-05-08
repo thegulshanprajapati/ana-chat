@@ -1,15 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BadgeCheck, ShieldCheck, Sparkles, MessageCircle, Users, Zap } from "lucide-react";
+import { BadgeCheck, ShieldCheck, Sparkles, MessageCircle, Users, Zap, Mail, Lock, User, Phone } from "lucide-react";
 import { api } from "../api/client";
 import { navigateTo } from "../utils/nav";
 import { useTheme } from "../context/ThemeContext";
 
-const labelClass =
-  "mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-red-300";
-const fieldClass =
-  "w-full rounded-lg border border-red-700 bg-black px-4 py-3 text-sm text-white outline-none transition placeholder:text-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/30";
-const primaryButtonClass =
-  "inline-flex w-full items-center justify-center rounded-lg bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-red-500/20 transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-60";
 export default function AuthPage({ onAuthed }) {
   const { theme } = useTheme();
   const [mode, setMode] = useState("signup");
@@ -93,14 +87,14 @@ export default function AuthPage({ onAuthed }) {
     });
     googleButtonRef.current.innerHTML = "";
     window.google.accounts.id.renderButton(googleButtonRef.current, {
-      theme: theme === "dark" ? "filled_black" : "outline",
+      theme: "outline",
       size: "large",
       ...(width ? { width } : null),
       shape: "pill",
       text: "continue_with"
     });
     googleInitializedRef.current = true;
-  }, [googleClientId, googleReady, handleGoogleCredential, showGoogleSection, theme]);
+  }, [googleClientId, googleReady, handleGoogleCredential, showGoogleSection]);
 
   function switchMode(nextMode) {
     setMode(nextMode);
@@ -146,239 +140,299 @@ export default function AuthPage({ onAuthed }) {
   }
 
   return (
-    <div className="relative min-h-[100dvh] overflow-x-hidden bg-black px-3 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-6 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center p-4">
+      {/* Background decorative elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-red-100 rounded-full opacity-20 blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gray-200 rounded-full opacity-30 blur-3xl"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-red-50 rounded-full opacity-10 blur-3xl"></div>
+      </div>
 
-      <div className="relative mx-auto w-full max-w-[1200px]">
-        <div className="rounded-3xl border border-red-700 bg-[#090909] shadow-[0_20px_80px_rgba(255,0,0,0.12)]">
-          <div className="p-4 sm:p-6">
-            <div className="grid gap-8 lg:grid-cols-[1fr_1.2fr] lg:items-start">
-              {/* Hero Section */}
-              <div className="rounded-3xl border border-red-700 bg-[#111111] p-5 sm:p-8">
-                <div className="mb-6">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-red-500/50 bg-red-500/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-red-300">
-                    <ShieldCheck size={14} />
-                    AnaChat Secure
+      <div className="relative w-full max-w-7xl mx-auto">
+        <div className="grid lg:grid-cols-2 gap-12 items-center">
+          {/* Left Side - Branding */}
+          <div className="hidden lg:block space-y-8">
+            <div className="space-y-6">
+              <div className="inline-flex items-center gap-3 px-4 py-2 bg-red-50 border border-red-100 rounded-full">
+                <ShieldCheck className="w-5 h-5 text-red-600" />
+                <span className="text-sm font-semibold text-red-700">AnaChat Secure</span>
+              </div>
+
+              <div className="space-y-4">
+                <h1 className="text-5xl font-bold text-gray-900 leading-tight">
+                  Connect Instantly,<br />
+                  <span className="text-red-600">Chat Securely</span>
+                </h1>
+                <p className="text-xl text-gray-600 leading-relaxed">
+                  {mode === "login"
+                    ? "Welcome back! Continue your conversations with end-to-end encryption."
+                    : "Join thousands of users in secure, real-time messaging. Create your account today."}
+                </p>
+              </div>
+            </div>
+
+            {/* Feature Cards */}
+            <div className="grid gap-4">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-300">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
+                    <Zap className="w-6 h-6 text-red-600" />
                   </div>
-                  <h1 className="mt-3 font-display text-[30px] font-bold leading-[1.12] text-white sm:text-[36px]">
-                    Red. Fast. Private.
-                  </h1>
-                  <p className="mt-2 text-base text-red-200">
-                    {mode === "login"
-                      ? "Sign in and continue your chat sessions instantly."
-                      : "Create your account now and join the secure AnaChat network."}
-                  </p>
-                </div>
-
-                {/* Feature highlights */}
-                <div className="hidden space-y-3 sm:block">
-                  <div className="flex items-center gap-3 rounded-2xl border border-red-700 bg-black/80 p-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600/10">
-                      <Zap size={16} className="text-red-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-white">Lightning Fast</p>
-                      <p className="text-xs text-red-200">Real-time messaging with instant delivery.</p>
-                    </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Lightning Fast</h3>
+                    <p className="text-sm text-gray-600">Real-time messaging with instant delivery</p>
                   </div>
-
-                  <div className="flex items-center gap-3 rounded-2xl border border-red-700 bg-black/80 p-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600/10">
-                      <ShieldCheck size={16} className="text-red-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-white">Secure & Private</p>
-                      <p className="text-xs text-red-200">Encrypted chats and trusted privacy controls.</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 rounded-2xl border border-red-700 bg-black/80 p-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600/10">
-                      <Users size={16} className="text-red-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-white">Group Chat Ready</p>
-                      <p className="text-xs text-red-200">Create rooms, invite friends, and stay connected.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 sm:flex dark:border-slate-700 dark:bg-slate-950">
-                  <Sparkles size={16} className="text-purple-500 animate-pulse" />
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Join thousands of users already chatting on AnaChat
-                  </p>
                 </div>
               </div>
 
-              {/* Auth Form Section */}
-              <div className="min-h-0">
-                <div className="pr-1">
-                  <div className="mb-6 grid grid-cols-2 rounded-lg border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-900">
-                    <button
-                      type="button"
-                      onClick={() => switchMode("login")}
-                      className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${
-                        mode === "login"
-                          ? "bg-violet-600 text-white shadow-sm"
-                          : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800"
-                      }`}
-                    >
-                      Login
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => switchMode("signup")}
-                      className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${
-                        mode === "signup"
-                          ? "bg-violet-600 text-white shadow-sm"
-                          : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800"
-                      }`}
-                    >
-                      Signup
-                    </button>
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-300">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
+                    <ShieldCheck className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">End-to-End Security</h3>
+                    <p className="text-sm text-gray-600">Your conversations are fully encrypted</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-300">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
+                    <Users className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Group Conversations</h3>
+                    <p className="text-sm text-gray-600">Create rooms and invite friends</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Trust Indicator */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <div className="flex items-center gap-3">
+                <Sparkles className="w-5 h-5 text-red-500" />
+                <span className="text-sm font-medium text-gray-700">
+                  Trusted by thousands of users worldwide
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Side - Auth Card */}
+          <div className="w-full max-w-md mx-auto lg:mx-0">
+            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 hover:shadow-2xl transition-shadow duration-300">
+              {/* Tabs */}
+              <div className="flex rounded-xl bg-gray-50 p-1 mb-8">
+                <button
+                  type="button"
+                  onClick={() => switchMode("login")}
+                  className={`flex-1 py-3 px-4 rounded-lg font-semibold text-sm transition-all duration-200 ${
+                    mode === "login"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  Login
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchMode("signup")}
+                  className={`flex-1 py-3 px-4 rounded-lg font-semibold text-sm transition-all duration-200 ${
+                    mode === "signup"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  Sign Up
+                </button>
+              </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center">
+                      <span className="text-red-600 text-xs">!</span>
+                    </div>
+                    <p className="text-sm text-red-700">{error}</p>
+                  </div>
+                </div>
+              )}
+
+              {mode === "login" ? (
+                <form onSubmit={handleLogin} className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="block">
+                      <div className="relative">
+                        <input
+                          name="email_or_mobile"
+                          required
+                          autoComplete="username"
+                          className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200"
+                          placeholder="Email or Mobile"
+                        />
+                        <Mail className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      </div>
+                    </label>
                   </div>
 
-                  {mode === "login" ? (
-                    <form onSubmit={handleLogin} className="space-y-4">
-                      <div className="space-y-1">
-                        <label className="block">
-                          <span className={labelClass}>Email or Mobile</span>
-                          <input
-                            name="email_or_mobile"
-                            required
-                            autoComplete="username"
-                            className={fieldClass}
-                            placeholder="name@email.com or 98XXXXXXXX"
-                          />
-                        </label>
+                  <div className="space-y-2">
+                    <label className="block">
+                      <div className="relative">
+                        <input
+                          name="password"
+                          required
+                          type="password"
+                          autoComplete="current-password"
+                          className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200"
+                          placeholder="Password"
+                        />
+                        <Lock className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                       </div>
-                      <div className="space-y-1">
-                        <label className="block">
-                          <span className={labelClass}>Password</span>
+                    </label>
+                  </div>
+
+                  <button
+                    disabled={loading}
+                    className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:shadow-lg hover:scale-[1.02] disabled:hover:scale-100 flex items-center justify-center gap-3"
+                  >
+                    <MessageCircle className="w-5 h-5" />
+                    {loading ? "Signing you in..." : "Login to AnaChat"}
+                  </button>
+                </form>
+              ) : (
+                <div className="space-y-6">
+                  <form onSubmit={handleSignupForm} className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="block">
+                        <div className="relative">
                           <input
-                            name="password"
+                            name="name"
                             required
-                            type="password"
-                            autoComplete="current-password"
-                            className={fieldClass}
-                            placeholder="Enter your password"
+                            autoComplete="name"
+                            className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200"
+                            placeholder="Full Name"
                           />
-                        </label>
-                      </div>
-                      <button disabled={loading} className={`${primaryButtonClass} mt-5`}>
-                        <MessageCircle size={16} className="mr-2" />
-                        {loading ? "Signing you in..." : "Login to AnaChat"}
-                      </button>
-                    </form>
-                  ) : (
-                    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
-                      <div className="space-y-4">
-                        <form onSubmit={handleSignupForm} className="grid gap-4 sm:grid-cols-2">
-                          <label className="block sm:col-span-2">
-                            <span className={labelClass}>Full Name</span>
-                            <input
-                              name="name"
-                              required
-                              autoComplete="name"
-                              className={fieldClass}
-                              placeholder="Your full name"
-                            />
-                          </label>
-                          <label className="block">
-                            <span className={labelClass}>Email</span>
+                          <User className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        </div>
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="block">
+                          <div className="relative">
                             <input
                               name="email"
                               required
                               type="email"
                               autoComplete="email"
-                              className={fieldClass}
-                              placeholder="you@company.com"
+                              className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200"
+                              placeholder="Email"
                             />
-                          </label>
-                          <label className="block">
-                            <span className={labelClass}>Mobile</span>
+                            <Mail className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                          </div>
+                        </label>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block">
+                          <div className="relative">
                             <input
                               name="mobile"
                               required
                               autoComplete="tel"
-                              className={fieldClass}
-                              placeholder="98XXXXXXXX"
+                              className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200"
+                              placeholder="Mobile"
                             />
-                          </label>
-                          <label className="block sm:col-span-2">
-                            <span className={labelClass}>Password</span>
-                            <input
-                              name="password"
-                              required
-                              type="password"
-                              autoComplete="new-password"
-                              className={fieldClass}
-                              placeholder="Create a secure password (min 6 characters)"
-                            />
-                          </label>
-                          <button disabled={loading} className={`${primaryButtonClass} sm:col-span-2 mt-2`}>
-                            <BadgeCheck size={16} className="mr-2" />
-                            {loading ? "Creating your account..." : "Join AnaChat"}
-                          </button>
-                        </form>
+                            <Phone className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block">
+                        <div className="relative">
+                          <input
+                            name="password"
+                            required
+                            type="password"
+                            autoComplete="new-password"
+                            className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200"
+                            placeholder="Password (min 6 characters)"
+                          />
+                          <Lock className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        </div>
+                      </label>
+                    </div>
+
+                    <button
+                      disabled={loading}
+                      className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 hover:shadow-lg hover:scale-[1.02] disabled:hover:scale-100 flex items-center justify-center gap-3"
+                    >
+                      <BadgeCheck className="w-5 h-5" />
+                      {loading ? "Creating your account..." : "Join AnaChat"}
+                    </button>
+                  </form>
+
+                  {showGoogleSection && (
+                    <div className="mt-8">
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-gray-200"></div>
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                          <span className="px-4 bg-white text-gray-500 font-medium">Or continue with</span>
+                        </div>
                       </div>
 
-                      {showGoogleSection && (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900">
-                          <div className="mb-4 flex items-center gap-3">
-                            <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
-                            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Quick Google Signup</span>
-                            <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
-                          </div>
-
-                          {!googleClientId ? (
-                            <p className="rounded-2xl border border-red-700 bg-[#110000] px-3 py-2 text-xs text-red-200">
+                      <div className="mt-6">
+                        {!googleClientId ? (
+                          <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                            <p className="text-sm text-red-700">
                               Google OAuth not configured. Add VITE_GOOGLE_CLIENT_ID to environment.
                             </p>
-                          ) : googleLoadError ? (
-                            <p className="rounded-2xl border border-red-700 bg-[#110000] px-3 py-2 text-xs text-red-200">
+                          </div>
+                        ) : googleLoadError ? (
+                          <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                            <p className="text-sm text-red-700">
                               Failed to load Google sign-in. Check network connection.
                             </p>
-                          ) : !googleReady ? (
-                            <p className="rounded-2xl border border-red-700 bg-[#110000] px-3 py-2 text-xs text-red-200">
-                              Loading Google sign-in...
-                            </p>
-                          ) : (
-                            <div ref={googleButtonRef} className="flex min-h-[44px] max-w-full items-center justify-center overflow-hidden" />
-                          )}
-                          {googleClientId && (
-                            <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400">
-                              Origin for Google OAuth: <span className="font-semibold text-slate-700 dark:text-slate-200">{currentOrigin}</span>
-                            </p>
-                          )}
-                        </div>
-                      )}
+                          </div>
+                        ) : !googleReady ? (
+                          <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                            <p className="text-sm text-gray-600">Loading Google sign-in...</p>
+                          </div>
+                        ) : (
+                          <div ref={googleButtonRef} className="flex justify-center" />
+                        )}
+                      </div>
                     </div>
                   )}
-
-                  {error && (
-                    <div className="mt-4 rounded-2xl border border-red-700 bg-[#220000] px-4 py-3">
-                      <p className="text-sm text-red-200">{error}</p>
-                    </div>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => switchMode(mode === "login" ? "signup" : "login")}
-                    className="mt-6 block text-sm font-semibold text-red-200 underline decoration-red-500 underline-offset-4 transition hover:text-white"
-                  >
-                    {mode === "login" ? "New to AnaChat? Create account" : "Already have an account? Login"}
-                  </button>
                 </div>
+              )}
+
+              <div className="mt-8 text-center">
+                <button
+                  type="button"
+                  onClick={() => switchMode(mode === "login" ? "signup" : "login")}
+                  className="text-sm text-gray-600 hover:text-gray-900 font-medium transition-colors duration-200"
+                >
+                  {mode === "login" ? "New to AnaChat? Create account" : "Already have an account? Login"}
+                </button>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="mt-6 text-center">
-          <p className="text-xs font-medium text-red-200">
-            AnaChat — secure messaging built for speed and privacy.
-          </p>
+            <div className="mt-8 text-center">
+              <p className="text-xs text-gray-500">
+                AnaChat — secure messaging built for speed and privacy.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
