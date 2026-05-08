@@ -7,21 +7,21 @@ const secureCookies = process.env.NODE_ENV === "production";
 export function setAuthCookies(res, accessToken, refreshToken) {
   res.cookie("access_token", accessToken, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: secureCookies ? "none" : "lax",
     secure: secureCookies,
     maxAge: 1000 * 60 * 15
   });
   res.cookie("refresh_token", refreshToken, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: secureCookies ? "none" : "lax",
     secure: secureCookies,
     maxAge: 1000 * 60 * 60 * 24 * 365
   });
 }
 
 export function clearAuthCookies(res) {
-  res.clearCookie("access_token", { httpOnly: true, sameSite: "lax", secure: secureCookies });
-  res.clearCookie("refresh_token", { httpOnly: true, sameSite: "lax", secure: secureCookies });
+  res.clearCookie("access_token", { httpOnly: true, sameSite: secureCookies ? "none" : "lax", secure: secureCookies });
+  res.clearCookie("refresh_token", { httpOnly: true, sameSite: secureCookies ? "none" : "lax", secure: secureCookies });
 }
 
 function requestMeta(req) {
