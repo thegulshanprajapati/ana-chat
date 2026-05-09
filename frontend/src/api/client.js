@@ -71,8 +71,13 @@ function getDeviceFingerprint() {
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true
+  withCredentials: true,
+  headers: {
+    "Content-Type": "application/json"
+  }
 });
+
+let refreshingPromise = null;
 
 function getStoredAccessToken() {
   try {
@@ -134,17 +139,10 @@ api.interceptors.response.use(
     const original = error.config || {};
     const status = error.response?.status;
     const url = original.url || "";
+    const isAuthRequest = url.startsWith("/auth/");
 
-    const skipRefresh =
-      url.startsWith("/admin") ||
-      url.startsWith("/auth/login") ||
-      url.startsWith("/auth/signup") ||
-      url.startsWith("/auth/google") ||
-      url.startsWith("/auth/refresh") ||
-      url.startsWith("/auth/logout");
-
-    if (status !== 401 || original._retry || skipRefresh) {
-      if (status === 401 && url.startsWith("/auth/logout")) {
+    if (status !== 401 || original._retry || isAuthRequest) {
+      if (status === 401 && isAuthRequest) {
         clearStoredAccessToken();
       }
       return Promise.reject(error);
@@ -167,6 +165,9 @@ api.interceptors.response.use(
       return api(original);
     } catch (refreshErr) {
       clearStoredAccessToken();
+      if (typeof window !== "undefined") {
+        window.location.href = "/";
+      }
       return Promise.reject(refreshErr);
     }
   }

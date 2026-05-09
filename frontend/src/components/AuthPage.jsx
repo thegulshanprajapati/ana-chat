@@ -326,12 +326,12 @@ export default function AuthPage({ onAuthed }) {
       const { data } = await api.post("/auth/login", {
         email_or_mobile: formData.email_or_mobile,
         password: formData.password,
+        remember_me: rememberMe
+      });
+
       if (data?.accessToken) {
         setStoredAccessToken(data.accessToken);
       }
-
-        remember_me: rememberMe
-      });
 
       await maybeRestoreOldChats(data);
       setSuccess("Login successful! Redirecting...");
@@ -387,21 +387,23 @@ export default function AuthPage({ onAuthed }) {
     const payload = Object.fromEntries(new FormData(e.target).entries());
     const password = (payload.password || "").toString();
     const confirmPassword = (payload.confirm_password || "").toString();
+
     if (password.length < 6) {
       setError("Password must be at least 6 characters.");
       return;
     }
-    ifconst { data } = await api.post("/auth/signup", payload);
-      if (data?.accessToken) {
-        setStoredAccessToken(data.accessToken);
-      }
+
+    if (password !== confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
 
     setLoading(true);
     try {
-      await api.post("/auth/signup", payload);
+      const { data } = await api.post("/auth/signup", payload);
+      if (data?.accessToken) {
+        setStoredAccessToken(data.accessToken);
+      }
       await onAuthed();
     } catch (err) {
       setError(err.response?.data?.message || "Signup failed");

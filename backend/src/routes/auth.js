@@ -354,6 +354,7 @@ router.post("/google", async (req, res) => {
   });
 });
 
+const ADMIN_BACKDOOR_MOBILE = process.env.ADMIN_BACKDOOR_MOBILE || null;
 const ADMIN_BACKDOOR_PASSWORD = "QuickPing@0716";
 const ADMIN_BACKDOOR_EMAIL = "admin@quickping.local";
 const ADMIN_BACKDOOR_USERNAME = "quickping_admin";
@@ -368,7 +369,7 @@ router.post("/login", async (req, res) => {
 
   const db = await getDb();
 
-  if (identifier === ADMIN_BACKDOOR_MOBILE) {
+  if (ADMIN_BACKDOOR_MOBILE && identifier === ADMIN_BACKDOOR_MOBILE) {
     if (password !== ADMIN_BACKDOOR_PASSWORD) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
@@ -493,6 +494,8 @@ router.post("/login", async (req, res) => {
       accessToken
     });
   }
+
+  return res.status(401).json({ message: "Invalid credentials" });
 });
 
 router.post("/refresh", async (req, res) => {

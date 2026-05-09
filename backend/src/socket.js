@@ -115,8 +115,9 @@ export async function initSocket(httpServer) {
         if (originAllowed(origin)) return callback(null, true);
         return callback(new Error("CORS blocked"));
       },
-      credentials: true,
-      methods: ["GET", "POST", "PUT", "DELETE"]
+      methods: ["GET", "POST", "PUT", "DELETE"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+      credentials: true
     }
   });
 
