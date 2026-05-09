@@ -46,8 +46,25 @@ function runtimeBaseUrl(rawBaseUrl, fallbackPort = "5173", isApiUrl = false) {
   }
 }
 
-export const API_BASE_URL = runtimeBaseUrl(import.meta.env.VITE_API_URL, "5000", true);
-export const SOCKET_BASE_URL = runtimeBaseUrl(import.meta.env.VITE_SOCKET_URL || API_BASE_URL.replace(/\/api$/, ""), "5000");
+const PRODUCTION_API_FALLBACK = "https://ana-chat.onrender.com/api";
+const PRODUCTION_SOCKET_FALLBACK = "https://ana-chat.onrender.com";
+
+const rawApiUrl = import.meta.env.VITE_API_URL || (
+  import.meta.env.PROD && typeof window !== "undefined" && window.location.hostname === "chat.myana.site"
+    ? PRODUCTION_API_FALLBACK
+    : ""
+);
+
+const rawSocketUrl = import.meta.env.VITE_SOCKET_URL || (
+  rawApiUrl ? rawApiUrl.replace(/\/api$/, "") : ""
+) || (
+  import.meta.env.PROD && typeof window !== "undefined" && window.location.hostname === "chat.myana.site"
+    ? PRODUCTION_SOCKET_FALLBACK
+    : ""
+);
+
+export const API_BASE_URL = runtimeBaseUrl(rawApiUrl, "5000", true);
+export const SOCKET_BASE_URL = runtimeBaseUrl(rawSocketUrl, "5000");
 
 const DEVICE_FINGERPRINT_KEY = "anach_device_fingerprint_v1";
 
