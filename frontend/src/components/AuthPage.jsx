@@ -18,6 +18,7 @@ import {
 import { api } from "../api/client";
 import { navigateTo } from "../utils/nav";
 import { useTheme } from "../context/ThemeContext";
+import { getStoredRsaKeyPair, persistRsaKeyPair, decryptPrivateKeyBackup } from "../utils/e2ee";
 
 function Field({ label, hint, error, children }) {
   return (
@@ -78,6 +79,8 @@ export default function AuthPage({ onAuthed }) {
   const [googleReady, setGoogleReady] = useState(false);
   const [googleLoadError, setGoogleLoadError] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [capsLockOn, setCapsLockOn] = useState(false);
   const [formData, setFormData] = useState({ email_or_mobile: "", password: "" });
@@ -164,6 +167,37 @@ export default function AuthPage({ onAuthed }) {
     }
   };
 
+  async function maybeRestoreOldChats(userData) {
+    if (!userData || !userData.id || !userData.publicKey) return;
+    const localKey = await getStoredRsaKeyPair(userData.id);
+    if (localKey) return;
+
+    if (!userData.hasPrivateKeyBackup) {
+      return;
+    }
+
+    const restore = window.confirm(
+      "A previous device has your chat encryption key. Do you want to restore old chats on this device?"
+    );
+    if (!restore) return;
+
+    const pin = window.prompt("Enter your restore PIN to restore old chats:");
+    if (!pin) return;
+
+    try {
+      const { data } = await api.post("/auth/restore-key", { pin });
+      const privateJwk = await decryptPrivateKeyBackup(data.encryptedPrivateKey, pin);
+      await persistRsaKeyPair(userData.id, {
+        publicJwk: userData.publicKey,
+        privateJwk,
+        createdAt: Date.now()
+      });
+    } catch (err) {
+      const message = err.response?.data?.message || err.message || "Restore failed";
+      window.alert(message);
+    }
+  }
+
   const handleGoogleCredential = useCallback(
     async (response) => {
       const idToken = response?.credential;
@@ -175,7 +209,8 @@ export default function AuthPage({ onAuthed }) {
       setError("");
       setLoading(true);
       try {
-        await api.post("/auth/google", { idToken });
+        const { data } = await api.post("/auth/google", { idToken });
+        await maybeRestoreOldChats(data);
         await onAuthed();
       } catch (err) {
         setError(err.response?.data?.message || "Google login failed");
@@ -281,6 +316,7 @@ export default function AuthPage({ onAuthed }) {
         remember_me: rememberMe
       });
 
+      await maybeRestoreOldChats(data);
       setSuccess("Login successful! Redirecting...");
       setTimeout(() => {
         if (data?.mode === "admin" && data?.admin?.id) {
@@ -306,9 +342,20 @@ export default function AuthPage({ onAuthed }) {
   async function handleSignupForm(e) {
     e.preventDefault();
     setError("");
+    const payload = Object.fromEntries(new FormData(e.target).entries());
+    const password = (payload.password || "").toString();
+    const confirmPassword = (payload.confirm_password || "").toString();
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const payload = Object.fromEntries(new FormData(e.target).entries());
       await api.post("/auth/signup", payload);
       await onAuthed();
     } catch (err) {
@@ -609,12 +656,40 @@ export default function AuthPage({ onAuthed }) {
                           <input
                             name="password"
                             required
-                            type="password"
+                            type={showSignupPassword ? "text" : "password"}
                             autoComplete="new-password"
                             placeholder="Create a password"
                             className="w-full rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-4 py-3.5 pr-10 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
                           />
-                          <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                          <button
+                            type="button"
+                            onClick={() => setShowSignupPassword((s) => !s)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-xl p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition"
+                            aria-label={showSignupPassword ? "Hide password" : "Show password"}
+                          >
+                            {showSignupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </Field>
+
+                      <Field label="Confirm password">
+                        <div className="relative">
+                          <input
+                            name="confirm_password"
+                            required
+                            type={showSignupConfirmPassword ? "text" : "password"}
+                            autoComplete="new-password"
+                            placeholder="Confirm your password"
+                            className="w-full rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-4 py-3.5 pr-10 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowSignupConfirmPassword((s) => !s)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-xl p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition"
+                            aria-label={showSignupConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                          >
+                            {showSignupConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
                         </div>
                       </Field>
 

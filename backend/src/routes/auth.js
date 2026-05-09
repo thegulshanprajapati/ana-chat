@@ -168,7 +168,8 @@ function publicUser(user) {
     settings: parseSettings(user.settings_json),
     isAdmin: computeIsAdmin(user),
     isSuperAdmin: isSuperAdminPhone(phone),
-    publicKey: user.public_key || null
+    publicKey: user.public_key || null,
+    hasPrivateKeyBackup: Boolean(user.private_key_backup)
   };
 }
 
@@ -327,8 +328,15 @@ router.post("/google", async (req, res) => {
   if (!user) return res.status(500).json({ message: "Unable to sign in with Google" });
   if (user.is_blocked) return res.status(403).json({ message: "User blocked" });
 
-  const { accessToken, refreshToken } = await createSessionForUser(user.id, req);
-  setAuthCookies(res, accessToken, refreshToken);
+  try {
+    const { accessToken, refreshToken } = await createSessionForUser(user.id, req);
+    setAuthCookies(res, accessToken, refreshToken);
+  } catch (err) {
+    if (err.message === "Maximum active devices reached") {
+      return res.status(403).json({ message: err.message });
+    }
+    throw err;
+  }
 
   return res.json(publicUser(user));
 });
@@ -382,8 +390,15 @@ router.post("/login", async (req, res) => {
 
     const chatUser = await ensureChatUserForAdmin(db, admin);
     if (chatUser) {
-      const { accessToken, refreshToken } = await createSessionForUser(chatUser.id, req);
-      setAuthCookies(res, accessToken, refreshToken);
+      try {
+        const { accessToken, refreshToken } = await createSessionForUser(chatUser.id, req);
+        setAuthCookies(res, accessToken, refreshToken);
+      } catch (err) {
+        if (err.message === "Maximum active devices reached") {
+          return res.status(403).json({ message: err.message });
+        }
+        throw err;
+      }
     }
 
     const token = signAdminToken(admin.id);
@@ -411,11 +426,17 @@ router.post("/login", async (req, res) => {
     if (user.is_blocked) return res.status(403).json({ message: "User blocked" });
     if (!user.is_verified) return res.status(403).json({ message: "User not verified" });
 
-    const { accessToken, refreshToken } = await createSessionForUser(user.id, req);
-    setAuthCookies(res, accessToken, refreshToken);
-    res.clearCookie("admin_token", adminCookieOptions());
-
-    return res.json(publicUser(user));
+    try {
+      const { accessToken, refreshToken } = await createSessionForUser(user.id, req);
+      setAuthCookies(res, accessToken, refreshToken);
+      res.clearCookie("admin_token", adminCookieOptions());
+      return res.json(publicUser(user));
+    } catch (err) {
+      if (err.message === "Maximum active devices reached") {
+        return res.status(403).json({ message: err.message });
+      }
+      throw err;
+    }
   }
 
   const admin = await db.collection("admins").findOne({ $or: [{ email: adminIdentifier }, { username: adminIdentifier }] });
@@ -485,6 +506,30 @@ router.post("/logout", async (req, res) => {
   }
   clearAuthCookies(res);
   res.json({ success: true });
+});
+
+router.post("/restore-key", requireUser, async (req, res) => {
+  const pin = (req.body?.pin || "").toString().trim();
+  if (!/^[0-9]{4,8}$/.test(pin)) {
+    return res.status(400).json({ message: "PIN must be 4 to 8 digits" });
+  }
+
+  const db = await getDb();
+  const user = await db.collection("users").findOne(
+    { id: req.user.id },
+    { projection: { _id: 0, private_key_backup: 1, private_key_backup_pin_hash: 1 } }
+  );
+
+  if (!user?.private_key_backup || !user?.private_key_backup_pin_hash) {
+    return res.status(404).json({ message: "No restore backup available" });
+  }
+
+  const valid = await bcrypt.compare(pin, user.private_key_backup_pin_hash);
+  if (!valid) {
+    return res.status(401).json({ message: "Invalid restore PIN" });
+  }
+
+  res.json({ encryptedPrivateKey: user.private_key_backup });
 });
 
 router.get("/me", requireUser, async (req, res) => {

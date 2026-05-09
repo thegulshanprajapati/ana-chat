@@ -49,9 +49,40 @@ function runtimeBaseUrl(rawBaseUrl, fallbackPort = "5173", isApiUrl = false) {
 export const API_BASE_URL = runtimeBaseUrl(import.meta.env.VITE_API_URL, "5000", true);
 export const SOCKET_BASE_URL = runtimeBaseUrl(import.meta.env.VITE_SOCKET_URL || API_BASE_URL.replace(/\/api$/, ""), "5000");
 
+const DEVICE_FINGERPRINT_KEY = "anach_device_fingerprint_v1";
+
+function getDeviceFingerprint() {
+  try {
+    if (typeof localStorage !== "undefined") {
+      let fingerprint = localStorage.getItem(DEVICE_FINGERPRINT_KEY);
+      if (!fingerprint) {
+        const array = new Uint8Array(16);
+        crypto.getRandomValues(array);
+        fingerprint = Array.from(array).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+        localStorage.setItem(DEVICE_FINGERPRINT_KEY, fingerprint);
+      }
+      return fingerprint;
+    }
+  } catch {
+    // ignore localStorage failures
+  }
+  return null;
+}
+
 export const api = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true
+});
+
+api.interceptors.request.use((config) => {
+  const fingerprint = getDeviceFingerprint();
+  if (fingerprint) {
+    config.headers = {
+      ...config.headers,
+      "x-device-fingerprint": fingerprint
+    };
+  }
+  return config;
 });
 
 let refreshingPromise = null;

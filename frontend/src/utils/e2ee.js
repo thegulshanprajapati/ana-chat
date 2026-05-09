@@ -82,6 +82,10 @@ async function loadStoredKeyPair(userId) {
   return null;
 }
 
+export async function getStoredRsaKeyPair(userId) {
+  return await loadStoredKeyPair(userId);
+}
+
 async function persistKeyPair(userId, record) {
   const key = toUserKey(userId);
   try {
@@ -94,6 +98,67 @@ async function persistKeyPair(userId, record) {
   if (typeof localStorage !== "undefined") {
     localStorage.setItem(key, JSON.stringify(record));
   }
+}
+
+export async function persistRsaKeyPair(userId, record) {
+  return await persistKeyPair(userId, record);
+}
+
+async function importPinKey(pin) {
+  if (!pin) throw new Error("PIN is required");
+  const encoded = new TextEncoder().encode(pin.toString());
+  return await crypto.subtle.importKey(
+    "raw",
+    encoded,
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"]
+  );
+}
+
+async function deriveKeyFromPin(pin, salt) {
+  const baseKey = await importPinKey(pin);
+  return await crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt,
+      iterations: 250000,
+      hash: "SHA-256"
+    },
+    baseKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+export async function encryptPrivateKeyBackup(privateJwk, pin) {
+  if (!privateJwk || typeof privateJwk !== "object") throw new Error("privateJwk required");
+  if (!pin || typeof pin !== "string") throw new Error("PIN required");
+  const raw = new TextEncoder().encode(JSON.stringify(privateJwk));
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKeyFromPin(pin, salt);
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, raw);
+  return {
+    v: 1,
+    salt: arrayBufferToBase64(salt),
+    iv: arrayBufferToBase64(iv),
+    ciphertext: arrayBufferToBase64(ciphertext)
+  };
+}
+
+export async function decryptPrivateKeyBackup(payload, pin) {
+  if (!payload || typeof payload !== "object") throw new Error("Encrypted payload required");
+  if (!pin || typeof pin !== "string") throw new Error("PIN required");
+  const salt = base64ToArrayBuffer(payload.salt || "");
+  const iv = base64ToArrayBuffer(payload.iv || "");
+  const ciphertext = base64ToArrayBuffer(payload.ciphertext || "");
+  if (!salt || !iv || !ciphertext) throw new Error("Encrypted payload is invalid");
+  const key = await deriveKeyFromPin(pin, new Uint8Array(salt));
+  const raw = await crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(iv) }, key, ciphertext);
+  const json = new TextDecoder().decode(raw);
+  return JSON.parse(json);
 }
 
 function arrayBufferToBase64(buffer) {
