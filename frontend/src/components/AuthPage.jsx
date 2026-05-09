@@ -90,6 +90,9 @@ export default function AuthPage({ onAuthed }) {
   const [resetEmail, setResetEmail] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMessage, setResetMessage] = useState("");
+  const [activeDeviceSessions, setActiveDeviceSessions] = useState([]);
+  const [deviceLimit, setDeviceLimit] = useState(null);
+  const [deviceLogoutLoading, setDeviceLogoutLoading] = useState(null);
 
   const googleButtonRef = useRef(null);
   const googleInitializedRef = useRef(false);
@@ -213,7 +216,12 @@ export default function AuthPage({ onAuthed }) {
         await maybeRestoreOldChats(data);
         await onAuthed();
       } catch (err) {
-        setError(err.response?.data?.message || "Google login failed");
+        const message = err.response?.data?.message || "Google login failed";
+        setError(message);
+        if (err.response?.status === 403 && err.response?.data?.activeSessions) {
+          setActiveDeviceSessions(err.response.data.activeSessions || []);
+          setDeviceLimit(err.response.data?.maxActiveDevices || null);
+        }
       } finally {
         setLoading(false);
       }
@@ -295,6 +303,8 @@ export default function AuthPage({ onAuthed }) {
     e.preventDefault();
     setError("");
     setSuccess("");
+    setActiveDeviceSessions([]);
+    setDeviceLimit(null);
 
     const errors = {};
     Object.keys(formData).forEach((field) => {
@@ -334,8 +344,33 @@ export default function AuthPage({ onAuthed }) {
           password: "Invalid email/mobile or password"
         });
       }
+      if (err.response?.status === 403 && err.response?.data?.activeSessions) {
+        setActiveDeviceSessions(err.response.data.activeSessions || []);
+        setDeviceLimit(err.response.data?.maxActiveDevices || null);
+      }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleLogoutDevice(sessionId) {
+    setError("");
+    setSuccess("");
+    setDeviceLogoutLoading(sessionId);
+
+    try {
+      await api.post("/auth/devices/revoke", {
+        email_or_mobile: formData.email_or_mobile,
+        password: formData.password,
+        sessionId
+      });
+      setSuccess("Device logged out successfully. Please retry login.");
+      setActiveDeviceSessions((prev) => prev.filter((item) => item.id !== sessionId));
+    } catch (err) {
+      const message = err.response?.data?.message || "Unable to logout device";
+      setError(message);
+    } finally {
+      setDeviceLogoutLoading(null);
     }
   }
 
@@ -498,6 +533,47 @@ export default function AuthPage({ onAuthed }) {
                   </motion.div>
                 ) : null}
               </AnimatePresence>
+
+              {activeDeviceSessions.length > 0 ? (
+                <motion.div
+                  className="mt-4 rounded-2xl border border-amber-200/70 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/25 p-4 text-sm text-amber-950 dark:text-amber-100"
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">Active devices limit reached</div>
+                      {deviceLimit ? (
+                        <div className="text-xs text-amber-700 dark:text-amber-300">You can have up to {deviceLimit} active devices.</div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {activeDeviceSessions.map((session) => (
+                      <div key={session.id} className="rounded-2xl border border-amber-200/80 bg-white/80 dark:bg-slate-950/80 p-3 text-slate-800 dark:text-slate-100">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-semibold">{session.user_agent || "Unknown device"}</div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400">IP: {session.ip || "Unknown"}</div>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={deviceLogoutLoading === session.id}
+                            onClick={() => handleLogoutDevice(session.id)}
+                            className="rounded-full bg-rose-500 px-3 py-1 text-xs font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {deviceLogoutLoading === session.id ? "Logging out..." : "Logout device"}
+                          </button>
+                        </div>
+                        <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+                          Last used: {new Date(session.last_used_at).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              ) : null}
 
               <div className="mt-6">
                 {mode === "login" ? (
