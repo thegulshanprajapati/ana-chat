@@ -327,6 +327,12 @@ export function SocketProvider({ children }) {
   const enhancedSocket = useMemo(() => {
     if (!socket) return null;
 
+    const emit = (...args) => socket.emit(...args);
+    const on = (...args) => socket.on(...args);
+    const off = (...args) => socket.off(...args);
+    const once = (...args) => socket.once(...args);
+    const disconnect = (...args) => socket.disconnect(...args);
+
     return {
       ...socket,
       // Connection state
@@ -343,11 +349,16 @@ export function SocketProvider({ children }) {
       addEventListener,
       removeEventListener,
       removeAllEventListeners,
+      on,
+      off,
+      once,
+      disconnect,
 
       // Monitoring
       logMonitoringEvent,
 
       // Utility methods
+      emit,
       emitWithMonitoring: (event, data) => {
         logMonitoringEvent(event, data);
         socket.emit(event, data);
