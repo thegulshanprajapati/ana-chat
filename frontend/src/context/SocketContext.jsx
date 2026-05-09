@@ -191,12 +191,23 @@ export function SocketProvider({ children }) {
     setConnectionState(CONNECTION_STATES.CONNECTING);
 
     try {
+      const authToken = (() => {
+        try {
+          return typeof window !== 'undefined' ? window.localStorage.getItem('access_token') : null;
+        } catch {
+          return null;
+        }
+      })();
+
       const socketInstance = io(SOCKET_BASE_URL, {
         withCredentials: true,
+        auth: {
+          token: authToken
+        },
         transports: ['websocket', 'polling'], // Prefer websocket, fallback to polling
         timeout: 20000,
         reconnection: true,
-        reconnectionAttempts: 5,
+        reconnectionAttempts: 10,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
         randomizationFactor: 0.5,
@@ -257,6 +268,11 @@ export function SocketProvider({ children }) {
       });
 
       socketInstance.on('reconnect_attempt', (attemptNumber) => {
+        if (typeof window !== 'undefined') {
+          socketInstance.auth = {
+            token: window.localStorage.getItem('access_token')
+          };
+        }
         console.log('[Socket] Reconnection attempt', attemptNumber);
         setConnectionState(CONNECTION_STATES.RECONNECTING);
         logMonitoringEvent(MONITORING_EVENTS.RECONNECT_ATTEMPT, { attemptNumber });

@@ -74,6 +74,34 @@ export const api = axios.create({
   withCredentials: true
 });
 
+function getStoredAccessToken() {
+  try {
+    return typeof localStorage !== "undefined" ? localStorage.getItem("access_token") : null;
+  } catch {
+    return null;
+  }
+}
+
+function setStoredAccessToken(token) {
+  try {
+    if (typeof localStorage !== "undefined" && token) {
+      localStorage.setItem("access_token", token);
+    }
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function clearStoredAccessToken() {
+  try {
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem("access_token");
+    }
+  } catch {
+    // ignore storage failures
+  }
+}
+
 api.interceptors.request.use((config) => {
   const fingerprint = getDeviceFingerprint();
   if (fingerprint) {
@@ -82,13 +110,26 @@ api.interceptors.request.use((config) => {
       "x-device-fingerprint": fingerprint
     };
   }
+
+  const authToken = getStoredAccessToken();
+  if (authToken && !config.headers?.Authorization) {
+    config.headers = {
+      ...config.headers,
+      Authorization: `Bearer ${authToken}`
+    };
+  }
+
   return config;
 });
 
-let refreshingPromise = null;
-
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const token = response?.data?.accessToken;
+    if (token) {
+      setStoredAccessToken(token);
+    }
+    return response;
+  },
   async (error) => {
     const original = error.config || {};
     const status = error.response?.status;
@@ -103,6 +144,9 @@ api.interceptors.response.use(
       url.startsWith("/auth/logout");
 
     if (status !== 401 || original._retry || skipRefresh) {
+      if (status === 401 && url.startsWith("/auth/logout")) {
+        clearStoredAccessToken();
+      }
       return Promise.reject(error);
     }
 
@@ -115,10 +159,17 @@ api.interceptors.response.use(
         });
       }
 
-      await refreshingPromise;
+      const refreshResponse = await refreshingPromise;
+      const refreshedToken = refreshResponse?.data?.accessToken;
+      if (refreshedToken) {
+        setStoredAccessToken(refreshedToken);
+      }
       return api(original);
     } catch (refreshErr) {
+      clearStoredAccessToken();
       return Promise.reject(refreshErr);
     }
   }
 );
+
+export { getStoredAccessToken, setStoredAccessToken, clearStoredAccessToken };

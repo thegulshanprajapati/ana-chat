@@ -96,7 +96,8 @@ async function createRedisAdapterIfConfigured(io) {
 let io = null; // Module-level io instance for monitoring
 
 export async function initSocket(httpServer) {
-  const allowedOrigins = (process.env.CLIENT_ORIGIN || "https://chat.myana.site,https://www.chat.myana.site")
+  const clientOriginConfig = process.env.CLIENT_ORIGIN || process.env.CLIENT_URL || "https://chat.myana.site,https://www.chat.myana.site";
+  const allowedOrigins = clientOriginConfig
     .split(",")
     .map((v) => v.trim())
     .filter(Boolean);
@@ -127,11 +128,30 @@ export async function initSocket(httpServer) {
     try {
       const rawCookie = socket.handshake.headers.cookie || "";
       const parsed = cookie.parse(rawCookie);
-      const accessToken = parsed.access_token;
-      if (!accessToken) return next(new Error("Unauthorized"));
+      const headerAuth = socket.handshake.headers.authorization || socket.handshake.headers.Authorization || "";
+      const headerToken = headerAuth.startsWith("Bearer ") ? headerAuth.slice(7).trim() : null;
+      const authToken = socket.handshake.auth?.token || parsed.access_token || headerToken;
 
-      const payload = verifyToken(accessToken);
-      if (payload.typ !== "access") return next(new Error("Unauthorized"));
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[Socket.IO] handshake auth check", {
+          socketId: socket.id,
+          origin: socket.handshake.headers.origin,
+          authTokenPresent: Boolean(authToken),
+          cookieKeys: Object.keys(parsed),
+          authPayload: socket.handshake.auth
+        });
+      }
+
+      if (!authToken) {
+        connectionMetrics.connectionErrors++;
+        return next(new Error("Unauthorized"));
+      }
+
+      const payload = verifyToken(authToken);
+      if (payload.typ !== "access") {
+        connectionMetrics.connectionErrors++;
+        return next(new Error("Unauthorized"));
+      }
 
       const db = await getDb();
       const [user, session] = await Promise.all([
@@ -146,6 +166,7 @@ export async function initSocket(httpServer) {
       ]);
 
       if (!user || !session || session.revoked_at || user.is_blocked || !user.is_verified) {
+        connectionMetrics.connectionErrors++;
         return next(new Error("Unauthorized"));
       }
 
@@ -154,7 +175,11 @@ export async function initSocket(httpServer) {
       socket.userName = (user.name || "").toString().trim() || `User ${user.id}`;
       socket.userAvatar = user.avatar_url || null;
       return next();
-    } catch {
+    } catch (err) {
+      connectionMetrics.connectionErrors++;
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[Socket.IO] token verification failed", { error: err?.message });
+      }
       return next(new Error("Unauthorized"));
     }
   });
@@ -162,6 +187,7 @@ export async function initSocket(httpServer) {
   io.on("connection", async (socket) => {
     connectionMetrics.totalConnections++;
     connectionMetrics.activeConnections++;
+    console.log("[Socket.IO] User connected:", { socketId: socket.id, userId: socket.userId, origin: socket.handshake.headers.origin });
     logMonitoringEvent({
       type: 'socket_connect',
       userId: socket.userId,

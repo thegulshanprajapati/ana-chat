@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { api } from "../api/client";
+import { api, clearStoredAccessToken } from "../api/client";
 import { getOrCreateRsaKeyPair } from "../utils/e2ee";
 
 const AuthContext = createContext();
@@ -27,6 +27,7 @@ export function AuthProvider({ children }) {
     } catch {
       // no-op
     }
+    clearStoredAccessToken();
     setUser(null);
   }, []);
 

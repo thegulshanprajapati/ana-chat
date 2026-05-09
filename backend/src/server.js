@@ -26,13 +26,16 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = express();
-app.set("trust proxy", true);
+app.set("trust proxy", 1);
 
 const apiPrefix = "/api";
-const allowedOrigins = (process.env.CLIENT_ORIGIN || "https://chat.myana.site,https://www.chat.myana.site")
+const clientOriginConfig = process.env.CLIENT_ORIGIN || process.env.CLIENT_URL || "https://chat.myana.site,https://www.chat.myana.site";
+const allowedOrigins = clientOriginConfig
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
+
+console.log("[Server] Trusted proxy enabled. Allowed origins:", allowedOrigins);
 
 const corsOptions = {
   origin(origin, callback) {

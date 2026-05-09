@@ -15,7 +15,7 @@ import {
   Sparkles,
   User
 } from "lucide-react";
-import { api } from "../api/client";
+import { api, setStoredAccessToken } from "../api/client";
 import { navigateTo } from "../utils/nav";
 import { useTheme } from "../context/ThemeContext";
 import { getStoredRsaKeyPair, persistRsaKeyPair, decryptPrivateKeyBackup } from "../utils/e2ee";
@@ -213,6 +213,9 @@ export default function AuthPage({ onAuthed }) {
       setLoading(true);
       try {
         const { data } = await api.post("/auth/google", { idToken });
+        if (data?.accessToken) {
+          setStoredAccessToken(data.accessToken);
+        }
         await maybeRestoreOldChats(data);
         await onAuthed();
       } catch (err) {
@@ -323,6 +326,10 @@ export default function AuthPage({ onAuthed }) {
       const { data } = await api.post("/auth/login", {
         email_or_mobile: formData.email_or_mobile,
         password: formData.password,
+      if (data?.accessToken) {
+        setStoredAccessToken(data.accessToken);
+      }
+
         remember_me: rememberMe
       });
 
@@ -384,7 +391,10 @@ export default function AuthPage({ onAuthed }) {
       setError("Password must be at least 6 characters.");
       return;
     }
-    if (password !== confirmPassword) {
+    ifconst { data } = await api.post("/auth/signup", payload);
+      if (data?.accessToken) {
+        setStoredAccessToken(data.accessToken);
+      }
       setError("Passwords do not match.");
       return;
     }
