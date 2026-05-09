@@ -13,7 +13,7 @@ const cookieOptions = {
   path: "/"
 };
 
-async function getActiveSessions(userId) {
+export async function getActiveSessions(userId) {
   const db = await getDb();
   return db.collection("sessions")
     .find({ user_id: Number(userId), revoked_at: null })
@@ -25,6 +25,14 @@ async function findActiveSessionByFingerprint(userId, fingerprint) {
   if (!fingerprint) return null;
   const activeSessions = await getActiveSessions(userId);
   return activeSessions.find((session) => session.device_fingerprint === fingerprint) || null;
+}
+
+export async function revokeSessionById(userId, sessionId) {
+  const db = await getDb();
+  await db.collection("sessions").updateOne(
+    { id: Number(sessionId), user_id: Number(userId), revoked_at: null },
+    { $set: { revoked_at: new Date() } }
+  );
 }
 
 function requestMeta(req) {
