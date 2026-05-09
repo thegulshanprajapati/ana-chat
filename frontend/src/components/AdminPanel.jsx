@@ -15,7 +15,7 @@ export default function AdminPanel({ users: initialUsers, onReload }) {
   }
 
   return (
-    <div className="p-6 space-y-3">
+    <div className="p-6 space-y-3 overflow-y-auto">
       <div className="text-xl font-semibold text-slate-900 dark:text-slate-100">Admin Panel</div>
       <div className="rounded-xl border border-slate-200 bg-white divide-y divide-slate-200 dark:border-neutral-800 dark:bg-black dark:divide-neutral-800">
         {users.map((u) => (

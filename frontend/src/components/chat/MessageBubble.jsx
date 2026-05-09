@@ -1477,9 +1477,9 @@ function SeenStatus({ message }) {
     return <Check size={12} className="opacity-60" aria-label="Sending" />;
   }
   if (message.seen) {
-    return <CheckCheck size={12} className="text-violet-200" aria-label="Seen" />;
+    return <CheckCheck size={12} className="text-blue-500" aria-label="Read" />;
   }
-  return <Check size={12} className="opacity-90" aria-label="Delivered" />;
+  return <CheckCheck size={12} className="opacity-90" aria-label="Delivered" />;
 }
 
 export default memo(MessageBubble);
