@@ -37,8 +37,25 @@ const IDLE_CALL = {
   logId: null
 };
 
+const rawStunUrls = (import.meta.env.VITE_STUN_URL || "").toString().trim();
+const rawTurnUrls = (import.meta.env.VITE_TURN_URL || "").toString().trim();
+const turnUsername = (import.meta.env.VITE_TURN_USERNAME || "").toString().trim();
+const turnCredential = (import.meta.env.VITE_TURN_CREDENTIAL || "").toString().trim();
+
+const stunServers = rawStunUrls
+  ? rawStunUrls.split(",").map((url) => ({ urls: url.trim() })).filter((item) => item.urls)
+  : [{ urls: "stun:stun.l.google.com:19302" }];
+
+const turnServers = rawTurnUrls
+  ? rawTurnUrls.split(",").map((url) => ({
+      urls: url.trim(),
+      ...(turnUsername ? { username: turnUsername } : {}),
+      ...(turnCredential ? { credential: turnCredential } : {})
+    })).filter((item) => item.urls)
+  : [];
+
 const RTC_CONFIG = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+  iceServers: [...stunServers, ...turnServers]
 };
 const DEFAULT_UI_SETTINGS = {
   compactMode: true,

@@ -37,6 +37,11 @@ function logMonitoringEvent(eventData) {
     monitoringEvents.splice(MAX_MONITORING_EVENTS);
   }
 
+  // Emit real-time dashboard updates for connected admin sockets.
+  if (io) {
+    io.to("admin_monitoring").emit("monitoring_update", eventData);
+  }
+
   // In production, emit to admin dashboard
   console.log('[Monitoring]', eventData);
 }
@@ -175,6 +180,7 @@ export async function initSocket(httpServer) {
       socket.sessionId = session.id;
       socket.userName = (user.name || "").toString().trim() || `User ${user.id}`;
       socket.userAvatar = user.avatar_url || null;
+      socket.isAdmin = Boolean(user.is_admin);
       return next();
     } catch (err) {
       connectionMetrics.connectionErrors++;
@@ -220,6 +226,18 @@ export async function initSocket(httpServer) {
         socketId: socket.id,
         userId: socket.userId
       });
+    });
+
+    socket.on('monitoring_subscribe', () => {
+      if (!socket.isAdmin) return;
+      socket.join('admin_monitoring');
+      socket.emit('monitoring_subscribed', { success: true });
+    });
+
+    socket.on('monitoring_subscribe', () => {
+      if (!socket.isAdmin) return;
+      socket.join('admin_monitoring');
+      socket.emit('monitoring_subscribed', { success: true });
     });
 
     socket.on("join_room", async (chatId) => {

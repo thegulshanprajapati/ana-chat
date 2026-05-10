@@ -627,6 +627,9 @@ router.get("/monitoring", requireAdmin, async (req, res) => {
 
   await audit(req, "VIEW_MONITORING");
   res.json({
+    connectionMetrics: socketMonitoring.connectionMetrics,
+    recentEvents: socketMonitoring.recentEvents,
+    activeSockets: socketMonitoring.activeSockets,
     health,
     recentErrors: recentErrors.map(err => ({
       id: err._id,
