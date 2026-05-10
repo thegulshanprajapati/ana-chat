@@ -33,7 +33,7 @@ export default function AdminPanel({ users: initialUsers, onReload }) {
 
   // Listen for real-time monitoring events
   useEffect(() => {
-    if (!socket || !socket.addEventListener) return;
+    if (!socket || !socket.addEventListener || !socket.emit) return;
 
     const handleMonitoringUpdate = (eventData) => {
       setMonitoringData(prev => {
@@ -46,6 +46,8 @@ export default function AdminPanel({ users: initialUsers, onReload }) {
     };
 
     socket.addEventListener('monitoring_update', handleMonitoringUpdate);
+    socket.emit('monitoring_subscribe');
+
     return () => {
       socket.removeEventListener('monitoring_update');
     };
