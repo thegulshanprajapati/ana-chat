@@ -37,6 +37,30 @@
         </div>
       </div>
       
+      <div id="db-status" class="status-item">
+        <div class="indicator loading"></div>
+        <div class="status-content">
+          <div class="status-label">Checking database...</div>
+          <div class="status-desc">Verifying MongoDB connection</div>
+        </div>
+      </div>
+
+      <div id="auth-status" class="status-item">
+        <div class="indicator loading"></div>
+        <div class="status-content">
+          <div class="status-label">Checking auth service...</div>
+          <div class="status-desc">Verifying authentication endpoint</div>
+        </div>
+      </div>
+
+      <div id="socket-status" class="status-item">
+        <div class="indicator loading"></div>
+        <div class="status-content">
+          <div class="status-label">Checking socket connections...</div>
+          <div class="status-desc">Verifying WebSocket server status</div>
+        </div>
+      </div>
+      
       <div id="details" class="details">Initializing...</div>
       
       <div class="footer">
@@ -45,40 +69,6 @@
     </div>
   </div>
 
-  <script>
-    const statusEl = document.getElementById('status');
-    const detailsEl = document.getElementById('details');
-    const timeout = 8000;
-
-    async function checkHealth() {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-      try {
-        const startTime = performance.now();
-        const res = await fetch('/healthz', { 
-          signal: controller.signal,
-          cache: 'no-store',
-          headers: { 'Accept': 'application/json' }
-        });
-        const duration = Math.round(performance.now() - startTime);
-        
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-
-        statusEl.innerHTML = '<div class="indicator active"></div><div class="status-content"><div class="status-label">✓ Server Status: Active</div><div class="status-desc">Backend is running and responding</div></div>';
-        detailsEl.innerHTML = `<strong>Response (${duration}ms):</strong><br><br>${JSON.stringify(data, null, 2)}<br><br><strong>Endpoint:</strong> /healthz<br><strong>Status:</strong> ${res.status} ${res.statusText}`;
-      } catch (error) {
-        statusEl.innerHTML = '<div class="indicator" style="background:#ef4444"></div><div class="status-content"><div class="status-label">✗ Connection Failed</div><div class="status-desc">Backend is not responding</div></div>';
-        const msg = error.name === 'AbortError' ? 'Request timeout (no response after 8s)' : error.message;
-        detailsEl.innerHTML = `<strong>Error:</strong><br>${msg}<br><br><strong>Troubleshooting:</strong><br>• Check if backend server is running<br>• Verify MongoDB connection<br>• Check network/firewall settings<br>• Review backend logs for errors`;
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    }
-
-    checkHealth();
-    setInterval(checkHealth, 30000);
-  </script>
+  <script src="/status-script.js" defer></script>
 </body>
 </html>

@@ -2,14 +2,14 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://ana-chat.onrender.com/api/:path*"
+      "destination": "https://api.chat.myana.site/api/:path*"
     },
     {
       "source": "/socket.io/:path*",
-      "destination": "https://ana-chat.onrender.com/socket.io/:path*"
+      "destination": "https://api.chat.myana.site/socket.io/:path*"
     },
     {
-      "source": "/(.*)",
+      "source": "^/(.*)$",
       "destination": "/index.html"
     }
   ]

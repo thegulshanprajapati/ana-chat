@@ -26,27 +26,63 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = express();
-app.set("trust proxy", true);
+app.set("trust proxy", 1);
 
 const apiPrefix = "/api";
-const allowedOrigins = (process.env.CLIENT_ORIGIN || "https://chat.myana.site,https://www.chat.myana.site")
+const clientOriginConfig = process.env.CLIENT_ORIGIN || process.env.CLIENT_URL || "https://chat.myana.site,https://www.chat.myana.site,https://api.chat.myana.site,http://localhost:3000,http://localhost:5173";
+const allowedOrigins = clientOriginConfig
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
 
+function originAllowed(origin) {
+  if (!origin) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  if (process.env.NODE_ENV !== "production" && /^https?:\/\/[^/]+$/.test(origin)) return true;
+  return false;
+}
+
+console.log("[Server] Trusted proxy enabled. Allowed origins:", allowedOrigins);
+
+const allowedCorsHeaders = [
+  "Content-Type",
+  "Authorization",
+  "x-device-fingerprint",
+  "X-Requested-With",
+  "Accept",
+  "Origin"
+];
+
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-    if (process.env.NODE_ENV !== "production" && /^https?:\/\/[^/]+$/.test(origin)) return callback(null, true);
+    if (originAllowed(origin)) return callback(null, true);
     return callback(new Error("Not allowed by CORS"));
   },
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: allowedCorsHeaders,
+  exposedHeaders: ["Authorization"],
   credentials: true,
+  preflightContinue: false,
   optionsSuccessStatus: 204
 };
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
+app.use((req, res, next) => {
+  const requestOrigin = req.headers.origin || "";
+  if (originAllowed(requestOrigin)) {
+    res.header("Access-Control-Allow-Origin", requestOrigin);
+  }
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Headers", allowedCorsHeaders.join(", "));
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+
+  return next();
+});
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
@@ -72,6 +108,11 @@ app.get("/", (_req, res) => {
   res.redirect("/status");
 });
 
+app.get("/status-script.js", (_req, res) => {
+  res.type("application/javascript");
+  res.sendFile(path.join(__dirname, "status-script.js"));
+});
+
 app.get("/status", (_req, res) => {
   res.sendFile(path.join(__dirname, "status.html"));
 });
@@ -80,8 +121,63 @@ app.get("/healthz", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+app.get("/health", async (req, res) => {
+  const serverStatus = "ok";
+  let databaseStatus = "unknown";
+  let socketStatus = "disconnected";
+  let dbError = null;
+
+  try {
+    await connectDb();
+    databaseStatus = "connected";
+  } catch (error) {
+    databaseStatus = "disconnected";
+    dbError = error.message;
+  }
+
+  const io = req.app.get("io");
+  if (io && io.engine) {
+    socketStatus = io.engine.clientsCount !== undefined ? "running" : "running";
+  }
+
+  return res.json({
+    server: serverStatus,
+    database: databaseStatus,
+    socket: socketStatus,
+    timestamp: new Date().toISOString(),
+    ...(dbError ? { databaseError: dbError } : {})
+  });
+});
+
+app.get("/db-health", async (_req, res) => {
+  try {
+    const db = await connectDb();
+    const pingResult = await db.admin().ping();
+    return res.json({ status: "ok", db: pingResult });
+  } catch (error) {
+    return res.status(500).json({ status: "error", message: error.message });
+  }
+});
+
 app.get(`${apiPrefix}/health`, (_req, res) => {
   res.json({ status: "ok" });
+});
+
+app.get("/api/auth/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.get("/socket-status", (req, res) => {
+  const io = req.app.get("io");
+  if (!io) {
+    return res.json({ status: "disconnected", activeConnections: 0 });
+  }
+  
+  const activeConnections = io.sockets?.sockets?.size || 0;
+  res.json({ 
+    status: activeConnections > 0 ? "connected" : "disconnected", 
+    activeConnections 
+  });
 });
 
 const authLimiter = (await import("express-rate-limit")).default({ windowMs: 5 * 60 * 1000, max: 40 });
@@ -122,28 +218,38 @@ function startServer(port, attempts = 0) {
     process.exit(1);
   });
 
-  server.listen(port, () => {
-    console.log(`[Server] Listening on port ${port} - API base path: ${apiPrefix}`);
-    console.log(`[Server] Health checks available at /healthz and ${apiPrefix}/health`);
+  const listenHost = "0.0.0.0";
+  server.listen(port, listenHost, () => {
+    console.log(`[Server] Listening on ${listenHost}:${port} - API base path: ${apiPrefix}`);
+    console.log(`[Server] Health checks available at /healthz, /health, and ${apiPrefix}/health`);
   });
 
   initSocket(server)
     .then((io) => {
       app.set("io", io);
-      console.log("[Socket.IO] Initialized successfully");
+      console.log("[Socket.IO] Initialized successfully with transports: websocket, polling");
+      console.log("[Socket.IO] CORS origins:", allowedOrigins);
     })
     .catch((err) => {
       console.error("[Socket.IO] Initialization failed:", err.message);
+      console.error("[Socket.IO] Socket connections will not be available");
     });
 }
 
-startServer(basePort);
+async function boot() {
+  console.log("[Startup] NODE_ENV=", process.env.NODE_ENV);
+  console.log("[Startup] PORT=", basePort);
+  console.log("[Startup] Allowed origins=", allowedOrigins);
 
-connectDb()
-  .then(() => {
+  try {
+    await connectDb();
     console.log("[Database] Connected successfully");
-  })
-  .catch((err) => {
-    console.error("[Database] Connection failed (non-blocking):", err.message);
+  } catch (err) {
+    console.error("[Database] Connection failed:", err.message);
     console.error("[Database] Some features may not work until database connection is restored");
-  });
+  }
+
+  startServer(basePort);
+}
+
+boot();

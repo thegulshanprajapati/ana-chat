@@ -12,6 +12,54 @@ import {
   usersAreConnectedByChat
 } from "./utils/chatDb.js";
 
+// Connection monitoring
+const connectionMetrics = {
+  totalConnections: 0,
+  activeConnections: 0,
+  totalDisconnects: 0,
+  totalReconnects: 0,
+  connectionErrors: 0
+};
+
+// Monitoring events storage (in production, this would go to a database)
+const monitoringEvents = [];
+const MAX_MONITORING_EVENTS = 1000;
+
+async function persistErrorLog(entry) {
+  try {
+    const db = await getDb();
+    await db.collection("error_logs").insertOne({
+      ...entry,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('[Error Logger] Failed to persist error log:', err?.message || err);
+  }
+}
+
+function logMonitoringEvent(eventData) {
+  const payload = {
+    id: Date.now().toString(),
+    timestamp: new Date().toISOString(),
+    ...eventData
+  };
+
+  monitoringEvents.unshift(payload);
+
+  // Keep only recent events
+  if (monitoringEvents.length > MAX_MONITORING_EVENTS) {
+    monitoringEvents.splice(MAX_MONITORING_EVENTS);
+  }
+
+  // Broadcast monitoring events to connected sockets for live admin dashboards
+  if (io) {
+    io.emit('monitoring_update', payload);
+  }
+
+  // In production, emit to admin dashboard
+  console.log('[Monitoring]', payload);
+}
+
 function userRoom(userId) {
   return `user_${userId}`;
 }
@@ -49,43 +97,54 @@ function normalizeWatchRate(rawRate) {
 
 async function createRedisAdapterIfConfigured(io) {
   const redisUrl = process.env.REDIS_URL?.trim();
-  if (!redisUrl) return null;
+  if (!redisUrl) {
+    console.log("[Socket.IO] Redis adapter disabled (REDIS_URL not set) - using in-memory adapter");
+    return null;
+  }
 
   try {
     const pubClient = createClient({ url: redisUrl });
     const subClient = pubClient.duplicate();
     await Promise.all([pubClient.connect(), subClient.connect()]);
     io.adapter(createAdapter(pubClient, subClient));
-    console.log("[Socket.IO] Redis adapter enabled.");
+    console.log("[Socket.IO] Redis adapter enabled successfully");
     return { pubClient, subClient };
   } catch (error) {
-    console.warn("[Socket.IO] Redis adapter disabled:", error.message);
+    console.warn("[Socket.IO] Redis adapter connection failed:", error.message);
+    console.warn("[Socket.IO] Falling back to in-memory adapter");
     return null;
   }
 }
 
+let io = null; // Module-level io instance for monitoring
+
 export async function initSocket(httpServer) {
-  const allowedOrigins = (process.env.CLIENT_ORIGIN || "https://chat.myana.site,https://www.chat.myana.site")
+  const clientOriginConfig = process.env.CLIENT_ORIGIN || process.env.CLIENT_URL || "https://chat.myana.site,https://www.chat.myana.site,https://api.chat.myana.site,http://localhost:3000,http://localhost:5173";
+  const allowedOrigins = clientOriginConfig
     .split(",")
     .map((v) => v.trim())
     .filter(Boolean);
 
-  const originAllowed = (origin) => {
+  function originAllowed(origin) {
     if (!origin) return true;
     if (allowedOrigins.includes(origin)) return true;
     if (process.env.NODE_ENV !== "production" && /^https?:\/\/[^/]+$/.test(origin)) return true;
+    console.warn("[Socket.IO] CORS origin rejected:", origin);
     return false;
-  };
+  }
 
-  const io = new Server(httpServer, {
+  io = new Server(httpServer, {
     cors: {
       origin(origin, callback) {
         if (originAllowed(origin)) return callback(null, true);
+        console.error("[Socket.IO] CORS blocked origin:", origin);
         return callback(new Error("CORS blocked"));
       },
-      credentials: true,
-      methods: ["GET", "POST", "PUT", "DELETE"]
-    }
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization", "x-device-fingerprint"],
+      credentials: true
+    },
+    transports: ["websocket", "polling"]
   });
 
   await createRedisAdapterIfConfigured(io);
@@ -96,11 +155,49 @@ export async function initSocket(httpServer) {
     try {
       const rawCookie = socket.handshake.headers.cookie || "";
       const parsed = cookie.parse(rawCookie);
-      const accessToken = parsed.access_token;
-      if (!accessToken) return next(new Error("Unauthorized"));
+      const headerAuth = socket.handshake.headers.authorization || socket.handshake.headers.Authorization || "";
+      const headerToken = headerAuth.startsWith("Bearer ") ? headerAuth.slice(7).trim() : null;
+      const authToken = socket.handshake.auth?.token || parsed.access_token || headerToken;
 
-      const payload = verifyToken(accessToken);
-      if (payload.typ !== "access") return next(new Error("Unauthorized"));
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[Socket.IO] handshake auth check", {
+          socketId: socket.id,
+          origin: socket.handshake.headers.origin,
+          authTokenPresent: Boolean(authToken),
+          cookieKeys: Object.keys(parsed),
+          authPayload: socket.handshake.auth
+        });
+      }
+
+      if (!authToken) {
+        connectionMetrics.connectionErrors++;
+        console.error("[Socket.IO] Handshake failed: missing auth token", {
+          origin: socket.handshake.headers.origin,
+          headers: socket.handshake.headers,
+          ip: socket.handshake.address
+        });
+        void persistErrorLog({
+          type: 'socket_handshake_error',
+          reason: 'missing_token',
+          origin: socket.handshake.headers.origin,
+          userAgent: socket.handshake.headers['user-agent'],
+          ip: socket.handshake.address
+        });
+        return next(new Error("Unauthorized"));
+      }
+
+      const payload = verifyToken(authToken);
+      if (payload.typ !== "access") {
+        connectionMetrics.connectionErrors++;
+        void persistErrorLog({
+          type: 'socket_handshake_error',
+          reason: 'invalid_token_type',
+          origin: socket.handshake.headers.origin,
+          userAgent: socket.handshake.headers['user-agent'],
+          ip: socket.handshake.address
+        });
+        return next(new Error("Unauthorized"));
+      }
 
       const db = await getDb();
       const [user, session] = await Promise.all([
@@ -115,6 +212,7 @@ export async function initSocket(httpServer) {
       ]);
 
       if (!user || !session || session.revoked_at || user.is_blocked || !user.is_verified) {
+        connectionMetrics.connectionErrors++;
         return next(new Error("Unauthorized"));
       }
 
@@ -123,12 +221,27 @@ export async function initSocket(httpServer) {
       socket.userName = (user.name || "").toString().trim() || `User ${user.id}`;
       socket.userAvatar = user.avatar_url || null;
       return next();
-    } catch {
+    } catch (err) {
+      connectionMetrics.connectionErrors++;
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[Socket.IO] token verification failed", { error: err?.message });
+      }
       return next(new Error("Unauthorized"));
     }
   });
 
   io.on("connection", async (socket) => {
+    connectionMetrics.totalConnections++;
+    connectionMetrics.activeConnections++;
+    console.log("[Socket.IO] User connected:", { socketId: socket.id, userId: socket.userId, origin: socket.handshake.headers.origin });
+    logMonitoringEvent({
+      type: 'socket_connect',
+      userId: socket.userId,
+      socketId: socket.id,
+      userAgent: socket.handshake.headers['user-agent'],
+      ip: socket.handshake.address
+    });
+
     const userId = socket.userId;
     socket.join(userRoom(userId));
 
@@ -139,6 +252,20 @@ export async function initSocket(httpServer) {
     } catch {
       // ignore status update failures
     }
+
+    // Heartbeat handler
+    socket.on('ping', (data) => {
+      socket.emit('pong', data);
+    });
+
+    // Monitoring event handler
+    socket.on('monitoring_event', (eventData) => {
+      logMonitoringEvent({
+        ...eventData,
+        socketId: socket.id,
+        userId: socket.userId
+      });
+    });
 
     socket.on("join_room", async (chatId) => {
       const normalizedChatId = Number(chatId);
@@ -152,6 +279,35 @@ export async function initSocket(httpServer) {
         socket.emit("watch_session_state", session);
       } else {
         socket.emit("watch_session_state", { chatId: normalizedChatId, active: false });
+      }
+    });
+
+    socket.on("message_delivered", async ({ messageId, chatId }) => {
+      if (!messageId || !chatId) return;
+      const db = await getDb();
+
+      try {
+        const now = new Date();
+        await db.collection("messages").updateOne(
+          { id: Number(messageId), chat_id: Number(chatId), sender_id: Number(userId) },
+          { $set: { delivery_status: 'delivered', delivered_at: now } }
+        );
+
+        // Notify sender that message was delivered
+        io.to(userRoom(userId)).emit("message_status_update", {
+          messageId,
+          chatId,
+          status: 'delivered',
+          timestamp: now
+        });
+      } catch (error) {
+        logMonitoringEvent({
+          type: 'message_delivery_update_failed',
+          userId,
+          messageId,
+          chatId,
+          error: error.message
+        });
       }
     });
 
@@ -184,12 +340,35 @@ export async function initSocket(httpServer) {
         if (blocked.blocked) return;
       }
 
+      const now = new Date();
       try {
+        // Get messages that will be marked as read
+        const unreadMessages = await db.collection("messages").find({
+          chat_id: Number(chatId),
+          sender_id: { $ne: Number(userId) },
+          delivery_status: { $ne: 'read' }
+        }).toArray();
+
+        // Update messages as read
         await db.collection("messages").updateMany(
           { chat_id: Number(chatId), sender_id: { $ne: Number(userId) } },
-          { $set: { seen: true } }
+          { $set: { seen: true, delivery_status: 'read', read_at: now } }
         );
-        socket.to(`chat_${chatId}`).emit("seen", { chatId, userId });
+
+        // Emit read receipts for each message to all participants
+        const participantIds = await getChatParticipantIds(db, chat);
+        unreadMessages.forEach((message) => {
+          participantIds.forEach((participantId) => {
+            if (participantId !== userId) {
+              io.to(userRoom(participantId)).emit("message_read", {
+                messageId: message.id,
+                chatId,
+                userId,
+                timestamp: now
+              });
+            }
+          });
+        });
       } catch {
         // ignore
       }
@@ -218,11 +397,14 @@ export async function initSocket(httpServer) {
           id: messageId,
           chat_id: Number(chatId),
           sender_id: Number(userId),
-          client_message_id: null,
+          client_message_id: clientMessageId,
           reply_to_message_id: null,
           body: normalizedBody,
           image_url: null,
           seen: false,
+          delivery_status: 'sent', // sent, delivered, read
+          delivered_at: null,
+          read_at: null,
           created_at: now,
           updated_at: null,
           deleted_for_everyone: false,
@@ -236,6 +418,15 @@ export async function initSocket(httpServer) {
         participantIds.forEach((participantId) => {
           io.to(userRoom(participantId)).emit("receive_message", message);
         });
+
+        // Emit delivery status to sender - message is now delivered to recipients
+        io.to(userRoom(userId)).emit("message_delivered", {
+          messageId,
+          chatId,
+          status: 'delivered',
+          timestamp: now
+        });
+
         notifyChatUpdated(io, participantIds, chatId);
       } catch {
         // ignore
@@ -464,6 +655,15 @@ export async function initSocket(httpServer) {
     });
 
     socket.on("disconnect", async () => {
+      connectionMetrics.activeConnections--;
+      connectionMetrics.totalDisconnects++;
+      logMonitoringEvent({
+        type: 'socket_disconnect',
+        userId: socket.userId,
+        socketId: socket.id,
+        reason: 'user_disconnect'
+      });
+
       const room = io.sockets.adapter.rooms.get(userRoom(userId));
       if (room && room.size > 0) return;
 
@@ -481,5 +681,37 @@ export async function initSocket(httpServer) {
     });
   });
 
+  // Global connection error monitoring
+  io.on('connection_error', (error) => {
+    connectionMetrics.connectionErrors++;
+    const eventData = {
+      type: 'socket_connection_error',
+      error: error.message,
+      code: error.code,
+      context: error.context
+    };
+    logMonitoringEvent(eventData);
+    void persistErrorLog({
+      type: 'socket_connection_error',
+      message: error.message,
+      code: error.code,
+      context: error.context
+    });
+  });
+
   return io;
+}
+
+// Export monitoring data for admin panel
+export function getSocketMonitoringData() {
+  return {
+    connectionMetrics,
+    recentEvents: monitoringEvents.slice(0, 100),
+    activeSockets: io ? Array.from(io.sockets?.sockets || []).map(socket => ({
+      id: socket.id,
+      userId: socket.userId,
+      connectedAt: socket.handshake.time,
+      userAgent: socket.handshake.headers['user-agent']
+    })) : []
+  };
 }

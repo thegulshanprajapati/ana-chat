@@ -1,8 +1,7 @@
 import express from "express";
 import fs from "node:fs";
 import multer from "multer";
-import path from "path";
-import { getDb } from "../db.js";
+import path from "path";import bcrypt from "bcryptjs";import { getDb } from "../db.js";
 import { requireUser } from "../middleware/auth.js";
 import { writeUserActivity } from "../services/userActivity.js";
 
@@ -251,6 +250,26 @@ router.put("/me/public-key", requireUser, async (req, res) => {
   );
 
   res.json({ success: true, id: updated?.id, publicKey: updated?.public_key || null });
+});
+
+router.put("/me/private-key-backup", requireUser, async (req, res) => {
+  const encryptedPrivateKey = req.body?.encryptedPrivateKey;
+  const pin = (req.body?.pin || "").toString().trim();
+  if (!encryptedPrivateKey || typeof encryptedPrivateKey !== "object") {
+    return res.status(400).json({ message: "encryptedPrivateKey required" });
+  }
+  if (!/^[0-9]{4,8}$/.test(pin)) {
+    return res.status(400).json({ message: "PIN must be 4 to 8 digits" });
+  }
+
+  const db = await getDb();
+  const pinHash = await bcrypt.hash(pin, 10);
+  await db.collection("users").updateOne(
+    { id: Number(req.user.id) },
+    { $set: { private_key_backup: encryptedPrivateKey, private_key_backup_pin_hash: pinHash } }
+  );
+
+  res.json({ success: true });
 });
 
 router.get("/:userId/public-key", requireUser, async (req, res) => {

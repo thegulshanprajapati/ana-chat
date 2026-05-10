@@ -764,6 +764,7 @@ export default function ChatPage() {
       reply_to_image_url: replyTarget?.image_url || null,
       reply_to_deleted_for_everyone: Boolean(replyTarget?.deleted_for_everyone),
       seen: 0,
+      delivery_status: "sending",
       created_at: new Date().toISOString(),
       pending: true
     };
@@ -804,8 +805,8 @@ export default function ChatPage() {
       const decryptedData = await decryptMessageForMe(data);
 
       setMessages((prev) => {
-        const replaced = prev.map((msg) => (msg.id === tempId ? decryptedData : msg));
-        return replaced.some((msg) => msg.id === decryptedData.id) ? replaced : [...replaced, decryptedData];
+        const replaced = prev.map((msg) => (msg.id === tempId ? { ...decryptedData, delivery_status: "sent" } : msg));
+        return replaced.some((msg) => msg.id === decryptedData.id) ? replaced : [...replaced, { ...decryptedData, delivery_status: "sent" }];
       });
       setChats((prev) => sortChats(prev.map((chat) => (
         chat.id === activeChat.id
@@ -1044,7 +1045,7 @@ export default function ChatPage() {
 
   const handleSeen = useCallback(() => {
     if (!activeChatIdRef.current) return;
-    socket?.emit("seen", { chatId: activeChatIdRef.current });
+    socket?.emitWithMonitoring?.("seen", { chatId: activeChatIdRef.current }) || socket?.emit("seen", { chatId: activeChatIdRef.current });
   }, [socket]);
 
   const setWatchSource = useCallback(async ({ chatId, sourceUrl, title }) => {
@@ -1944,52 +1945,88 @@ export default function ChatPage() {
       notify({ type: "error", message: payload?.message || "Watch Together failed." });
     };
 
-    socket.on("receive_message", onReceive);
-    socket.on("typing", onTyping);
-    socket.on("seen", onSeen);
-    socket.on("chat_updated", onChatUpdated);
-    socket.on("message_updated", onMessageUpdated);
-    socket.on("message_deleted_everyone", onMessageDeletedEveryone);
-    socket.on("message_reaction", onMessageReaction);
-    socket.on("user_status", onStatus);
-    socket.on("user_profile_updated", onProfileUpdated);
-    socket.on("call_offer", onCallOffer);
-    socket.on("call_answer", onCallAnswer);
-    socket.on("call_ice_candidate", onCallIce);
-    socket.on("call_end", onCallEnd);
-    socket.on("call_reject", onCallReject);
-    socket.on("call_error", onCallError);
-    socket.on("watch_session_state", onWatchSessionState);
-    socket.on("watch_playback_sync", onWatchPlaybackSync);
-    socket.on("watch_error", onWatchError);
+    const onMessageDelivered = (payload) => {
+      const { messageId, deliveredAt } = payload;
+      if (!messageId) return;
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? { ...msg, delivery_status: "delivered", delivered_at: deliveredAt }
+            : msg
+        )
+      );
+    };
+
+    const onMessageRead = (payload) => {
+      const { messageId, readAt } = payload;
+      if (!messageId) return;
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? { ...msg, delivery_status: "read", read_at: readAt }
+            : msg
+        )
+      );
+    };
+
+    const onMessageStatusUpdate = (payload) => {
+      const { messageId, status, timestamp } = payload;
+      if (!messageId || !status) return;
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? {
+                ...msg,
+                delivery_status: status,
+                ...(status === "delivered" && { delivered_at: timestamp }),
+                ...(status === "read" && { read_at: timestamp })
+              }
+            : msg
+        )
+      );
+    };
+
+    // Set up socket event listeners using enhanced socket context
+    if (socket && socket.addEventListener) {
+      socket.addEventListener("receive_message", onReceive);
+      socket.addEventListener("typing", onTyping);
+      socket.addEventListener("seen", onSeen);
+      socket.addEventListener("chat_updated", onChatUpdated);
+      socket.addEventListener("message_updated", onMessageUpdated);
+      socket.addEventListener("message_deleted_everyone", onMessageDeletedEveryone);
+      socket.addEventListener("message_reaction", onMessageReaction);
+      socket.addEventListener("user_status", onStatus);
+      socket.addEventListener("user_profile_updated", onProfileUpdated);
+      socket.addEventListener("call_offer", onCallOffer);
+      socket.addEventListener("call_answer", onCallAnswer);
+      socket.addEventListener("call_ice_candidate", onCallIce);
+      socket.addEventListener("call_end", onCallEnd);
+      socket.addEventListener("call_reject", onCallReject);
+      socket.addEventListener("call_error", onCallError);
+      socket.addEventListener("watch_session_state", onWatchSessionState);
+      socket.addEventListener("watch_playback_sync", onWatchPlaybackSync);
+      socket.addEventListener("watch_error", onWatchError);
+      socket.addEventListener("message_delivered", onMessageDelivered);
+      socket.addEventListener("message_read", onMessageRead);
+      socket.addEventListener("message_status_update", onMessageStatusUpdate);
+    }
 
     return () => {
-      socket.off("receive_message", onReceive);
-      socket.off("typing", onTyping);
-      socket.off("seen", onSeen);
-      socket.off("chat_updated", onChatUpdated);
-      socket.off("message_updated", onMessageUpdated);
-      socket.off("message_deleted_everyone", onMessageDeletedEveryone);
-      socket.off("message_reaction", onMessageReaction);
-      socket.off("user_status", onStatus);
-      socket.off("user_profile_updated", onProfileUpdated);
-      socket.off("call_offer", onCallOffer);
-      socket.off("call_answer", onCallAnswer);
-      socket.off("call_ice_candidate", onCallIce);
-      socket.off("call_end", onCallEnd);
-      socket.off("call_reject", onCallReject);
-      socket.off("call_error", onCallError);
-      socket.off("watch_session_state", onWatchSessionState);
-      socket.off("watch_playback_sync", onWatchPlaybackSync);
-      socket.off("watch_error", onWatchError);
+      // Clean up event listeners using enhanced socket context
+      if (socket && socket.removeAllEventListeners) {
+        socket.removeAllEventListeners();
+      }
       clearTimeout(typingTimer.current);
       clearTimeout(chatUpdatedTimerRef.current);
     };
   }, [loadChats, loadMessages, notify, reload, resetCallState, socket, user?.id]);
 
   useEffect(() => {
-    if (socket && activeChat?.id) {
-      socket.emit("join_room", activeChat.id);
+    if (socket && socket.joinRoom && activeChat?.id) {
+      socket.joinRoom(`chat_${activeChat.id}`);
     }
   }, [activeChat?.id, socket]);
 

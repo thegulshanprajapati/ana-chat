@@ -1473,13 +1473,21 @@ function MessageBubble({
 }
 
 function SeenStatus({ message }) {
-  if (message.pending) {
+  const status = message.delivery_status || "sent";
+
+  if (status === "sending" || message.pending) {
     return <Check size={12} className="opacity-60" aria-label="Sending" />;
   }
-  if (message.seen) {
-    return <CheckCheck size={12} className="text-violet-200" aria-label="Seen" />;
+  if (status === "sent") {
+    return <Check size={12} className="opacity-60" aria-label="Sent" />;
   }
-  return <Check size={12} className="opacity-90" aria-label="Delivered" />;
+  if (status === "delivered") {
+    return <CheckCheck size={12} className="opacity-90" aria-label="Delivered" />;
+  }
+  if (status === "read") {
+    return <CheckCheck size={12} className="text-blue-500" aria-label="Read" />;
+  }
+  return <Check size={12} className="opacity-60" aria-label="Sent" />;
 }
 
 export default memo(MessageBubble);

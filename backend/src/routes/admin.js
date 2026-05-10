@@ -6,6 +6,7 @@ import { requireUser } from "../middleware/auth.js";
 import { signAdminToken } from "../services/tokens.js";
 import { writeAuditLog } from "../services/audit.js";
 import { revokeAllUserSessions } from "../services/session.js";
+import { getSocketMonitoringData } from "../socket.js";
 
 const router = express.Router();
 
@@ -582,6 +583,65 @@ router.get("/user-activity", requireAdmin, async (req, res) => {
 
   await audit(req, "VIEW_USER_ACTIVITY", { q, type: typeFilter || "ALL", limit });
   res.json(payload);
+});
+
+router.get("/monitoring", requireAdmin, async (req, res) => {
+  const io = req.app.get("io");
+  const db = await getDb();
+
+  // Get socket monitoring data
+  const socketMonitoring = io ? getSocketMonitoringData() : {
+    connectionMetrics: { totalConnections: 0, activeConnections: 0, totalDisconnects: 0, totalReconnects: 0, connectionErrors: 0 },
+    recentEvents: [],
+    activeSockets: []
+  };
+
+  // Get database stats
+  const userCount = await db.collection("users").countDocuments();
+  const messageCount = await db.collection("messages").countDocuments();
+  const chatCount = await db.collection("chats").countDocuments();
+
+  // Get recent errors from database (if we add error logging)
+  const recentErrors = await db.collection("error_logs")
+    .find({})
+    .sort({ timestamp: -1 })
+    .limit(50)
+    .toArray();
+
+  // Get system health
+  const health = {
+    server: {
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      nodeVersion: process.version,
+      platform: process.platform
+    },
+    database: {
+      connected: true, // Assume connected if we got here
+      userCount,
+      messageCount,
+      chatCount
+    },
+    sockets: socketMonitoring
+  };
+
+  const socketStatus = socketMonitoring.connectionMetrics?.activeConnections > 0 ? 'online' : 'offline';
+
+  await audit(req, "VIEW_MONITORING");
+  res.json({
+    health,
+    socketStatus,
+    recentErrors: recentErrors.map(err => ({
+      id: err._id,
+      type: err.type,
+      message: err.message,
+      stack: err.stack,
+      userId: err.userId,
+      path: err.path,
+      method: err.method,
+      timestamp: err.timestamp
+    }))
+  });
 });
 
 export default router;

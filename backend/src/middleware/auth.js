@@ -28,19 +28,37 @@ function parseSettings(rawValue) {
   }
 }
 
+function extractToken(req) {
+  const header = req.headers?.authorization || req.headers?.Authorization;
+  const bearerToken = header?.startsWith("Bearer ") ? header.slice(7).trim() : null;
+  return req.cookies?.access_token || bearerToken || null;
+}
+
 export async function requireUser(req, res, next) {
-  const token = req.cookies?.access_token;
-  if (!token) return res.status(401).json({ message: "Unauthorized" });
+  const token = extractToken(req);
+  if (!token) {
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[Auth] Missing token", {
+        cookies: req.cookies,
+        authorization: req.headers?.authorization
+      });
+    }
+    return res.status(401).json({ message: "Unauthorized" });
+  }
 
   try {
     const payload = verifyToken(token);
-    if (payload.typ !== "access") return res.status(401).json({ message: "Unauthorized" });
+    if (payload.typ !== "access") {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
     const db = await getDb();
     const user = await db.collection("users").findOne({ id: payload.uid });
     const session = await db.collection("sessions").findOne({ id: payload.sid, user_id: payload.uid });
 
-    if (!user || !session || session.revoked_at) return res.status(401).json({ message: "Session revoked" });
+    if (!user || !session || session.revoked_at) {
+      return res.status(401).json({ message: "Session revoked" });
+    }
     if (user.is_blocked) return res.status(403).json({ message: "User blocked" });
     if (!user.is_verified) return res.status(403).json({ message: "User not verified" });
 
@@ -48,7 +66,6 @@ export async function requireUser(req, res, next) {
     const shouldBeSuperAdmin = isSuperAdminPhone(normalizedPhone);
     const computedIsAdmin = computeIsAdmin(user);
 
-    // Auto-heal: keep `phone` populated and ensure SUPER_ADMIN is always admin.
     const userSet = {};
     if (!user.phone && user.mobile) userSet.phone = user.mobile;
     if (shouldBeSuperAdmin && !user.is_admin) userSet.is_admin = true;
@@ -77,6 +94,9 @@ export async function requireUser(req, res, next) {
     req.sessionId = session.id;
     next();
   } catch (err) {
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[Auth] JWT verification failed", { error: err?.message, token: token?.slice(0, 20) });
+    }
     res.status(401).json({ message: "Invalid token" });
   }
 }

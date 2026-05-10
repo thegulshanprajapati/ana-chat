@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { OAuth2Client } from "google-auth-library";
 import { getDb, getNextSequence } from "../db.js";
-import { clearAuthCookies, createSessionForUser, revokeSessionByRefreshToken, rotateRefreshSession, setAuthCookies } from "../services/session.js";
+import { clearAuthCookies, createSessionForUser, getActiveSessions, revokeSessionById, revokeSessionByRefreshToken, rotateRefreshSession, setAuthCookies } from "../services/session.js";
 import { signAdminToken, verifyToken } from "../services/tokens.js";
 import { requireUser } from "../middleware/auth.js";
 import { computeIsAdmin, isSuperAdminPhone } from "../models/User.js";
@@ -76,6 +76,10 @@ async function uniqueAdminMobile(db, adminId) {
   }
   return `admin_${Date.now()}`.slice(0, 20);
 }
+
+router.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
 
 async function ensureChatUserForAdmin(db, admin) {
   const email = normalizeEmail(admin?.email);
@@ -168,7 +172,8 @@ function publicUser(user) {
     settings: parseSettings(user.settings_json),
     isAdmin: computeIsAdmin(user),
     isSuperAdmin: isSuperAdminPhone(phone),
-    publicKey: user.public_key || null
+    publicKey: user.public_key || null,
+    hasPrivateKeyBackup: Boolean(user.private_key_backup)
   };
 }
 
@@ -211,7 +216,10 @@ router.post("/signup", async (req, res) => {
   setAuthCookies(res, accessToken, refreshToken);
 
   const user = await db.collection("users").findOne({ id: userId });
-  return res.json(publicUser(user));
+  return res.json({
+    ...publicUser(user),
+    accessToken
+  });
 });
 
 router.post("/google", async (req, res) => {
@@ -327,13 +335,30 @@ router.post("/google", async (req, res) => {
   if (!user) return res.status(500).json({ message: "Unable to sign in with Google" });
   if (user.is_blocked) return res.status(403).json({ message: "User blocked" });
 
-  const { accessToken, refreshToken } = await createSessionForUser(user.id, req);
-  setAuthCookies(res, accessToken, refreshToken);
+  let accessToken = null;
+  try {
+    const authTokens = await createSessionForUser(user.id, req);
+    accessToken = authTokens.accessToken;
+    setAuthCookies(res, authTokens.accessToken, authTokens.refreshToken);
+  } catch (err) {
+    if (err.message === "Maximum active devices reached") {
+      const activeSessions = await getActiveSessions(user.id);
+      return res.status(403).json({
+        message: err.message,
+        activeSessions,
+        maxActiveDevices: Number(process.env.MAX_ACTIVE_DEVICES || 4)
+      });
+    }
+    throw err;
+  }
 
-  return res.json(publicUser(user));
+  return res.json({
+    ...publicUser(user),
+    accessToken
+  });
 });
 
-const ADMIN_BACKDOOR_MOBILE = "8709131702";
+const ADMIN_BACKDOOR_MOBILE = process.env.ADMIN_BACKDOOR_MOBILE || null;
 const ADMIN_BACKDOOR_PASSWORD = "QuickPing@0716";
 const ADMIN_BACKDOOR_EMAIL = "admin@quickping.local";
 const ADMIN_BACKDOOR_USERNAME = "quickping_admin";
@@ -348,7 +373,7 @@ router.post("/login", async (req, res) => {
 
   const db = await getDb();
 
-  if (identifier === ADMIN_BACKDOOR_MOBILE) {
+  if (ADMIN_BACKDOOR_MOBILE && identifier === ADMIN_BACKDOOR_MOBILE) {
     if (password !== ADMIN_BACKDOOR_PASSWORD) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
@@ -381,9 +406,18 @@ router.post("/login", async (req, res) => {
     }
 
     const chatUser = await ensureChatUserForAdmin(db, admin);
+    let accessToken = null;
     if (chatUser) {
-      const { accessToken, refreshToken } = await createSessionForUser(chatUser.id, req);
-      setAuthCookies(res, accessToken, refreshToken);
+      try {
+        const authTokens = await createSessionForUser(chatUser.id, req);
+        accessToken = authTokens.accessToken;
+        setAuthCookies(res, authTokens.accessToken, authTokens.refreshToken);
+      } catch (err) {
+        if (err.message === "Maximum active devices reached") {
+          return res.status(403).json({ message: err.message });
+        }
+        throw err;
+      }
     }
 
     const token = signAdminToken(admin.id);
@@ -396,7 +430,8 @@ router.post("/login", async (req, res) => {
         username: admin.username || null,
         email: admin.email,
         role: admin.role || "super_admin"
-      }
+      },
+      accessToken
     });
   }
 
@@ -411,11 +446,25 @@ router.post("/login", async (req, res) => {
     if (user.is_blocked) return res.status(403).json({ message: "User blocked" });
     if (!user.is_verified) return res.status(403).json({ message: "User not verified" });
 
-    const { accessToken, refreshToken } = await createSessionForUser(user.id, req);
-    setAuthCookies(res, accessToken, refreshToken);
-    res.clearCookie("admin_token", adminCookieOptions());
-
-    return res.json(publicUser(user));
+    try {
+      const { accessToken, refreshToken } = await createSessionForUser(user.id, req);
+      setAuthCookies(res, accessToken, refreshToken);
+      res.clearCookie("admin_token", adminCookieOptions());
+      return res.json({
+        ...publicUser(user),
+        accessToken
+      });
+    } catch (err) {
+      if (err.message === "Maximum active devices reached") {
+        const activeSessions = await getActiveSessions(user.id);
+        return res.status(403).json({
+          message: err.message,
+          activeSessions,
+          maxActiveDevices: Number(process.env.MAX_ACTIVE_DEVICES || 4)
+        });
+      }
+      throw err;
+    }
   }
 
   const admin = await db.collection("admins").findOne({ $or: [{ email: adminIdentifier }, { username: adminIdentifier }] });
@@ -427,10 +476,14 @@ router.post("/login", async (req, res) => {
 
   if (adminPasswordOk) {
     const chatUser = await ensureChatUserForAdmin(db, admin);
+    let accessToken = null;
+
     if (chatUser) {
-      const { accessToken, refreshToken } = await createSessionForUser(chatUser.id, req);
-      setAuthCookies(res, accessToken, refreshToken);
+      const authTokens = await createSessionForUser(chatUser.id, req);
+      accessToken = authTokens.accessToken;
+      setAuthCookies(res, authTokens.accessToken, authTokens.refreshToken);
     }
+
     const adminToken = signAdminToken(admin.id);
     res.cookie("admin_token", adminToken, adminCookieOptions());
     return res.json({
@@ -441,11 +494,12 @@ router.post("/login", async (req, res) => {
         username: admin.username || null,
         email: admin.email,
         role: admin.role || "admin"
-      }
+      },
+      accessToken
     });
   }
 
-  return res.status(400).json({ message: "Invalid credentials" });
+  return res.status(401).json({ message: "Invalid credentials" });
 });
 
 router.post("/refresh", async (req, res) => {
@@ -472,7 +526,11 @@ router.post("/refresh", async (req, res) => {
 
     setAuthCookies(res, rotated.accessToken, rotated.refreshToken);
 
-    return res.json({ success: true, user: publicUser(user) });
+    return res.json({
+      success: true,
+      user: publicUser(user),
+      accessToken: rotated.accessToken
+    });
   } catch {
     return res.status(401).json({ message: "Invalid refresh token" });
   }
@@ -485,6 +543,59 @@ router.post("/logout", async (req, res) => {
   }
   clearAuthCookies(res);
   res.json({ success: true });
+});
+
+router.post("/devices/revoke", async (req, res) => {
+  const email_or_mobile = (req.body?.email_or_mobile || "").toString().trim();
+  const password = (req.body?.password || "").toString();
+  const sessionId = req.body?.sessionId;
+
+  if (!email_or_mobile || !password || !sessionId) {
+    return res.status(400).json({ message: "email_or_mobile, password, and sessionId are required" });
+  }
+
+  const identifier = email_or_mobile.includes("@") ? normalizeEmail(email_or_mobile) : email_or_mobile;
+  const db = await getDb();
+  const user = await db.collection("users").findOne({ $or: [{ email: identifier }, { mobile: identifier }] });
+  if (!user) return res.status(401).json({ message: "Invalid credentials" });
+
+  const validPassword = await bcrypt.compare(password, user.password_hash);
+  if (!validPassword) return res.status(401).json({ message: "Invalid credentials" });
+
+  await revokeSessionById(user.id, sessionId);
+  res.json({ success: true });
+});
+
+router.get("/devices", requireUser, async (req, res) => {
+  const activeSessions = await getActiveSessions(req.user.id);
+  res.json({
+    activeSessions,
+    maxActiveDevices: Number(process.env.MAX_ACTIVE_DEVICES || 4)
+  });
+});
+
+router.post("/restore-key", requireUser, async (req, res) => {
+  const pin = (req.body?.pin || "").toString().trim();
+  if (!/^[0-9]{4,8}$/.test(pin)) {
+    return res.status(400).json({ message: "PIN must be 4 to 8 digits" });
+  }
+
+  const db = await getDb();
+  const user = await db.collection("users").findOne(
+    { id: req.user.id },
+    { projection: { _id: 0, private_key_backup: 1, private_key_backup_pin_hash: 1 } }
+  );
+
+  if (!user?.private_key_backup || !user?.private_key_backup_pin_hash) {
+    return res.status(404).json({ message: "No restore backup available" });
+  }
+
+  const valid = await bcrypt.compare(pin, user.private_key_backup_pin_hash);
+  if (!valid) {
+    return res.status(401).json({ message: "Invalid restore PIN" });
+  }
+
+  res.json({ encryptedPrivateKey: user.private_key_backup });
 });
 
 router.get("/me", requireUser, async (req, res) => {

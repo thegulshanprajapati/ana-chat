@@ -46,32 +46,120 @@ function runtimeBaseUrl(rawBaseUrl, fallbackPort = "5173", isApiUrl = false) {
   }
 }
 
-export const API_BASE_URL = runtimeBaseUrl(import.meta.env.VITE_API_URL, "5000", true);
-export const SOCKET_BASE_URL = runtimeBaseUrl(import.meta.env.VITE_SOCKET_URL || API_BASE_URL.replace(/\/api$/, ""), "5000");
+const PRODUCTION_API_FALLBACK = "https://api.chat.myana.site/api";
+const PRODUCTION_SOCKET_FALLBACK = "https://api.chat.myana.site";
+
+const isProductionHost = import.meta.env.PROD && typeof window !== "undefined" && !["localhost", "127.0.0.1"].includes(window.location.hostname);
+
+const rawApiUrl = import.meta.env.VITE_API_URL || (
+  isProductionHost ? PRODUCTION_API_FALLBACK : ""
+);
+
+const rawSocketUrl = import.meta.env.VITE_SOCKET_URL || (
+  rawApiUrl ? rawApiUrl.replace(/\/api$/, "") : ""
+) || (
+  isProductionHost ? PRODUCTION_SOCKET_FALLBACK : ""
+);
+
+export const API_BASE_URL = runtimeBaseUrl(rawApiUrl, "5000", true);
+export const SOCKET_BASE_URL = runtimeBaseUrl(rawSocketUrl, "5000");
+
+const DEVICE_FINGERPRINT_KEY = "anach_device_fingerprint_v1";
+
+function getDeviceFingerprint() {
+  try {
+    if (typeof localStorage !== "undefined") {
+      let fingerprint = localStorage.getItem(DEVICE_FINGERPRINT_KEY);
+      if (!fingerprint) {
+        const array = new Uint8Array(16);
+        crypto.getRandomValues(array);
+        fingerprint = Array.from(array).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+        localStorage.setItem(DEVICE_FINGERPRINT_KEY, fingerprint);
+      }
+      return fingerprint;
+    }
+  } catch {
+    // ignore localStorage failures
+  }
+  return null;
+}
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true
+  withCredentials: true,
+  headers: {
+    "Content-Type": "application/json"
+  }
 });
 
 let refreshingPromise = null;
 
+function getStoredAccessToken() {
+  try {
+    return typeof localStorage !== "undefined" ? localStorage.getItem("access_token") : null;
+  } catch {
+    return null;
+  }
+}
+
+function setStoredAccessToken(token) {
+  try {
+    if (typeof localStorage !== "undefined" && token) {
+      localStorage.setItem("access_token", token);
+    }
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function clearStoredAccessToken() {
+  try {
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem("access_token");
+    }
+  } catch {
+    // ignore storage failures
+  }
+}
+
+api.interceptors.request.use((config) => {
+  const fingerprint = getDeviceFingerprint();
+  if (fingerprint) {
+    config.headers = {
+      ...config.headers,
+      "x-device-fingerprint": fingerprint
+    };
+  }
+
+  const authToken = getStoredAccessToken();
+  if (authToken && !config.headers?.Authorization) {
+    config.headers = {
+      ...config.headers,
+      Authorization: `Bearer ${authToken}`
+    };
+  }
+
+  return config;
+});
+
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const token = response?.data?.accessToken;
+    if (token) {
+      setStoredAccessToken(token);
+    }
+    return response;
+  },
   async (error) => {
     const original = error.config || {};
     const status = error.response?.status;
     const url = original.url || "";
+    const isAuthRequest = url.startsWith("/auth/");
 
-    const skipRefresh =
-      url.startsWith("/admin") ||
-      url.startsWith("/auth/login") ||
-      url.startsWith("/auth/signup") ||
-      url.startsWith("/auth/google") ||
-      url.startsWith("/auth/refresh") ||
-      url.startsWith("/auth/logout");
-
-    if (status !== 401 || original._retry || skipRefresh) {
+    if (status !== 401 || original._retry || isAuthRequest) {
+      if (status === 401 && isAuthRequest) {
+        clearStoredAccessToken();
+      }
       return Promise.reject(error);
     }
 
@@ -84,10 +172,20 @@ api.interceptors.response.use(
         });
       }
 
-      await refreshingPromise;
+      const refreshResponse = await refreshingPromise;
+      const refreshedToken = refreshResponse?.data?.accessToken;
+      if (refreshedToken) {
+        setStoredAccessToken(refreshedToken);
+      }
       return api(original);
     } catch (refreshErr) {
+      clearStoredAccessToken();
+      if (typeof window !== "undefined") {
+        window.location.href = "/";
+      }
       return Promise.reject(refreshErr);
     }
   }
 );
+
+export { getStoredAccessToken, setStoredAccessToken, clearStoredAccessToken };

@@ -12,15 +12,7 @@
     <meta name="theme-color" content="#04112f" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AnaChat</title>
-    <script>
-      (function () {
-        try {
-          var mode = (localStorage.getItem("chat_color_mode") || "").toLowerCase();
-          if (mode === "light") document.documentElement.classList.remove("dark");
-          else document.documentElement.classList.add("dark"); // default to dark
-        } catch (e) {}
-      })();
-    </script>
+    <script type="module" src="/src/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>
