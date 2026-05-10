@@ -154,10 +154,11 @@ api.interceptors.response.use(
     const original = error.config || {};
     const status = error.response?.status;
     const url = original.url || "";
-    const isAuthRequest = url.startsWith("/auth/");
+    const isRefreshRequest = url.startsWith("/auth/refresh");
+    const isAuthMeRequest = url === "/auth/me";
 
-    if (status !== 401 || original._retry || isAuthRequest) {
-      if (status === 401 && isAuthRequest) {
+    if (status !== 401 || original._retry || isRefreshRequest) {
+      if (status === 401 && (isRefreshRequest || isAuthMeRequest || url.startsWith("/auth/"))) {
         clearStoredAccessToken();
       }
       return Promise.reject(error);

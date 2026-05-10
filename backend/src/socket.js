@@ -141,7 +141,7 @@ export async function initSocket(httpServer) {
         return callback(new Error("CORS blocked"));
       },
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization", "x-device-fingerprint"],
+      allowedHeaders: ["Content-Type", "Authorization", "x-device-fingerprint", "X-Requested-With", "Accept", "Origin"],
       credentials: true
     },
     transports: ["websocket", "polling"]
