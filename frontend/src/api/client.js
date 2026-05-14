@@ -18,7 +18,7 @@ function runtimeBaseUrl(rawBaseUrl, fallbackPort = "5173", isApiUrl = false) {
       : hostname === "localhost" || hostname === "127.0.0.1"
         ? `${protocol}//${hostname}:${fallbackPort}`
         : `${protocol}//${hostname}`;
-    
+
   if (!rawBaseUrl) return fallback;
   if (rawBaseUrl.startsWith("/")) return rawBaseUrl.replace(/\/$/, "");
 
@@ -84,9 +84,34 @@ function getDeviceFingerprint() {
   return null;
 }
 
+// Request deduplication cache
+const pendingRequests = new Map();
+
+function generateRequestKey(config) {
+  return `${config.method?.toUpperCase()}_${config.url}_${JSON.stringify(config.params || {})}_${JSON.stringify(config.data || {})}`;
+}
+
+function isRequestPending(key) {
+  return pendingRequests.has(key);
+}
+
+function addPendingRequest(key, abortController) {
+  pendingRequests.set(key, abortController);
+}
+
+function removePendingRequest(key) {
+  pendingRequests.delete(key);
+}
+
+function cancelPendingRequests() {
+  pendingRequests.forEach((controller) => controller.abort());
+  pendingRequests.clear();
+}
+
 export const api = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
+  timeout: 30000, // 30 seconds timeout
   headers: {
     "Content-Type": "application/json"
   }
@@ -122,7 +147,26 @@ function clearStoredAccessToken() {
   }
 }
 
+// Request interceptor with deduplication
 api.interceptors.request.use((config) => {
+  // Add AbortController for cancellation
+  const controller = new AbortController();
+  config.signal = controller.signal;
+
+  // Generate request key for deduplication
+  const requestKey = generateRequestKey(config);
+
+  // Check if request is already pending
+  if (isRequestPending(requestKey)) {
+    console.warn('[API] Duplicate request detected, cancelling:', requestKey);
+    controller.abort();
+    return config;
+  }
+
+  // Add to pending requests
+  addPendingRequest(requestKey, controller);
+
+  // Add fingerprint
   const fingerprint = getDeviceFingerprint();
   if (fingerprint) {
     config.headers = {
@@ -131,6 +175,7 @@ api.interceptors.request.use((config) => {
     };
   }
 
+  // Add auth token
   const authToken = getStoredAccessToken();
   if (authToken && !config.headers?.Authorization) {
     config.headers = {
@@ -142,8 +187,13 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Response interceptor with retry logic
 api.interceptors.response.use(
   (response) => {
+    // Remove from pending requests
+    const requestKey = generateRequestKey(response.config);
+    removePendingRequest(requestKey);
+
     const token = response?.data?.accessToken;
     if (token) {
       setStoredAccessToken(token);
@@ -152,11 +202,22 @@ api.interceptors.response.use(
   },
   async (error) => {
     const original = error.config || {};
+    const requestKey = generateRequestKey(original);
+
+    // Remove from pending requests on error
+    removePendingRequest(requestKey);
+
     const status = error.response?.status;
     const url = original.url || "";
     const isRefreshRequest = url.startsWith("/auth/refresh");
     const isAuthMeRequest = url === "/auth/me";
 
+    // Don't retry aborted requests
+    if (error.name === 'AbortError') {
+      return Promise.reject(error);
+    }
+
+    // Don't retry certain requests
     if (status !== 401 || original._retry || isRefreshRequest) {
       if (status === 401 && (isRefreshRequest || isAuthMeRequest || url.startsWith("/auth/"))) {
         clearStoredAccessToken();
@@ -189,4 +250,45 @@ api.interceptors.response.use(
   }
 );
 
-export { getStoredAccessToken, setStoredAccessToken, clearStoredAccessToken };
+// Utility functions
+export { getStoredAccessToken, setStoredAccessToken, clearStoredAccessToken, cancelPendingRequests };
+
+// Hook for using API with loading states and cancellation
+export function useApi() {
+  const abortControllerRef = useRef(null);
+
+  const makeRequest = useCallback(async (config) => {
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new controller
+    abortControllerRef.current = new AbortController();
+    config.signal = abortControllerRef.current.signal;
+
+    try {
+      const response = await api(config);
+      return response;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('[API] Request cancelled');
+        return null;
+      }
+      throw error;
+    }
+  }, []);
+
+  const cancel = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => cancel();
+  }, [cancel]);
+
+  return { makeRequest, cancel };
+}

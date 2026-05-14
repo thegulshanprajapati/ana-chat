@@ -5,6 +5,9 @@ import ReactionMockup from "./pages/ReactionMockup";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { SocketProvider } from "./context/SocketContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { ToastProvider } from "./context/ToastContext";
+import { OfflineQueueProvider } from "./context/OfflineQueueContext";
+import { ConnectionBanner } from "./components/common/SocketStatusIndicator";
 import useDisableDevtools from "./hooks/useDisableDevtools";
 import AppErrorBoundary from "./components/common/AppErrorBoundary";
 import GlobalErrorOverlay from "./components/common/GlobalErrorOverlay";
@@ -23,7 +26,12 @@ function UserApp() {
   }
 
   if (!user) return <AuthPage onAuthed={reload} />;
-  return <ChatPage />;
+  return (
+    <>
+      <ConnectionBanner />
+      <ChatPage />
+    </>
+  );
 }
 
 export default function App() {
@@ -35,19 +43,27 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <GlobalErrorOverlay />
-      <AppErrorBoundary>
-        {isReactionMockRoute ? (
-          <ReactionMockup />
-        ) : isAdminRoute ? (
-          <AdminPortal />
-        ) : (
-          <AuthProvider>
-            <SocketProvider>
-              <UserApp />
-            </SocketProvider>
-          </AuthProvider>
-        )}
+      <ToastProvider>
+        <GlobalErrorOverlay />
+        <AppErrorBoundary>
+          {isReactionMockRoute ? (
+            <ReactionMockup />
+          ) : isAdminRoute ? (
+            <AdminPortal />
+          ) : (
+            <AuthProvider>
+              <OfflineQueueProvider>
+                <SocketProvider>
+                  <UserApp />
+                </SocketProvider>
+              </OfflineQueueProvider>
+            </AuthProvider>
+          )}
+        </AppErrorBoundary>
+      </ToastProvider>
+    </ThemeProvider>
+  );
+}
       </AppErrorBoundary>
     </ThemeProvider>
   );

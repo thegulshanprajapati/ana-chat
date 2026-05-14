@@ -49,11 +49,40 @@ export function SocketProvider({ children }) {
   const eventListenersRef = useRef(new Map());
   const roomsRef = useRef(new Set());
   const metricsRef = useRef(connectionMetrics);
+  const isOnlineRef = useRef(navigator.onLine);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 10;
+  const reconnectDelay = 1000; // Start with 1s, exponential backoff
 
   // Update metrics ref
   useEffect(() => {
     metricsRef.current = connectionMetrics;
   }, [connectionMetrics]);
+
+  // Online/offline detection
+  useEffect(() => {
+    const handleOnline = () => {
+      isOnlineRef.current = true;
+      console.log('[Socket] Network online, attempting reconnect...');
+      if (connectionState === CONNECTION_STATES.DISCONNECTED && user) {
+        initializeSocket();
+      }
+    };
+
+    const handleOffline = () => {
+      isOnlineRef.current = false;
+      console.log('[Socket] Network offline');
+      setConnectionState(CONNECTION_STATES.DISCONNECTED);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [connectionState, user]);
 
   // Heartbeat system
   const startHeartbeat = useCallback((socketInstance) => {
@@ -62,7 +91,7 @@ export function SocketProvider({ children }) {
     }
 
     heartbeatTimerRef.current = setInterval(() => {
-      if (socketInstance && socketInstance.connected) {
+      if (socketInstance && socketInstance.connected && isOnlineRef.current) {
         const pingTime = Date.now();
         socketInstance.emit('ping', { timestamp: pingTime });
 
@@ -186,7 +215,13 @@ export function SocketProvider({ children }) {
 
   // Enhanced socket initialization
   const initializeSocket = useCallback(() => {
-    if (!user) return;
+    if (!user || !isOnlineRef.current) return;
+
+    // Prevent multiple socket instances
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
 
     setConnectionState(CONNECTION_STATES.CONNECTING);
 
@@ -206,12 +241,8 @@ export function SocketProvider({ children }) {
         },
         transports: ['websocket', 'polling'], // Prefer websocket, fallback to polling
         timeout: 20000,
-        reconnection: true,
-        reconnectionAttempts: 10,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        randomizationFactor: 0.5,
-        autoConnect: true,
+        reconnection: false, // Manual reconnection control
+        autoConnect: false, // Manual connect
         forceNew: true,
         upgrade: true
       });
@@ -220,6 +251,7 @@ export function SocketProvider({ children }) {
       socketInstance.on('connect', () => {
         console.log('[Socket] Connected successfully');
         setConnectionState(CONNECTION_STATES.CONNECTED);
+        reconnectAttemptsRef.current = 0; // Reset attempts on success
         setConnectionMetrics(prev => ({
           ...prev,
           connectCount: prev.connectCount + 1,
@@ -246,6 +278,19 @@ export function SocketProvider({ children }) {
         }));
         logMonitoringEvent(MONITORING_EVENTS.DISCONNECT, { reason });
         stopHeartbeat();
+
+        // Auto reconnect if not intentional disconnect and online
+        if (reason !== 'io client disconnect' && isOnlineRef.current && reconnectAttemptsRef.current < maxReconnectAttempts) {
+          const delay = Math.min(reconnectDelay * Math.pow(2, reconnectAttemptsRef.current), 30000);
+          reconnectAttemptsRef.current++;
+          console.log(`[Socket] Auto reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
+          setConnectionState(CONNECTION_STATES.RECONNECTING);
+          reconnectTimerRef.current = setTimeout(() => {
+            if (isOnlineRef.current) {
+              socketInstance.connect();
+            }
+          }, delay);
+        }
       });
 
       socketInstance.on('connect_error', (error) => {
@@ -257,26 +302,145 @@ export function SocketProvider({ children }) {
         });
       });
 
-      socketInstance.on('reconnect', (attemptNumber) => {
-        console.log('[Socket] Reconnected after', attemptNumber, 'attempts');
-        setConnectionState(CONNECTION_STATES.CONNECTED);
-        setConnectionMetrics(prev => ({
-          ...prev,
-          reconnectCount: prev.reconnectCount + 1
-        }));
-        logMonitoringEvent(MONITORING_EVENTS.RECONNECT, { attemptNumber });
-      });
-
       socketInstance.on('reconnect_attempt', (attemptNumber) => {
-        if (typeof window !== 'undefined') {
-          socketInstance.auth = {
-            token: window.localStorage.getItem('access_token')
-          };
-        }
         console.log('[Socket] Reconnection attempt', attemptNumber);
         setConnectionState(CONNECTION_STATES.RECONNECTING);
         logMonitoringEvent(MONITORING_EVENTS.RECONNECT_ATTEMPT, { attemptNumber });
       });
+
+      socketInstance.on('reconnect_error', (error) => {
+        console.error('[Socket] Reconnection error:', error);
+        logMonitoringEvent(MONITORING_EVENTS.RECONNECT_ERROR, {
+          error: error.message
+        });
+      });
+
+      // Heartbeat response
+      socketInstance.on('pong', (data) => {
+        // Handled in heartbeat function
+      });
+
+      // Store socket instance
+      socketRef.current = socketInstance;
+      setSocket(socketInstance);
+
+      // Connect
+      socketInstance.connect();
+
+    } catch (error) {
+      console.error('[Socket] Initialization failed:', error);
+      setConnectionState(CONNECTION_STATES.ERROR);
+      logMonitoringEvent(MONITORING_EVENTS.ERROR, {
+        error: error.message,
+        type: 'initialization_error'
+      });
+      setSocket(null);
+    }
+  }, [user, startHeartbeat, stopHeartbeat, logMonitoringEvent]);
+
+  // Cleanup function
+  const cleanup = useCallback(() => {
+    if (socketRef.current) {
+      removeAllEventListeners();
+      leaveAllRooms();
+      stopHeartbeat();
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+    setSocket(null);
+    setConnectionState(CONNECTION_STATES.DISCONNECTED);
+
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, [removeAllEventListeners, leaveAllRooms, stopHeartbeat]);
+
+  // Initialize socket when user changes
+  useEffect(() => {
+    cleanup();
+    if (user && isOnlineRef.current) {
+      // Small delay to ensure auth is ready
+      reconnectTimerRef.current = setTimeout(initializeSocket, 100);
+    }
+
+    return cleanup;
+  }, [user, initializeSocket, cleanup]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return cleanup;
+  }, [cleanup]);
+
+  // Manual reconnect function
+  const reconnect = useCallback(() => {
+    if (user && isOnlineRef.current) {
+      reconnectAttemptsRef.current = 0; // Reset attempts for manual reconnect
+      initializeSocket();
+    }
+  }, [user, initializeSocket]);
+
+  // Enhanced socket object with utilities
+  const enhancedSocket = useMemo(() => {
+    if (!socket) return null;
+
+    const emit = (...args) => socket.emit(...args);
+    const on = (...args) => socket.on(...args);
+    const off = (...args) => socket.off(...args);
+    const once = (...args) => socket.once(...args);
+    const disconnect = (...args) => socket.disconnect(...args);
+
+    return {
+      ...socket,
+      // Connection state
+      connectionState,
+      isConnected: connectionState === CONNECTION_STATES.CONNECTED,
+      metrics: connectionMetrics,
+
+      // Room management
+      joinRoom,
+      leaveRoom,
+      leaveAllRooms,
+
+      // Event management
+      addEventListener,
+      removeEventListener,
+      removeAllEventListeners,
+      on,
+      off,
+      once,
+      disconnect,
+
+      // Monitoring
+      logMonitoringEvent,
+
+      // Manual reconnect
+      reconnect,
+
+      // Utility methods
+      emit,
+      emitWithMonitoring: (event, data) => {
+        logMonitoringEvent(event, data);
+        socket.emit(event, data);
+      }
+    };
+  }, [
+    socket,
+    connectionState,
+    connectionMetrics,
+    joinRoom,
+    leaveRoom,
+    leaveAllRooms,
+    addEventListener,
+    removeEventListener,
+    removeAllEventListeners,
+    logMonitoringEvent,
+    reconnect
+  ]);
+
+  const value = useMemo(() => enhancedSocket, [enhancedSocket]);
+  return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>;
+}
 
       socketInstance.on('reconnect_error', (error) => {
         console.error('[Socket] Reconnection error:', error);

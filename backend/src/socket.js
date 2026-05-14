@@ -144,7 +144,25 @@ export async function initSocket(httpServer) {
       allowedHeaders: ["Content-Type", "Authorization", "x-device-fingerprint", "X-Requested-With", "Accept", "Origin"],
       credentials: true
     },
-    transports: ["websocket", "polling"]
+    // ===== CRITICAL FIX 6: WebSocket-first with proper transport config =====
+    transports: ["websocket", "polling"],
+    
+    // ===== CRITICAL FIX 7: Connection timeouts and heartbeat =====
+    pingInterval: 25000,    // Send ping every 25 seconds
+    pingTimeout: 60000,     // Expect pong within 60 seconds, then disconnect
+    
+    // ===== CRITICAL FIX 8: Upgrade configuration =====
+    upgradeTimeout: 10000,  // Wait 10s for upgrade to websocket
+    
+    // ===== CRITICAL FIX 9: Preserve HTTP long-polling as fallback =====
+    maxHttpBufferSize: 1e6, // 1MB max buffer for polling
+    
+    // ===== CRITICAL FIX 10: Engine.IO configuration =====
+    allowEIO3: true,        // Support older Socket.IO clients
+    
+    // ===== CRITICAL FIX 11: Connection settings for reverse proxy =====
+    serveClient: false,     // Don't serve client files (nginx handles this)
+    path: "/socket.io/",    // Keep consistent with NGINX config
   });
 
   await createRedisAdapterIfConfigured(io);

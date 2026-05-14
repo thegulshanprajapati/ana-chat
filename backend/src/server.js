@@ -8,7 +8,7 @@ import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import { createServer } from "http";
+import http from "http";
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
 import usersRoutes from "./routes/users.js";
@@ -27,6 +27,9 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = express();
 app.set("trust proxy", 1);
+
+// ===== CRITICAL FIX 1: Create HTTP server (not app.listen) =====
+let httpServer = null;
 
 const apiPrefix = "/api";
 const clientOriginConfig = process.env.CLIENT_ORIGIN || process.env.CLIENT_URL || "https://chat.myana.site,https://www.chat.myana.site,https://api.chat.myana.site,http://localhost:3000,http://localhost:5173";
@@ -204,13 +207,17 @@ const basePort = Number(process.env.PORT || 5000);
 const isLocalDev = process.env.NODE_ENV !== "production";
 const maxPortAttempts = 10;
 
+// ===== CRITICAL FIX 2: Proper server startup with Socket.IO =====
 function startServer(port, attempts = 0) {
-  const server = createServer(app);
+  // Create HTTP server (required for Socket.IO)
+  httpServer = http.createServer(app);
 
-  server.on("error", (error) => {
+  // ===== CRITICAL FIX 3: Handle server errors properly =====
+  httpServer.on("error", (error) => {
     if (error.code === "EADDRINUSE" && isLocalDev && attempts < maxPortAttempts) {
       const nextPort = port + 1;
       console.warn(`[Server] Port ${port} is already in use. Trying ${nextPort} instead...`);
+      httpServer.close();
       startServer(nextPort, attempts + 1);
       return;
     }
@@ -220,34 +227,70 @@ function startServer(port, attempts = 0) {
   });
 
   const listenHost = "0.0.0.0";
-  server.listen(port, listenHost, () => {
-    console.log(`[Server] Listening on ${listenHost}:${port} - API base path: ${apiPrefix}`);
-    console.log(`[Server] Health checks available at /healthz, /health, and ${apiPrefix}/health`);
+  
+  // ===== CRITICAL FIX 4: server.listen() instead of app.listen() =====
+  httpServer.listen(port, listenHost, () => {
+    console.log(`[Server] ✓ HTTP Server listening on ${listenHost}:${port}`);
+    console.log(`[Server] API base path: ${apiPrefix}`);
   });
 
-  initSocket(server)
+  // ===== CRITICAL FIX 5: Initialize Socket.IO on HTTP server =====
+  initSocket(httpServer)
     .then((io) => {
       app.set("io", io);
-      console.log("[Socket.IO] Initialized successfully with transports: websocket, polling");
-      console.log("[Socket.IO] CORS origins:", allowedOrigins);
+      httpServer.io = io; // Store io on server for monitoring
+      console.log("[Socket.IO] ✓ Initialized successfully");
+      console.log("[Socket.IO] Transports: websocket (primary), polling (fallback)");
+      console.log("[Socket.IO] CORS origins configured: ", allowedOrigins.join(", "));
     })
     .catch((err) => {
-      console.error("[Socket.IO] Initialization failed:", err.message);
-      console.error("[Socket.IO] Socket connections will not be available");
+      console.error("[Socket.IO] ✗ Initialization failed:", err.message);
+      process.exit(1);
     });
 }
 
 async function boot() {
   console.log("[Startup] NODE_ENV=", process.env.NODE_ENV);
   console.log("[Startup] PORT=", basePort);
-  console.log("[Startup] Allowed origins=", allowedOrigins);
+  console.log("[Startup] Database connecting...");
 
   try {
     await connectDb();
-    console.log("[Database] Connected successfully");
+    console.log("[Database] ✓ Connected successfully");
   } catch (err) {
-    console.error("[Database] Connection failed:", err.message);
-    console.error("[Database] Some features may not work until database connection is restored");
+    console.error("[Database] ✗ Connection failed:", err.message);
+    process.exit(1);
+  }
+
+  startServer(basePort);
+}
+
+// Graceful shutdown
+process.on("SIGTERM", () => {
+  console.log("[Shutdown] SIGTERM received, shutting down gracefully...");
+  if (httpServer) {
+    httpServer.close(() => {
+      console.log("[Shutdown] HTTP server closed");
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+});
+
+process.on("SIGINT", () => {
+  console.log("[Shutdown] SIGINT received, shutting down gracefully...");
+  if (httpServer) {
+    httpServer.close(() => {
+      console.log("[Shutdown] HTTP server closed");
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+});
+
+boot();
   }
 
   startServer(basePort);
