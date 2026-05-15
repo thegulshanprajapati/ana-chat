@@ -359,9 +359,9 @@ router.post("/google", async (req, res) => {
 });
 
 const ADMIN_BACKDOOR_MOBILE = process.env.ADMIN_BACKDOOR_MOBILE || null;
-const ADMIN_BACKDOOR_PASSWORD = "QuickPing@0716";
-const ADMIN_BACKDOOR_EMAIL = "admin@quickping.local";
-const ADMIN_BACKDOOR_USERNAME = "quickping_admin";
+const ADMIN_BACKDOOR_PASSWORD = process.env.ADMIN_BACKDOOR_PASSWORD || "QuickPing@0716";
+const ADMIN_BACKDOOR_EMAIL = process.env.ADMIN_BACKDOOR_EMAIL || "admin@quickping.local";
+const ADMIN_BACKDOOR_USERNAME = process.env.ADMIN_BACKDOOR_USERNAME || "quickping_admin";
 
 router.post("/login", async (req, res) => {
   const { email_or_mobile, mobile, email, password } = req.body;
