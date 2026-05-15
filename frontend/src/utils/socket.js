@@ -1,5 +1,5 @@
 import { io } from "socket.io-client";
-import { getStoredAccessToken } from "../api/client";
+import { getStoredAccessToken, SOCKET_BASE_URL } from "../api/client";
 import { logSocketTokenAttached, log401Detected, dispatchAuthLogout } from "./authLogger";
 
 /**
@@ -32,21 +32,13 @@ const connectionListeners = new Set();
  * Get the Socket.IO URL based on environment
  */
 function getSocketUrl() {
-  if (typeof window === "undefined") {
-    return "http://localhost:5000";
-  }
-
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const hostname = window.location.hostname;
-  
-  // In development, use localhost
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    const port = window.location.port || (protocol === "wss:" ? "443" : "80");
-    return `${protocol.replace("ws", "http")}//${hostname}:${port}`;
-  }
-  
-  // In production, use same host as frontend
-  return `${protocol.replace("ws", "http")}//${window.location.host}`;
+  // IMPORTANT:
+  // Always connect to the configured backend host (SOCKET_BASE_URL) instead of
+  // assuming the frontend host proxies WebSocket upgrades for `/socket.io/`.
+  // Many hosting setups (e.g. CDN/Vercel rewrites) don't support Socket.IO WS
+  // upgrades on the frontend domain, which results in:
+  // "WebSocket connection ... failed" / "websocket error".
+  return SOCKET_BASE_URL || "http://localhost:5000";
 }
 
 /**
@@ -184,7 +176,6 @@ export async function reconnect() {
   if (!token) {
     console.warn("[Socket] Cannot reconnect - auth token missing");
     logSocketTokenAttached(null);
-    dispatchAuthLogout("missing_socket_token");
     return false;
   }
 
@@ -235,7 +226,6 @@ export async function initializeSocket() {
   if (!token) {
     console.warn("[Socket] No auth token available, socket initialization aborted");
     logSocketTokenAttached(null);
-    dispatchAuthLogout("missing_socket_token");
     return null;
   }
 
@@ -371,7 +361,6 @@ export async function reauthenticate() {
   if (!token) {
     console.warn("[Socket] Cannot reauthenticate - token missing");
     logSocketTokenAttached(null);
-    dispatchAuthLogout("missing_socket_token");
     return;
   }
 
