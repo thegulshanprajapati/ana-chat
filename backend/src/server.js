@@ -291,9 +291,3 @@ process.on("SIGINT", () => {
 });
 
 boot();
-  }
-
-  startServer(basePort);
-}
-
-boot();
