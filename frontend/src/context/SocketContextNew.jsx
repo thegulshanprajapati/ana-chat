@@ -5,7 +5,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useCallback
 } from "react";
 import {
   initializeSocket,

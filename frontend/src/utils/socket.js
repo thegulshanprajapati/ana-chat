@@ -144,7 +144,7 @@ function createSocket(token) {
       console.log("[Socket] Transport upgraded to:", transport.name);
     });
 
-    socket.io.engine.on("packet", ({ type, data }) => {
+    socket.io.engine.on("packet", ({ type }) => {
       if (type === "ping") {
         console.debug("[Socket] Ping received, sending pong");
       }
@@ -179,7 +179,7 @@ function getReconnectDelay() {
 /**
  * Attempt to reconnect with exponential backoff
  */
-async function reconnect() {
+export async function reconnect() {
   const token = getStoredAccessToken();
   if (!token) {
     console.warn("[Socket] Cannot reconnect - auth token missing");

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion as Motion } from "framer-motion";
 import {
   AlertCircle,
   ArrowRight,
@@ -30,7 +30,7 @@ function Field({ label, hint, error, children }) {
       {children}
       <AnimatePresence>
         {error ? (
-          <motion.p
+          <Motion.p
             className="text-xs text-rose-600 dark:text-rose-400 flex items-center gap-2"
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
@@ -38,7 +38,7 @@ function Field({ label, hint, error, children }) {
           >
             <AlertCircle className="h-4 w-4" />
             {error}
-          </motion.p>
+          </Motion.p>
         ) : null}
       </AnimatePresence>
     </div>
@@ -423,7 +423,7 @@ export default function AuthPage({ onAuthed }) {
   };
 
   return (
-    <motion.div
+    <Motion.div
       className={[
         "min-h-screen w-full overflow-y-auto relative",
         "bg-gradient-to-br from-slate-50 via-white to-rose-50",
@@ -439,7 +439,7 @@ export default function AuthPage({ onAuthed }) {
       </div>
 
       <div className="relative mx-auto flex min-h-screen w-full max-w-6xl items-stretch px-4 py-10 sm:px-6 lg:px-10">
-        <motion.div
+        <Motion.div
           className="grid w-full grid-cols-1 overflow-hidden rounded-[28px] border border-slate-200/70 dark:border-slate-800/70 bg-white/70 dark:bg-slate-950/60 backdrop-blur-xl shadow-[0_30px_90px_rgba(15,23,42,0.12)]"
           variants={itemVariants}
         >
@@ -520,7 +520,7 @@ export default function AuthPage({ onAuthed }) {
 
               <AnimatePresence>
                 {success ? (
-                  <motion.div
+                  <Motion.div
                     className="mt-5 rounded-2xl border border-emerald-200/70 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/25 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200 flex items-center gap-2"
                     initial={{ opacity: 0, y: -8 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -528,13 +528,13 @@ export default function AuthPage({ onAuthed }) {
                   >
                     <CheckCircle2 className="h-5 w-5" />
                     {success}
-                  </motion.div>
+                  </Motion.div>
                 ) : null}
               </AnimatePresence>
 
               <AnimatePresence>
                 {error ? (
-                  <motion.div
+                  <Motion.div
                     className="mt-5 rounded-2xl border border-rose-200/70 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/25 px-4 py-3 text-sm text-rose-800 dark:text-rose-200 flex items-center gap-2"
                     initial={{ opacity: 0, y: -8 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -542,12 +542,12 @@ export default function AuthPage({ onAuthed }) {
                   >
                     <AlertCircle className="h-5 w-5" />
                     {error}
-                  </motion.div>
+                  </Motion.div>
                 ) : null}
               </AnimatePresence>
 
               {activeDeviceSessions.length > 0 ? (
-                <motion.div
+                <Motion.div
                   className="mt-4 rounded-2xl border border-amber-200/70 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/25 p-4 text-sm text-amber-950 dark:text-amber-100"
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -584,12 +584,12 @@ export default function AuthPage({ onAuthed }) {
                       </div>
                     ))}
                   </div>
-                </motion.div>
+                </Motion.div>
               ) : null}
 
               <div className="mt-6">
                 {mode === "login" ? (
-                  <motion.form
+                  <Motion.form
                     key="login"
                     onSubmit={handleLogin}
                     className="space-y-5"
@@ -693,9 +693,9 @@ export default function AuthPage({ onAuthed }) {
                     <p className="text-center text-xs text-slate-500 dark:text-slate-400">
                       No signup fees · Cute stickers · Start chatting instantly
                     </p>
-                  </motion.form>
+                  </Motion.form>
                 ) : (
-                  <motion.div key="signup" className="space-y-5" variants={itemVariants} initial="hidden" animate="visible">
+                  <Motion.div key="signup" className="space-y-5" variants={itemVariants} initial="hidden" animate="visible">
                     <form onSubmit={handleSignupForm} className="space-y-5">
                       <Field label="Full name">
                         <div className="relative">
@@ -827,7 +827,7 @@ export default function AuthPage({ onAuthed }) {
                         </div>
                       ) : null}
                     </form>
-                  </motion.div>
+                  </Motion.div>
                 )}
               </div>
 
@@ -842,19 +842,19 @@ export default function AuthPage({ onAuthed }) {
               </div>
             </div>
           </div>
-        </motion.div>
+        </Motion.div>
       </div>
 
       <AnimatePresence>
         {showForgotPassword ? (
-          <motion.div
+          <Motion.div
             className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setShowForgotPassword(false)}
           >
-            <motion.div
+            <Motion.div
               className="w-full max-w-md rounded-[24px] border border-slate-200/70 dark:border-slate-800/70 bg-white/85 dark:bg-slate-950/70 backdrop-blur-xl shadow-[0_30px_90px_rgba(15,23,42,0.35)] p-6"
               initial={{ opacity: 0, y: 18, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -892,7 +892,7 @@ export default function AuthPage({ onAuthed }) {
 
                 <AnimatePresence>
                   {resetMessage ? (
-                    <motion.div
+                    <Motion.div
                       className={[
                         "rounded-2xl border px-4 py-3 text-xs",
                         resetMessage.includes("sent")
@@ -904,7 +904,7 @@ export default function AuthPage({ onAuthed }) {
                       exit={{ opacity: 0, y: -6 }}
                     >
                       {resetMessage}
-                    </motion.div>
+                    </Motion.div>
                   ) : null}
                 </AnimatePresence>
 
@@ -935,10 +935,10 @@ export default function AuthPage({ onAuthed }) {
                   </button>
                 </div>
               </form>
-            </motion.div>
-          </motion.div>
+            </Motion.div>
+          </Motion.div>
         ) : null}
       </AnimatePresence>
-    </motion.div>
+    </Motion.div>
   );
 }

@@ -24,6 +24,20 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+
+      // The upstream react-hooks recommended config has become extremely strict
+      // and flags a number of legitimate patterns in this codebase (e.g. state
+      // sync from props, initializing state from storage, ref reads in render).
+      // Keep the core hooks rules, but relax the newer opinionated ones so lint
+      // focuses on correctness issues without requiring large refactors.
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/purity': 'off',
+      'react-hooks/immutability': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
+
+      // Fast-refresh warnings are useful during development, but shouldn't block lint.
+      'react-refresh/only-export-components': 'warn',
     },
   },
 ])

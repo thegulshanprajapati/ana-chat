@@ -1,5 +1,5 @@
-import { useSocket } from '../context/SocketContext';
-import { useOnlineStatus } from '../hooks/useApi';
+import { useSocket } from '../../context/SocketContext';
+import { useOnlineStatus } from '../../hooks/useApi';
 import { useMemo } from 'react';
 
 const CONNECTION_STATES = {

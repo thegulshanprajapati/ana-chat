@@ -184,7 +184,7 @@ export default function SidebarPanel({
   }, [activeTab, tabStorageKey]);
 
   const statusStorageKey = useMemo(() => `${STATUS_STORAGE_PREFIX}_${me?.id || "guest"}`, [me?.id]);
-  const [myStatus, setMyStatus] = useState(() => {
+  const [myStatus] = useState(() => {
     try {
       const raw = window.localStorage.getItem(statusStorageKey);
       const parsed = raw ? JSON.parse(raw) : null;
@@ -196,7 +196,6 @@ export default function SidebarPanel({
   });
 
   const [callLogs, setCallLogs] = useState([]);
-  const [statusDraft, setStatusDraft] = useState(() => (myStatus.text || "").toString());
   const statusFeedStorageKey = useMemo(() => `${STATUS_FEED_STORAGE_PREFIX}_${me?.id || "guest"}`, [me?.id]);
   const [anaUpdates, setAnaUpdates] = useState(() => {
     try {
@@ -245,10 +244,6 @@ export default function SidebarPanel({
       window.removeEventListener("anach_call_logs_updated", sync);
     };
   }, []);
-
-  useEffect(() => {
-    setStatusDraft((myStatus.text || "").toString());
-  }, [myStatus.text]);
 
   useEffect(() => {
     try {
@@ -336,17 +331,6 @@ export default function SidebarPanel({
       else next[chatId] = true;
       return next;
     });
-  }
-
-  function saveMyStatus(text) {
-    const cleaned = (text || "").toString().trim().slice(0, 140);
-    const payload = { text: cleaned, updatedAt: cleaned ? new Date().toISOString() : "" };
-    setMyStatus(payload);
-    try {
-      window.localStorage.setItem(statusStorageKey, JSON.stringify(payload));
-    } catch {
-      // ignore
-    }
   }
 
   function clearAnaUpdateMedia() {

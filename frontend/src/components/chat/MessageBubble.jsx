@@ -184,7 +184,6 @@ function richifyPlaceholders(value) {
   text = text.replace(/\*(?!\*)([^\n*]+?)\*(?!\*)/g, (_m, inner) => token(`<em>${escapeHtml(inner)}</em>`));
 
   return { text, stash };
-  return { text, stash };
 }
 
 function messageHtml(value) {
@@ -250,7 +249,6 @@ function MessageBubble({
   message,
   mine,
   centerAligned = false,
-  grouped,
   uploadBase,
   onOpenMedia,
   onReply,

@@ -39,7 +39,7 @@ function callStatusLabel(item) {
   return status ? status : "Call";
 }
 
-export default function CallsPanel({ me, mobile = false, onBack }) {
+export default function CallsPanel({ mobile = false, onBack }) {
   const [callLogs, setCallLogs] = useState(() => getCallLogs());
 
   useEffect(() => {
@@ -139,4 +139,3 @@ export default function CallsPanel({ me, mobile = false, onBack }) {
     </section>
   );
 }
-

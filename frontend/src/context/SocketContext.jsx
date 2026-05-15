@@ -39,7 +39,8 @@ export function SocketProvider({ children }) {
     reconnectCount: 0,
     lastConnectTime: null,
     lastDisconnectTime: null,
-    uptime: 0
+    uptime: 0,
+    latencyMs: null
   });
 
   // Refs for managing socket lifecycle
@@ -105,13 +106,14 @@ export function SocketProvider({ children }) {
         // Listen for pong once
         const pongHandler = (data) => {
           clearTimeout(pongTimeout);
-          const latency = Date.now() - data.timestamp;
+          const latencyMs = Date.now() - data.timestamp;
           socketInstance.off('pong', pongHandler);
 
           // Update metrics
           setConnectionMetrics(prev => ({
             ...prev,
-            uptime: prev.uptime + 1
+            uptime: prev.uptime + 1,
+            latencyMs
           }));
         };
 
@@ -208,7 +210,7 @@ export function SocketProvider({ children }) {
     }
 
     // Log to console in development
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.log('[Socket Monitoring]', eventData);
     }
   }, [user?.id, connectionState]);
@@ -316,7 +318,7 @@ export function SocketProvider({ children }) {
       });
 
       // Heartbeat response
-      socketInstance.on('pong', (data) => {
+      socketInstance.on('pong', () => {
         // Handled in heartbeat function
       });
 
@@ -436,125 +438,6 @@ export function SocketProvider({ children }) {
     removeAllEventListeners,
     logMonitoringEvent,
     reconnect
-  ]);
-
-  const value = useMemo(() => enhancedSocket, [enhancedSocket]);
-  return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>;
-}
-
-      socketInstance.on('reconnect_error', (error) => {
-        console.error('[Socket] Reconnection error:', error);
-        logMonitoringEvent(MONITORING_EVENTS.RECONNECT_ERROR, {
-          error: error.message
-        });
-      });
-
-      // Heartbeat response
-      socketInstance.on('pong', (data) => {
-        // Handled in heartbeat function
-      });
-
-      // Store socket instance
-      socketRef.current = socketInstance;
-      setSocket(socketInstance);
-
-    } catch (error) {
-      console.error('[Socket] Initialization failed:', error);
-      setConnectionState(CONNECTION_STATES.ERROR);
-      logMonitoringEvent(MONITORING_EVENTS.ERROR, {
-        error: error.message,
-        type: 'initialization_error'
-      });
-      setSocket(null);
-    }
-  }, [user, startHeartbeat, stopHeartbeat, logMonitoringEvent]);
-
-  // Cleanup function
-  const cleanup = useCallback(() => {
-    if (socketRef.current) {
-      removeAllEventListeners();
-      leaveAllRooms();
-      stopHeartbeat();
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
-    setSocket(null);
-    setConnectionState(CONNECTION_STATES.DISCONNECTED);
-
-    if (reconnectTimerRef.current) {
-      clearTimeout(reconnectTimerRef.current);
-      reconnectTimerRef.current = null;
-    }
-  }, [removeAllEventListeners, leaveAllRooms, stopHeartbeat]);
-
-  // Initialize socket when user changes
-  useEffect(() => {
-    cleanup();
-    if (user) {
-      // Small delay to ensure auth is ready
-      reconnectTimerRef.current = setTimeout(initializeSocket, 100);
-    }
-
-    return cleanup;
-  }, [user, initializeSocket, cleanup]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return cleanup;
-  }, [cleanup]);
-
-  // Enhanced socket object with utilities
-  const enhancedSocket = useMemo(() => {
-    if (!socket) return null;
-
-    const emit = (...args) => socket.emit(...args);
-    const on = (...args) => socket.on(...args);
-    const off = (...args) => socket.off(...args);
-    const once = (...args) => socket.once(...args);
-    const disconnect = (...args) => socket.disconnect(...args);
-
-    return {
-      ...socket,
-      // Connection state
-      connectionState,
-      isConnected: connectionState === CONNECTION_STATES.CONNECTED,
-      metrics: connectionMetrics,
-
-      // Room management
-      joinRoom,
-      leaveRoom,
-      leaveAllRooms,
-
-      // Event management
-      addEventListener,
-      removeEventListener,
-      removeAllEventListeners,
-      on,
-      off,
-      once,
-      disconnect,
-
-      // Monitoring
-      logMonitoringEvent,
-
-      // Utility methods
-      emit,
-      emitWithMonitoring: (event, data) => {
-        logMonitoringEvent(event, data);
-        socket.emit(event, data);
-      }
-    };
-  }, [
-    socket,
-    connectionState,
-    connectionMetrics,
-    joinRoom,
-    leaveRoom,
-    leaveAllRooms,
-    addEventListener,
-    removeEventListener,
-    removeAllEventListeners,
-    logMonitoringEvent
   ]);
 
   const value = useMemo(() => enhancedSocket, [enhancedSocket]);
