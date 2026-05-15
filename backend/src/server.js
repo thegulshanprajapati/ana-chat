@@ -179,7 +179,9 @@ app.get("/socket-status", (req, res) => {
   
   const activeConnections = io.sockets?.sockets?.size || 0;
   res.json({ 
-    status: activeConnections > 0 ? "connected" : "disconnected", 
+    // If Socket.IO is initialized, the server is "connected"/healthy even with 0 clients.
+    // The status page should only show red when Socket.IO is not initialized.
+    status: "connected",
     activeConnections 
   });
 });

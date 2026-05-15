@@ -246,7 +246,10 @@ api.interceptors.response.use(
     if (status !== 401 || original._retry || isRefreshRequest) {
       if (status === 401) {
         log401Detected(url, error.response?.data?.message || "Unauthorized");
-        if (isRefreshRequest || isAuthMeRequest || url.startsWith("/auth/")) {
+
+        // Only force a global logout for auth-state endpoints.
+        // IMPORTANT: Don't logout for /auth/login failures, etc. — let the UI handle it.
+        if (isRefreshRequest || isAuthMeRequest) {
           clearStoredAccessToken();
           dispatchAuthLogout("unauthorized");
         }
@@ -272,9 +275,6 @@ api.interceptors.response.use(
     } catch (refreshErr) {
       clearStoredAccessToken();
       dispatchAuthLogout("refresh_failed");
-      if (typeof window !== "undefined") {
-        window.location.href = "/";
-      }
       return Promise.reject(refreshErr);
     }
   }
