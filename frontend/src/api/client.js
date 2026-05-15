@@ -1,4 +1,13 @@
 import axios from "axios";
+import {
+  logTokenStored,
+  logTokenFetched,
+  logTokenHit,
+  logTokenMiss,
+  logUserLoggedOut,
+  log401Detected,
+  dispatchAuthLogout
+} from "../utils/authLogger";
 
 function runtimeBaseUrl(rawBaseUrl, fallbackPort = "5173", isApiUrl = false) {
   if (typeof window === "undefined") {
@@ -121,8 +130,17 @@ let refreshingPromise = null;
 
 function getStoredAccessToken() {
   try {
-    return typeof localStorage !== "undefined" ? localStorage.getItem("access_token") : null;
+    const token = typeof localStorage !== "undefined" ? localStorage.getItem("access_token") : null;
+    if (token) {
+      logTokenFetched(token);
+      logTokenHit(token);
+    } else {
+      logTokenFetched(null);
+      logTokenMiss();
+    }
+    return token;
   } catch {
+    logTokenMiss();
     return null;
   }
 }
@@ -131,9 +149,10 @@ function setStoredAccessToken(token) {
   try {
     if (typeof localStorage !== "undefined" && token) {
       localStorage.setItem("access_token", token);
+      logTokenStored(token);
     }
   } catch {
-    // ignore storage failures
+    console.warn("[AUTH] Failed to store access token");
   }
 }
 
@@ -141,9 +160,10 @@ function clearStoredAccessToken() {
   try {
     if (typeof localStorage !== "undefined") {
       localStorage.removeItem("access_token");
+      logUserLoggedOut();
     }
   } catch {
-    // ignore storage failures
+    console.warn("[AUTH] Failed to clear access token");
   }
 }
 
@@ -177,11 +197,15 @@ api.interceptors.request.use((config) => {
 
   // Add auth token
   const authToken = getStoredAccessToken();
-  if (authToken && !config.headers?.Authorization) {
-    config.headers = {
-      ...config.headers,
-      Authorization: `Bearer ${authToken}`
-    };
+  if (authToken) {
+    if (!config.headers?.Authorization) {
+      config.headers = {
+        ...config.headers,
+        Authorization: `Bearer ${authToken}`
+      };
+    }
+  } else {
+    logTokenMiss();
   }
 
   return config;
@@ -219,8 +243,12 @@ api.interceptors.response.use(
 
     // Don't retry certain requests
     if (status !== 401 || original._retry || isRefreshRequest) {
-      if (status === 401 && (isRefreshRequest || isAuthMeRequest || url.startsWith("/auth/"))) {
-        clearStoredAccessToken();
+      if (status === 401) {
+        log401Detected(url, error.response?.data?.message || "Unauthorized");
+        if (isRefreshRequest || isAuthMeRequest || url.startsWith("/auth/")) {
+          clearStoredAccessToken();
+          dispatchAuthLogout("unauthorized");
+        }
       }
       return Promise.reject(error);
     }
@@ -242,6 +270,7 @@ api.interceptors.response.use(
       return api(original);
     } catch (refreshErr) {
       clearStoredAccessToken();
+      dispatchAuthLogout("refresh_failed");
       if (typeof window !== "undefined") {
         window.location.href = "/";
       }

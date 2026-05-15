@@ -1,4 +1,6 @@
 import { io } from "socket.io-client";
+import { getStoredAccessToken } from "../api/client";
+import { logSocketTokenAttached, log401Detected, dispatchAuthLogout } from "./authLogger";
 
 /**
  * ===== CRITICAL FIX: Singleton Socket Instance =====
@@ -16,7 +18,6 @@ import { io } from "socket.io-client";
 
 let socketInstance = null;
 let socketPromise = null;
-let initialized = false;
 let initializationError = null;
 
 // Track reconnection state
@@ -51,24 +52,14 @@ function getSocketUrl() {
 /**
  * Get authentication token
  */
-function getAuthToken() {
-  if (typeof window === "undefined") return null;
-  
-  try {
-    return window.localStorage?.getItem("access_token");
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Create socket instance with production-grade configuration
  */
-function createSocket() {
-  const token = getAuthToken();
+function createSocket(token) {
   const socketUrl = getSocketUrl();
 
   console.log(`[Socket] Initializing at ${socketUrl}`);
+  logSocketTokenAttached(token);
 
   const socketConfig = {
     // ===== CRITICAL FIX 12: Connection configuration =====
@@ -130,12 +121,20 @@ function createSocket() {
 
   socket.on("connect_error", (error) => {
     console.error("[Socket] Connection error:", error?.message || error);
+    if (typeof error?.message === "string" && /unauthorized|invalid token/i.test(error.message)) {
+      log401Detected("socket_connect_error", error.message);
+      dispatchAuthLogout("socket_unauthorized");
+    }
     notifyListeners("error");
   });
 
   // Handle authentication errors
   socket.on("error", (error) => {
     console.error("[Socket] Error event:", error);
+    if (typeof error?.message === "string" && /unauthorized|invalid token/i.test(error.message)) {
+      log401Detected("socket_error", error.message);
+      dispatchAuthLogout("socket_unauthorized");
+    }
     notifyListeners("error");
   });
 
@@ -181,6 +180,14 @@ function getReconnectDelay() {
  * Attempt to reconnect with exponential backoff
  */
 async function reconnect() {
+  const token = getStoredAccessToken();
+  if (!token) {
+    console.warn("[Socket] Cannot reconnect - auth token missing");
+    logSocketTokenAttached(null);
+    dispatchAuthLogout("missing_socket_token");
+    return false;
+  }
+
   if (!socketInstance) {
     console.warn("[Socket] Cannot reconnect - socket not initialized");
     return false;
@@ -202,6 +209,7 @@ async function reconnect() {
   return new Promise((resolve) => {
     setTimeout(() => {
       console.log("[Socket] Attempting reconnection...");
+      socketInstance.auth = { token };
       socketInstance.connect();
       resolve(true);
     }, delay);
@@ -213,7 +221,7 @@ async function reconnect() {
  * Returns a promise that resolves when socket is initialized
  */
 export async function initializeSocket() {
-  if (initialized) {
+  if (socketInstance) {
     console.log("[Socket] Socket already initialized");
     return socketInstance;
   }
@@ -223,13 +231,21 @@ export async function initializeSocket() {
     return socketPromise;
   }
 
+  const token = getStoredAccessToken();
+  if (!token) {
+    console.warn("[Socket] No auth token available, socket initialization aborted");
+    logSocketTokenAttached(null);
+    dispatchAuthLogout("missing_socket_token");
+    return null;
+  }
+
   socketPromise = (async () => {
     try {
       if (!socketInstance) {
-        socketInstance = createSocket();
-        
+        socketInstance = createSocket(token);
+
         // Wait for initial connection attempt (but don't fail if it times out)
-        await new Promise((resolve, reject) => {
+        await new Promise((resolve) => {
           const timeout = setTimeout(() => {
             console.warn("[Socket] Initial connection timeout - will retry");
             resolve(); // Don't reject, connection is happening in background
@@ -244,24 +260,28 @@ export async function initializeSocket() {
 
           const onConnectError = (error) => {
             console.warn("[Socket] Initial connection failed:", error?.message);
-            // Don't reject - will retry via reconnect mechanism
+            if (typeof error?.message === "string" && /unauthorized|invalid token/i.test(error.message)) {
+              log401Detected("socket_connect", error.message);
+              dispatchAuthLogout("socket_unauthorized");
+            }
             resolve();
           };
 
           socketInstance.on("connect", onConnect);
           socketInstance.on("connect_error", onConnectError);
-          
+
           // ===== CRITICAL FIX 21: Manual connection trigger =====
           socketInstance.connect();
         });
       }
 
-      initialized = true;
       return socketInstance;
     } catch (error) {
       initializationError = error;
       console.error("[Socket] Initialization error:", error);
       throw error;
+    } finally {
+      socketPromise = null;
     }
   })();
 
@@ -274,12 +294,18 @@ export async function initializeSocket() {
  */
 export function getSocket() {
   if (!socketInstance) {
-    console.warn(
-      "[Socket] Socket not yet initialized. Call initializeSocket() first."
-    );
+    console.warn("[Socket] Socket not yet initialized. Call initializeSocket() first.");
     return null;
   }
   return socketInstance;
+}
+
+export function resetSocket() {
+  console.log("[Socket] Resetting socket connection");
+  disconnect();
+  socketPromise = null;
+  initializationError = null;
+  reconnectAttempts = 0;
 }
 
 /**
@@ -336,32 +362,27 @@ export function disconnect() {
 /**
  * Reset socket (for token refresh, etc.)
  */
-export function resetSocket() {
-  console.log("[Socket] Resetting socket connection");
-  disconnect();
-  socketPromise = null;
-  initalized = false;
-  reconnectAttempts = 0;
-}
-
 /**
  * Re-authenticate socket (when token refreshes)
  */
 export async function reauthenticate() {
-  const token = getAuthToken();
+  const token = getStoredAccessToken();
   
+  if (!token) {
+    console.warn("[Socket] Cannot reauthenticate - token missing");
+    logSocketTokenAttached(null);
+    dispatchAuthLogout("missing_socket_token");
+    return;
+  }
+
   if (socketInstance) {
-    // Update auth token
     socketInstance.auth = { token };
-    
-    // Reconnect with new token
     console.log("[Socket] Re-authenticating with new token");
     
     if (socketInstance.connected) {
       socketInstance.disconnect();
     }
     
-    // Wait a bit before reconnecting
     await new Promise((resolve) => setTimeout(resolve, 500));
     
     reconnectAttempts = 0; // Reset attempts for manual reauthentication

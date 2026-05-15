@@ -3,7 +3,7 @@ import ChatPage from "./pages/ChatPage";
 import AdminPortal from "./components/AdminPortal";
 import ReactionMockup from "./pages/ReactionMockup";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { SocketProvider } from "./context/SocketContext";
+import { SocketProvider } from "./context/SocketContextNew";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ToastProvider } from "./context/ToastContext";
 import { OfflineQueueProvider } from "./context/OfflineQueueContext";

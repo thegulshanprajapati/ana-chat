@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev_jwt_secret_change_me";
+const JWT_SECRET = process.env.JWT_SECRET || "ana-0716-nana-na-na-na-na-na-na-na-na-na-na-na-na-na-na-na";
 const ACCESS_TTL = process.env.ACCESS_TOKEN_TTL || "15m";
 const ADMIN_TTL = process.env.ADMIN_TOKEN_TTL || "7d";
 

@@ -175,24 +175,23 @@ export async function initSocket(httpServer) {
       const parsed = cookie.parse(rawCookie);
       const headerAuth = socket.handshake.headers.authorization || socket.handshake.headers.Authorization || "";
       const headerToken = headerAuth.startsWith("Bearer ") ? headerAuth.slice(7).trim() : null;
-      const authToken = socket.handshake.auth?.token || parsed.access_token || headerToken;
+      const handshakeToken = socket.handshake.auth?.token;
+      const authToken = handshakeToken || parsed.access_token || headerToken;
 
-      if (process.env.NODE_ENV !== "production") {
-        console.debug("[Socket.IO] handshake auth check", {
-          socketId: socket.id,
-          origin: socket.handshake.headers.origin,
-          authTokenPresent: Boolean(authToken),
-          cookieKeys: Object.keys(parsed),
-          authPayload: socket.handshake.auth
-        });
-      }
+      console.log("[SOCKET AUTH] TOKEN RECEIVED", {
+        socketId: socket.id,
+        origin: socket.handshake.headers.origin,
+        hasHandshakeToken: Boolean(handshakeToken),
+        hasCookieToken: Boolean(parsed.access_token),
+        hasHeaderToken: Boolean(headerToken)
+      });
 
       if (!authToken) {
         connectionMetrics.connectionErrors++;
-        console.error("[Socket.IO] Handshake failed: missing auth token", {
+        console.log("[SOCKET AUTH] TOKEN MISSING", {
+          socketId: socket.id,
           origin: socket.handshake.headers.origin,
-          headers: socket.handshake.headers,
-          ip: socket.handshake.address
+          cookieKeys: Object.keys(parsed)
         });
         void persistErrorLog({
           type: 'socket_handshake_error',
@@ -204,17 +203,69 @@ export async function initSocket(httpServer) {
         return next(new Error("Unauthorized"));
       }
 
-      const payload = verifyToken(authToken);
-      if (payload.typ !== "access") {
+      try {
+        const payload = verifyToken(authToken);
+        console.log("[SOCKET AUTH] TOKEN VERIFIED", {
+          socketId: socket.id,
+          userId: payload.uid,
+          sessionId: payload.sid,
+          tokenType: payload.typ
+        });
+        if (payload.typ !== "access") {
+          connectionMetrics.connectionErrors++;
+          console.log("[SOCKET AUTH] TOKEN INVALID", { reason: "Invalid token type", socketId: socket.id, tokenType: payload.typ });
+          void persistErrorLog({
+            type: 'socket_handshake_error',
+            reason: 'invalid_token_type',
+            origin: socket.handshake.headers.origin,
+            userAgent: socket.handshake.headers['user-agent'],
+            ip: socket.handshake.address
+          });
+          return next(new Error("Unauthorized"));
+        }
+
+        const db = await getDb();
+        const [user, session] = await Promise.all([
+          db.collection("users").findOne(
+            { id: Number(payload.uid) },
+            { projection: { _id: 0, id: 1, name: 1, avatar_url: 1, is_blocked: 1, is_verified: 1 } }
+          ),
+          db.collection("sessions").findOne(
+            { id: Number(payload.sid), user_id: Number(payload.uid) },
+            { projection: { _id: 0, id: 1, revoked_at: 1 } }
+          )
+        ]);
+
+        if (!user || !session || session.revoked_at || user.is_blocked || !user.is_verified) {
+          connectionMetrics.connectionErrors++;
+          console.log("[SOCKET AUTH] TOKEN INVALID", {
+            socketId: socket.id,
+            userExists: Boolean(user),
+            sessionExists: Boolean(session),
+            revoked: Boolean(session?.revoked_at),
+            blocked: Boolean(user?.is_blocked),
+            verified: Boolean(user?.is_verified)
+          });
+          return next(new Error("Unauthorized"));
+        }
+
+        socket.userId = user.id;
+        socket.sessionId = session.id;
+        socket.userName = (user.name || "").toString().trim() || `User ${user.id}`;
+        socket.userAvatar = user.avatar_url || null;
+        return next();
+      } catch (verifyError) {
         connectionMetrics.connectionErrors++;
+        console.log("[SOCKET AUTH] TOKEN INVALID", { message: verifyError.message, name: verifyError.name });
         void persistErrorLog({
           type: 'socket_handshake_error',
-          reason: 'invalid_token_type',
+          reason: 'invalid_token',
+          message: verifyError.message,
           origin: socket.handshake.headers.origin,
           userAgent: socket.handshake.headers['user-agent'],
           ip: socket.handshake.address
         });
-        return next(new Error("Unauthorized"));
+        return next(new Error("Invalid token"));
       }
 
       const db = await getDb();
@@ -251,7 +302,7 @@ export async function initSocket(httpServer) {
   io.on("connection", async (socket) => {
     connectionMetrics.totalConnections++;
     connectionMetrics.activeConnections++;
-    console.log("[Socket.IO] User connected:", { socketId: socket.id, userId: socket.userId, origin: socket.handshake.headers.origin });
+    console.log("[SOCKET AUTH] USER CONNECTED", { socketId: socket.id, userId: socket.userId, origin: socket.handshake.headers.origin });
     logMonitoringEvent({
       type: 'socket_connect',
       userId: socket.userId,
@@ -672,14 +723,15 @@ export async function initSocket(httpServer) {
       });
     });
 
-    socket.on("disconnect", async () => {
+    socket.on("disconnect", async (reason) => {
       connectionMetrics.activeConnections--;
       connectionMetrics.totalDisconnects++;
+      console.log("[SOCKET AUTH] USER DISCONNECTED", { socketId: socket.id, userId: socket.userId, reason });
       logMonitoringEvent({
         type: 'socket_disconnect',
         userId: socket.userId,
         socketId: socket.id,
-        reason: 'user_disconnect'
+        reason: reason || 'user_disconnect'
       });
 
       const room = io.sockets.adapter.rooms.get(userRoom(userId));

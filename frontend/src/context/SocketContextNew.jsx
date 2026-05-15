@@ -75,9 +75,20 @@ export function SocketProvider({ children }) {
     lastTokenRef.current = token;
   }, [token]);
 
-  // ===== CRITICAL FIX 25: Initialize socket on mount =====
+  // ===== CRITICAL FIX 25: Initialize socket only when authenticated =====
   useEffect(() => {
-    if (!user || initializationRef.current) {
+    if (!user) {
+      disconnect();
+      initializationRef.current = false;
+      setConnectionState(CONNECTION_STATES.DISCONNECTED);
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
+      return;
+    }
+
+    if (initializationRef.current) {
       return;
     }
 
@@ -88,22 +99,21 @@ export function SocketProvider({ children }) {
         console.log("[SocketProvider] Initializing socket for user:", user.id);
         setConnectionState(CONNECTION_STATES.CONNECTING);
 
-        // Initialize the global socket singleton
         await initializeSocket();
 
-        // Subscribe to connection state changes
         const unsubscribe = subscribe((state) => {
           console.log("[SocketProvider] Socket state changed:", state);
-          
+
           if (state === "connected") {
             setConnectionState(CONNECTION_STATES.CONNECTED);
           } else if (state === "disconnected") {
             setConnectionState(CONNECTION_STATES.DISCONNECTED);
           } else if (state === "error") {
             setConnectionState(CONNECTION_STATES.ERROR);
+          } else if (state === "reconnecting") {
+            setConnectionState(CONNECTION_STATES.RECONNECTING);
           }
 
-          // Update reconnection status
           const status = getReconnectionStatus();
           setReconnectionStatus({
             attempts: status.reconnectAttempts,
@@ -122,7 +132,6 @@ export function SocketProvider({ children }) {
     init();
 
     return () => {
-      // Cleanup
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
         unsubscribeRef.current = null;

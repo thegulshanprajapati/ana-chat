@@ -37,18 +37,22 @@ function extractToken(req) {
 export async function requireUser(req, res, next) {
   const token = extractToken(req);
   if (!token) {
-    if (process.env.NODE_ENV !== "production") {
-      console.debug("[Auth] Missing token", {
-        cookies: req.cookies,
-        authorization: req.headers?.authorization
-      });
-    }
+    console.log("[AUTH] TOKEN MISSING", {
+      cookies: req.cookies,
+      authorization: req.headers?.authorization
+    });
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   try {
     const payload = verifyToken(token);
+    console.log("[AUTH] TOKEN VERIFIED", {
+      userId: payload?.uid,
+      sessionId: payload?.sid,
+      type: payload?.typ
+    });
     if (payload.typ !== "access") {
+      console.log("[AUTH] TOKEN INVALID", { reason: "Invalid token type", tokenType: payload.typ });
       return res.status(401).json({ message: "Unauthorized" });
     }
 
@@ -94,8 +98,10 @@ export async function requireUser(req, res, next) {
     req.sessionId = session.id;
     next();
   } catch (err) {
-    if (process.env.NODE_ENV !== "production") {
-      console.debug("[Auth] JWT verification failed", { error: err?.message, token: token?.slice(0, 20) });
+    if (err?.name === "TokenExpiredError") {
+      console.log("[AUTH] TOKEN EXPIRED", { message: err.message, tokenPreview: token?.slice(0, 20) });
+    } else {
+      console.log("[AUTH] TOKEN INVALID", { message: err.message, tokenPreview: token?.slice(0, 20) });
     }
     res.status(401).json({ message: "Invalid token" });
   }

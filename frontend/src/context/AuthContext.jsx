@@ -1,5 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { api, clearStoredAccessToken } from "../api/client";
+import { api, getStoredAccessToken, clearStoredAccessToken } from "../api/client";
+import {
+  logUserAuthenticated,
+  logUserLoggedOut,
+  log401Detected,
+  dispatchAuthLogout,
+  onAuthLogout,
+  logTokenHit,
+  logTokenMiss
+} from "../utils/authLogger";
 import { getOrCreateRsaKeyPair } from "../utils/e2ee";
 
 const AuthContext = createContext();
@@ -8,18 +17,45 @@ export const useAuth = () => useContext(AuthContext);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState(() => getStoredAccessToken());
+
+  const logoutLocal = useCallback(() => {
+    clearStoredAccessToken();
+    setToken(null);
+    setUser(null);
+    logUserLoggedOut();
+    dispatchAuthLogout("logout");
+  }, []);
 
   const reload = useCallback(async () => {
+    setLoading(true);
     try {
       const { data } = await api.get("/auth/me");
-      if (data?.id) setUser(data);
-      else setUser(null);
-    } catch {
-      setUser(null);
+      if (data?.id) {
+        setUser(data);
+        const storedToken = getStoredAccessToken();
+        if (storedToken) {
+          logTokenHit(storedToken);
+          setToken(storedToken);
+        } else {
+          logTokenMiss();
+        }
+        logUserAuthenticated(data);
+      } else {
+        logoutLocal();
+      }
+    } catch (err) {
+      const status = err.response?.status;
+      if (status === 401) {
+        log401Detected("/auth/me", err.response?.data?.message || "Unauthorized");
+        logoutLocal();
+      } else {
+        setUser(null);
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [logoutLocal]);
 
   const logout = useCallback(async () => {
     try {
@@ -27,13 +63,22 @@ export function AuthProvider({ children }) {
     } catch {
       // no-op
     }
-    clearStoredAccessToken();
-    setUser(null);
-  }, []);
+    logoutLocal();
+  }, [logoutLocal]);
 
   useEffect(() => {
     reload();
-  }, []);
+  }, [reload]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthLogout(() => {
+      logoutLocal();
+      if (typeof window !== "undefined" && window.location.pathname !== "/") {
+        window.location.href = "/";
+      }
+    });
+    return () => unsubscribe();
+  }, [logoutLocal]);
 
   useEffect(() => {
     if (!user?.id) return undefined;
@@ -65,6 +110,9 @@ export function AuthProvider({ children }) {
     };
   }, [reload, user?.id]);
 
-  const value = useMemo(() => ({ user, loading, reload, logout }), [logout, reload, user, loading]);
+  const value = useMemo(
+    () => ({ user, token, loading, reload, logout }),
+    [logout, reload, token, user, loading]
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
