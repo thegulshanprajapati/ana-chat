@@ -416,13 +416,18 @@ export default function ChatPage() {
 
   const selectChat = useCallback(async (chat) => {
     if (!chat) return;
+    if (activeChat?.id !== chat.id) {
+      setMessages([]);
+      setTyping(false);
+      setTypingName("");
+    }
     setActiveChat(chat);
     await loadMessages(chat.id);
     void getChatRecipients(chat.id).catch(() => {});
     socket?.emit("join_room", chat.id);
     socket?.emit("seen", { chatId: chat.id });
     if (isMobile) setMobileChatOpen(true);
-  }, [getChatRecipients, isMobile, loadMessages, socket]);
+  }, [activeChat?.id, getChatRecipients, isMobile, loadMessages, socket]);
 
   const loadChats = useCallback(async () => {
     setLoadingChats(true);
@@ -1989,35 +1994,37 @@ export default function ChatPage() {
       );
     };
 
-    // Set up socket event listeners using enhanced socket context
-    if (socket && socket.addEventListener) {
-      socket.addEventListener("receive_message", onReceive);
-      socket.addEventListener("typing", onTyping);
-      socket.addEventListener("seen", onSeen);
-      socket.addEventListener("chat_updated", onChatUpdated);
-      socket.addEventListener("message_updated", onMessageUpdated);
-      socket.addEventListener("message_deleted_everyone", onMessageDeletedEveryone);
-      socket.addEventListener("message_reaction", onMessageReaction);
-      socket.addEventListener("user_status", onStatus);
-      socket.addEventListener("user_profile_updated", onProfileUpdated);
-      socket.addEventListener("call_offer", onCallOffer);
-      socket.addEventListener("call_answer", onCallAnswer);
-      socket.addEventListener("call_ice_candidate", onCallIce);
-      socket.addEventListener("call_end", onCallEnd);
-      socket.addEventListener("call_reject", onCallReject);
-      socket.addEventListener("call_error", onCallError);
-      socket.addEventListener("watch_session_state", onWatchSessionState);
-      socket.addEventListener("watch_playback_sync", onWatchPlaybackSync);
-      socket.addEventListener("watch_error", onWatchError);
-      socket.addEventListener("message_delivered", onMessageDelivered);
-      socket.addEventListener("message_read", onMessageRead);
-      socket.addEventListener("message_status_update", onMessageStatusUpdate);
+    const socketEvents = [
+      ["receive_message", onReceive],
+      ["typing", onTyping],
+      ["seen", onSeen],
+      ["chat_updated", onChatUpdated],
+      ["message_updated", onMessageUpdated],
+      ["message_deleted_everyone", onMessageDeletedEveryone],
+      ["message_reaction", onMessageReaction],
+      ["user_status", onStatus],
+      ["user_profile_updated", onProfileUpdated],
+      ["call_offer", onCallOffer],
+      ["call_answer", onCallAnswer],
+      ["call_ice_candidate", onCallIce],
+      ["call_end", onCallEnd],
+      ["call_reject", onCallReject],
+      ["call_error", onCallError],
+      ["watch_session_state", onWatchSessionState],
+      ["watch_playback_sync", onWatchPlaybackSync],
+      ["watch_error", onWatchError],
+      ["message_delivered", onMessageDelivered],
+      ["message_read", onMessageRead],
+      ["message_status_update", onMessageStatusUpdate]
+    ];
+
+    if (socket && socket.on && socket.off) {
+      socketEvents.forEach(([event, handler]) => socket.on(event, handler));
     }
 
     return () => {
-      // Clean up event listeners using enhanced socket context
-      if (socket && socket.removeAllEventListeners) {
-        socket.removeAllEventListeners();
+      if (socket && socket.off) {
+        socketEvents.forEach(([event, handler]) => socket.off(event, handler));
       }
       clearTimeout(typingTimer.current);
       clearTimeout(chatUpdatedTimerRef.current);

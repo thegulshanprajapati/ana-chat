@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { OAuth2Client } from "google-auth-library";
 import { getDb, getNextSequence } from "../db.js";
-import { clearAuthCookies, createSessionForUser, getActiveSessions, revokeSessionById, revokeSessionByRefreshToken, rotateRefreshSession, setAuthCookies } from "../services/session.js";
+import { clearAuthCookies, createSessionForUser, getActiveSessions, revokeSessionById, revokeSessionByRefreshToken, revokeAllUserSessions, rotateRefreshSession, setAuthCookies } from "../services/session.js";
 import { signAdminToken, verifyToken } from "../services/tokens.js";
 import { requireUser } from "../middleware/auth.js";
 import { computeIsAdmin, isSuperAdminPhone } from "../models/User.js";
@@ -563,6 +563,26 @@ router.post("/devices/revoke", async (req, res) => {
   if (!validPassword) return res.status(401).json({ message: "Invalid credentials" });
 
   await revokeSessionById(user.id, sessionId);
+  res.json({ success: true });
+});
+
+router.post("/devices/revoke-all", async (req, res) => {
+  const email_or_mobile = (req.body?.email_or_mobile || "").toString().trim();
+  const password = (req.body?.password || "").toString();
+
+  if (!email_or_mobile || !password) {
+    return res.status(400).json({ message: "email_or_mobile and password are required" });
+  }
+
+  const identifier = email_or_mobile.includes("@") ? normalizeEmail(email_or_mobile) : email_or_mobile;
+  const db = await getDb();
+  const user = await db.collection("users").findOne({ $or: [{ email: identifier }, { mobile: identifier }] });
+  if (!user) return res.status(401).json({ message: "Invalid credentials" });
+
+  const validPassword = await bcrypt.compare(password, user.password_hash);
+  if (!validPassword) return res.status(401).json({ message: "Invalid credentials" });
+
+  await revokeAllUserSessions(user.id);
   res.json({ success: true });
 });
 

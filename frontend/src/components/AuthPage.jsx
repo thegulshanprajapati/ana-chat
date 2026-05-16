@@ -93,6 +93,7 @@ export default function AuthPage({ onAuthed }) {
   const [activeDeviceSessions, setActiveDeviceSessions] = useState([]);
   const [deviceLimit, setDeviceLimit] = useState(null);
   const [deviceLogoutLoading, setDeviceLogoutLoading] = useState(null);
+  const [showDeviceLogoutModal, setShowDeviceLogoutModal] = useState(false);
 
   const googleButtonRef = useRef(null);
   const googleInitializedRef = useRef(false);
@@ -300,6 +301,9 @@ export default function AuthPage({ onAuthed }) {
     setTouched({});
     setFormData({ email_or_mobile: "", password: "" });
     setCapsLockOn(false);
+    setActiveDeviceSessions([]);
+    setDeviceLimit(null);
+    setShowDeviceLogoutModal(false);
   }
 
   async function handleLogin(e) {
@@ -354,6 +358,8 @@ export default function AuthPage({ onAuthed }) {
       if (err.response?.status === 403 && err.response?.data?.activeSessions) {
         setActiveDeviceSessions(err.response.data.activeSessions || []);
         setDeviceLimit(err.response.data?.maxActiveDevices || null);
+        setShowDeviceLogoutModal(true);
+        setShowDeviceLogoutModal(true);
       }
     } finally {
       setLoading(false);
@@ -373,8 +379,32 @@ export default function AuthPage({ onAuthed }) {
       });
       setSuccess("Device logged out successfully. Please retry login.");
       setActiveDeviceSessions((prev) => prev.filter((item) => item.id !== sessionId));
+      if (activeDeviceSessions.length <= 1) {
+        setShowDeviceLogoutModal(false);
+      }
     } catch (err) {
       const message = err.response?.data?.message || "Unable to logout device";
+      setError(message);
+    } finally {
+      setDeviceLogoutLoading(null);
+    }
+  }
+
+  async function handleLogoutAllDevices() {
+    setError("");
+    setSuccess("");
+    setDeviceLogoutLoading("all");
+
+    try {
+      await api.post("/auth/devices/revoke-all", {
+        email_or_mobile: formData.email_or_mobile,
+        password: formData.password
+      });
+      setSuccess("All other devices have been logged out. Please retry login.");
+      setActiveDeviceSessions([]);
+      setShowDeviceLogoutModal(false);
+    } catch (err) {
+      const message = err.response?.data?.message || "Unable to logout all devices";
       setError(message);
     } finally {
       setDeviceLogoutLoading(null);
@@ -542,6 +572,84 @@ export default function AuthPage({ onAuthed }) {
                   >
                     <AlertCircle className="h-5 w-5" />
                     {error}
+                  </Motion.div>
+                ) : null}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {activeDeviceSessions.length > 0 && showDeviceLogoutModal ? (
+                  <Motion.div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <Motion.div
+                      className="w-full max-w-2xl overflow-hidden rounded-3xl border border-amber-200/80 bg-slate-50 p-6 shadow-2xl shadow-slate-900/20 dark:border-amber-900/80 dark:bg-slate-900"
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: 20, opacity: 0 }}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className="text-lg font-semibold text-slate-900 dark:text-white">Maximum active devices reached</div>
+                          {deviceLimit ? (
+                            <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">You can have up to {deviceLimit} active devices.</div>
+                          ) : null}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowDeviceLogoutModal(false)}
+                          className="rounded-full bg-slate-200 px-3 py-2 text-slate-700 transition hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      <div className="mt-6 space-y-4">
+                        <div className="rounded-2xl border border-amber-200/80 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900/80 dark:bg-amber-950/20 dark:text-amber-100">
+                          Please logout one or all other active devices to continue logging in on this device.
+                        </div>
+
+                        <div className="grid gap-3">
+                          {activeDeviceSessions.map((session) => (
+                            <div key={session.id} className="rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-slate-700/80 dark:bg-slate-950">
+                              <div className="flex items-center justify-between gap-4">
+                                <div>
+                                  <div className="font-semibold text-slate-900 dark:text-white">{session.user_agent || "Unknown device"}</div>
+                                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">IP: {session.ip || "Unknown"}</div>
+                                </div>
+                                <button
+                                  type="button"
+                                  disabled={deviceLogoutLoading === session.id}
+                                  onClick={() => handleLogoutDevice(session.id)}
+                                  className="rounded-full bg-rose-500 px-3 py-1 text-xs font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {deviceLogoutLoading === session.id ? "Logging out..." : "Logout device"}
+                                </button>
+                              </div>
+                              <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+                                Last used: {new Date(session.last_used_at).toLocaleString()}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-slate-700/80 dark:bg-slate-950">
+                          <div className="text-sm text-slate-700 dark:text-slate-300">
+                            To immediately clear all logged-in devices and retry login on this device, use the button below.
+                          </div>
+                          <button
+                            type="button"
+                            disabled={deviceLogoutLoading === "all"}
+                            onClick={handleLogoutAllDevices}
+                            className="inline-flex items-center justify-center rounded-2xl bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {deviceLogoutLoading === "all" ? "Logging out all devices..." : "Logout all devices"}
+                          </button>
+                        </div>
+                      </div>
+                    </Motion.div>
                   </Motion.div>
                 ) : null}
               </AnimatePresence>

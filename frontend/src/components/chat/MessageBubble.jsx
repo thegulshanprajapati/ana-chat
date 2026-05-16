@@ -1483,7 +1483,13 @@ function SeenStatus({ message }) {
     return <CheckCheck size={12} className="opacity-90" aria-label="Delivered" />;
   }
   if (status === "read") {
-    return <CheckCheck size={12} className="text-blue-500" aria-label="Read" />;
+    return (
+      <span className="inline-flex items-center gap-[1px] text-blue-500" aria-label="Read">
+        <Check size={10} />
+        <Check size={10} />
+        <Check size={10} />
+      </span>
+    );
   }
   return <Check size={12} className="opacity-60" aria-label="Sent" />;
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, Loader2 } from "lucide-react";
 import MessageGroup from "./MessageGroup";
 import DaySeparator from "./DaySeparator";
 import TypingIndicator from "./TypingIndicator";
@@ -115,14 +115,15 @@ export default function MessageThread({
           ref={scrollRef}
           style={threadBackgroundStyle || undefined}
           onContextMenu={(event) => event.preventDefault()}
-          className="thread-surface chat-scroll min-h-0 h-full w-full flex-1 scroll-smooth space-y-2.5 overflow-y-auto px-3 pt-3 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-4 sm:pt-4 sm:pb-16"
+          className="thread-surface chat-scroll min-h-0 h-full w-full flex-1 scroll-smooth overflow-y-auto px-3 pt-3 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-4 sm:pt-4 sm:pb-16"
           aria-label="Loading messages"
         >
-          {Array.from({ length: 10 }).map((_, idx) => (
-            <div key={idx} className={`animate-pulse ${idx % 2 ? "ml-auto w-[65%]" : "w-[72%]"}`}>
-              <div className="h-12 rounded-2xl bg-slate-200 dark:bg-slate-800" />
+          <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+              <Loader2 className="animate-spin" />
             </div>
-          ))}
+            <p>Loading messages…</p>
+          </div>
         </div>
       </div>
     );
