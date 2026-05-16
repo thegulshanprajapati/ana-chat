@@ -14,7 +14,9 @@ import {
   getReconnectionStatus,
   disconnect,
   reauthenticate,
-  reconnect
+  reconnect,
+  joinRoom,
+  leaveRoom
 } from "../utils/socket";
 import { useAuth } from "./AuthContext";
 
@@ -159,9 +161,6 @@ export function SocketProvider({ children }) {
   // ===== CRITICAL FIX 28: Provide stable socket API =====
   const socketAPI = useMemo(() => {
     const socket = getSocket();
-    if (!socket) {
-      return null;
-    }
 
     return {
       // Connection state
@@ -170,10 +169,18 @@ export function SocketProvider({ children }) {
       reconnectionStatus,
 
       // Socket methods (from singleton)
-      emit: (...args) => socket.emit(...args),
-      on: (...args) => socket.on(...args),
-      once: (...args) => socket.once(...args),
-      off: (...args) => socket.off(...args),
+      emit: (...args) => socket?.emit?.(...args),
+      on: (...args) => socket?.on?.(...args),
+      once: (...args) => socket?.once?.(...args),
+      off: (...args) => socket?.off?.(...args),
+      joinRoom: (room) => {
+        console.log("[SocketProvider] joinRoom", room);
+        joinRoom(room);
+      },
+      leaveRoom: (room) => {
+        console.log("[SocketProvider] leaveRoom", room);
+        leaveRoom(room);
+      },
 
       // Utility methods
       disconnect: () => {

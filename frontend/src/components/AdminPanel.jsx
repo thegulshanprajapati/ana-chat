@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../api/client";
-import { useSocket } from "../context/SocketContext";
+import { useSocket } from "../context/SocketContextNew";
 
 export default function AdminPanel({ users: initialUsers, onReload }) {
   const socket = useSocket();

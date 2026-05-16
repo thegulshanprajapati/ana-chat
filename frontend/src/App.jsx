@@ -2,6 +2,7 @@ import AuthPage from "./components/AuthPage";
 import ChatPage from "./pages/ChatPage";
 import AdminPortal from "./components/AdminPortal";
 import ReactionMockup from "./pages/ReactionMockup";
+import SpeedInsightsInjector from "./components/SpeedInsights";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { SocketProvider } from "./context/SocketContextNew";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -44,6 +45,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <ToastProvider>
+        <SpeedInsightsInjector />
         <GlobalErrorOverlay />
         <AppErrorBoundary>
           {isReactionMockRoute ? (

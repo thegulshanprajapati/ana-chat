@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, API_BASE_URL } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import { useSocket } from "../context/SocketContext";
+import { useSocket } from "../context/SocketContextNew";
 import { useTheme } from "../context/ThemeContext";
 import {
   decryptTextFromMessage,
@@ -1558,8 +1558,12 @@ export default function ChatPage() {
   useEffect(() => {
     if (!socket) return undefined;
 
+    console.log("[ChatPage] attaching socket listeners", { socketId: socket.id || null });
+
     const onReceive = (message) => {
       const chatId = Number(message?.chat_id);
+      const messageId = message?.id != null ? String(message.id) : "";
+      console.log("[ChatPage] receive_message event", { messageId, chatId });
       if (chatId) lastChatMessageEventAtRef.current.set(chatId, Date.now());
 
       const messageId = message?.id != null ? String(message.id) : "";
@@ -2023,6 +2027,7 @@ export default function ChatPage() {
     }
 
     return () => {
+      console.log("[ChatPage] detaching socket listeners", { socketId: socket.id || null });
       if (socket && socket.off) {
         socketEvents.forEach(([event, handler]) => socket.off(event, handler));
       }
@@ -2032,9 +2037,17 @@ export default function ChatPage() {
   }, [loadChats, loadMessages, notify, reload, resetCallState, socket, user?.id]);
 
   useEffect(() => {
-    if (socket && socket.joinRoom && activeChat?.id) {
-      socket.joinRoom(`chat_${activeChat.id}`);
-    }
+    if (!socket || !activeChat?.id) return;
+
+    console.log("[ChatPage] joining chat room", activeChat.id);
+    socket.joinRoom(activeChat.id);
+
+    return () => {
+      if (socket && activeChat?.id) {
+        console.log("[ChatPage] leaving chat room", activeChat.id);
+        socket.leaveRoom(activeChat.id);
+      }
+    };
   }, [activeChat?.id, socket]);
 
   useEffect(() => {

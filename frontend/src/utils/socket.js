@@ -19,6 +19,7 @@ import { logSocketTokenAttached, log401Detected, dispatchAuthLogout } from "./au
 let socketInstance = null;
 let socketPromise = null;
 let initializationError = null;
+const joinedRooms = new Set();
 
 // Track reconnection state
 let reconnectAttempts = 0;
@@ -92,6 +93,7 @@ function createSocket(token) {
   socket.on("connect", () => {
     console.log("[Socket] ✓ Connected successfully", { socketId: socket.id });
     reconnectAttempts = 0; // Reset on success
+    rejoinRooms();
     notifyListeners("connected");
   });
 
@@ -157,6 +159,36 @@ function notifyListeners(state) {
       console.error("[Socket] Error in listener:", err);
     }
   });
+}
+
+function rejoinRooms() {
+  if (!socketInstance || !socketInstance.connected) return;
+  joinedRooms.forEach((room) => {
+    try {
+      console.log("[Socket] rejoining room", room);
+      socketInstance.emit("join_room", room);
+    } catch (err) {
+      console.warn("[Socket] rejoin room failed", room, err?.message || err);
+    }
+  });
+}
+
+export function joinRoom(room) {
+  if (!room) return;
+  joinedRooms.add(room);
+  if (socketInstance && socketInstance.connected) {
+    console.log("[Socket] joinRoom ->", room);
+    socketInstance.emit("join_room", room);
+  }
+}
+
+export function leaveRoom(room) {
+  if (!room) return;
+  joinedRooms.delete(room);
+  if (socketInstance && socketInstance.connected) {
+    console.log("[Socket] leaveRoom ->", room);
+    socketInstance.emit("leave_room", room);
+  }
 }
 
 /**
@@ -293,6 +325,7 @@ export function getSocket() {
 export function resetSocket() {
   console.log("[Socket] Resetting socket connection");
   disconnect();
+  joinedRooms.clear();
   socketPromise = null;
   initializationError = null;
   reconnectAttempts = 0;
@@ -346,6 +379,7 @@ export function disconnect() {
     socketInstance.disconnect();
     socketInstance = null;
     reconnectAttempts = 0;
+    joinedRooms.clear();
   }
 }
 
@@ -388,5 +422,7 @@ export default {
   disconnect,
   resetSocket,
   reauthenticate,
-  reconnect
+  reconnect,
+  joinRoom,
+  leaveRoom
 };

@@ -13,6 +13,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@vercel/speed-insights": "^2.0.0",
     "axios": "^1.7.9",
     "crypto-js": "^4.2.0",
     "date-fns": "^3.6.0",

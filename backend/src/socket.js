@@ -343,12 +343,20 @@ export async function initSocket(httpServer) {
       const chat = await getChatMembership(db, normalizedChatId, userId);
       if (!chat) return;
       socket.join(`chat_${normalizedChatId}`);
+      console.log("[SOCKET] joined chat room", { socketId: socket.id, chatId: normalizedChatId });
       const session = watchSessions.get(normalizedChatId);
       if (session) {
         socket.emit("watch_session_state", session);
       } else {
         socket.emit("watch_session_state", { chatId: normalizedChatId, active: false });
       }
+    });
+
+    socket.on("leave_room", async (chatId) => {
+      const normalizedChatId = Number(chatId);
+      if (!normalizedChatId) return;
+      socket.leave(`chat_${normalizedChatId}`);
+      console.log("[SOCKET] left chat room", { socketId: socket.id, chatId: normalizedChatId });
     });
 
     socket.on("message_delivered", async ({ messageId, chatId }) => {
