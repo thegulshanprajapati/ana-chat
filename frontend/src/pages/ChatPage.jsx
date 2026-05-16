@@ -1566,7 +1566,6 @@ export default function ChatPage() {
       console.log("[ChatPage] receive_message event", { messageId, chatId });
       if (chatId) lastChatMessageEventAtRef.current.set(chatId, Date.now());
 
-      const messageId = message?.id != null ? String(message.id) : "";
       if (messageId) {
         if (deliveredMessageIdsRef.current.has(messageId)) return;
         deliveredMessageIdsRef.current.add(messageId);
