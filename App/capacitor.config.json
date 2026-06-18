@@ -1,0 +1,7 @@
+{
+  "appId": "site.myana.chat",
+  "appName": "Ana Chat",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
+

@@ -1,0 +1,100 @@
+E frontend\src\api\client.js:287:30 no-undef 'useRef' is not defined.
+E frontend\src\api\client.js:289:23 no-undef 'useCallback' is not defined.
+E frontend\src\api\client.js:311:18 no-undef 'useCallback' is not defined.
+E frontend\src\api\client.js:318:3 no-undef 'useEffect' is not defined.
+E frontend\src\components\AdminPanel.jsx:24:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\AdminPanel.jsx:28:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\AuthPage.jsx:2:27 no-unused-vars 'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u.
+E frontend\src\components\AuthPage.jsx:238:7 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\chat\CallLogsDrawer.jsx:46:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\chat\ChatPane.jsx:88:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\chat\Composer.jsx:194:21 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\chat\Composer.jsx:199:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\chat\Composer.jsx:381:80 react-hooks/refs Error: Cannot access refs during render
+E frontend\src\components\chat\Composer.jsx:381:91 react-hooks/refs Error: Cannot access refs during render
+E frontend\src\components\chat\Composer.jsx:399:86 react-hooks/refs Error: Cannot access refs during render
+E frontend\src\components\chat\Composer.jsx:399:97 react-hooks/refs Error: Cannot access refs during render
+E frontend\src\components\chat\Composer.jsx:418:85 react-hooks/refs Error: Cannot access refs during render
+E frontend\src\components\chat\Composer.jsx:418:96 react-hooks/refs Error: Cannot access refs during render
+E frontend\src\components\chat\MediaViewerModal.jsx:292:7 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\chat\MediaViewerModal.jsx:302:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\chat\MediaViewerModal.jsx:358:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\chat\MediaViewerModal.jsx:368:20 react-hooks/refs Error: Cannot access refs during render
+E frontend\src\components\chat\MediaViewerModal.jsx:368:20 react-hooks/refs Error: Cannot access refs during render
+E frontend\src\components\chat\MediaViewerModal.jsx:374:7 react-hooks/refs Error: Cannot access refs during render
+E frontend\src\components\chat\MediaViewerModal.jsx:374:7 react-hooks/refs Error: Cannot access refs during render
+E frontend\src\components\chat\MediaViewerModal.jsx:445:30 react-hooks/refs Error: Cannot access refs during render
+E frontend\src\components\chat\MediaViewerModal.jsx:455:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\chat\MessageBubble.jsx:187:3 no-unreachable Unreachable code.
+E frontend\src\components\chat\MessageBubble.jsx:253:3 no-unused-vars 'grouped' is defined but never used.
+W frontend\src\components\chat\MessageBubble.jsx:315:86 react-hooks/exhaustive-deps React Hook useMemo has a missing dependency: 'message'. Either include it or remove the dependency array.
+E frontend\src\components\chat\MessageBubble.jsx:369:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\chat\MessageBubble.jsx:441:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\chat\MessageBubble.jsx:447:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\chat\MessageBubble.jsx:457:7 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+W frontend\src\components\chat\MessageBubble.jsx:496:6 react-hooks/exhaustive-deps React Hook useEffect has a missing dependency: 'message.e2ee'. Either include it or remove the dependency array.
+E frontend\src\components\chat\SparkleConfetti.jsx:21:16 react-hooks/purity Error: Cannot call impure function during render
+E frontend\src\components\chat\WatchTogetherPanel.jsx:46:7 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+W frontend\src\components\common\AppErrorBoundary.jsx:15:5 null Unused eslint-disable directive (no problems were reported from 'no-console').
+E frontend\src\components\common\CreateGroupModal.jsx:19:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\common\ProfileDrawer.jsx:18:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\common\SettingsDrawer.jsx:35:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\common\SettingsDrawer.jsx:42:16 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\common\SettingsDrawer.jsx:46:16 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\panels\CallsPanel.jsx:42:38 no-unused-vars 'me' is defined but never used.
+W frontend\src\components\panels\StatusPanel.jsx:60:54 react-hooks/exhaustive-deps React Hook useMemo has an unnecessary dependency: 'tick'. Either exclude it or remove the dependency array.
+W frontend\src\components\panels\StatusPanel.jsx:61:55 react-hooks/exhaustive-deps React Hook useMemo has an unnecessary dependency: 'tick'. Either exclude it or remove the dependency array.
+E frontend\src\components\sidebar\SidebarPanel.jsx:199:10 no-unused-vars 'statusDraft' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+E frontend\src\components\sidebar\SidebarPanel.jsx:235:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\sidebar\SidebarPanel.jsx:250:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\sidebar\SidebarPanel.jsx:341:12 no-unused-vars 'saveMyStatus' is defined but never used. Allowed unused vars must match /^[A-Z_]/u.
+E frontend\src\components\sidebar\SidebarPanel.jsx:508:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\sidebar\StatusViewerModal.jsx:52:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\components\sidebar\StatusViewerModal.jsx:59:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+W frontend\src\components\sidebar\StatusViewerModal.jsx:95:6 react-hooks/exhaustive-deps React Hook useEffect has a missing dependency: 'requestClose'. Either include it or remove the dependency array.
+E frontend\src\context\AuthContext.jsx:15:14 react-refresh/only-export-components Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+E frontend\src\context\AuthContext.jsx:70:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+W frontend\src\context\AuthContext.jsx:111:6 react-hooks/exhaustive-deps React Hook useEffect has a missing dependency: 'user.publicKey'. Either include it or remove the dependency array.
+E frontend\src\context\OfflineQueueContext.jsx:19:9 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\context\OfflineQueueContext.jsx:38:7 react-hooks/immutability Error: Cannot access variable before it is declared
+W frontend\src\context\OfflineQueueContext.jsx:40:6 react-hooks/exhaustive-deps React Hook useEffect has a missing dependency: 'processQueue'. Either include it or remove the dependency array.
+E frontend\src\context\OfflineQueueContext.jsx:126:17 react-refresh/only-export-components Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+E frontend\src\context\OfflineQueueContext.jsx:135:17 react-refresh/only-export-components Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+E frontend\src\context\SocketContext.jsx:7:14 react-refresh/only-export-components Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+E frontend\src\context\SocketContext.jsx:68:9 react-hooks/immutability Error: Cannot access variable before it is declared
+W frontend\src\context\SocketContext.jsx:85:6 react-hooks/exhaustive-deps React Hook useEffect has a missing dependency: 'initializeSocket'. Either include it or remove the dependency array.
+E frontend\src\context\SocketContext.jsx:108:17 no-unused-vars 'latency' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
+E frontend\src\context\SocketContext.jsx:164:9 react-hooks/immutability Error: Cannot access variable before it is declared
+W frontend\src\context\SocketContext.jsx:174:6 react-hooks/exhaustive-deps React Hook useCallback has a missing dependency: 'logMonitoringEvent'. Either include it or remove the dependency array.
+E frontend\src\context\SocketContext.jsx:211:9 no-undef 'process' is not defined.
+E frontend\src\context\SocketContext.jsx:319:34 no-unused-vars 'data' is defined but never used.
+E frontend\src\context\SocketContext.jsx:361:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\context\SocketContextNew.jsx:8:3 no-unused-vars 'useCallback' is defined but never used. Allowed unused vars must match /^[A-Z_]/u.
+E frontend\src\context\SocketContextNew.jsx:38:17 react-refresh/only-export-components Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+E frontend\src\context\SocketContextNew.jsx:83:7 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\context\ThemeContext.jsx:484:17 react-refresh/only-export-components Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+E frontend\src\context\ToastContext.jsx:1:60 no-unused-vars 'useEffect' is defined but never used. Allowed unused vars must match /^[A-Z_]/u.
+E frontend\src\context\ToastContext.jsx:4:14 react-refresh/only-export-components Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+E frontend\src\context\ToastContext.jsx:70:9 react-hooks/immutability Error: Cannot access variable before it is declared
+W frontend\src\context\ToastContext.jsx:75:6 react-hooks/exhaustive-deps React Hook useCallback has a missing dependency: 'removeToast'. Either include it or remove the dependency array.
+E frontend\src\context\ToastContext.jsx:77:35 react-hooks/preserve-manual-memoization Compilation Skipped: Existing memoization could not be preserved
+E frontend\src\context\ToastContext.jsx:123:17 react-refresh/only-export-components Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+E frontend\src\context\ToastContext.jsx:132:17 react-refresh/only-export-components Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+E frontend\src\context\ToastContext.jsx:167:17 react-refresh/only-export-components Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+E frontend\src\hooks\useApi.js:215:7 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\pages\ChatPage.jsx:245:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\pages\ChatPage.jsx:257:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\pages\ChatPage.jsx:729:35 react-hooks/preserve-manual-memoization Compilation Skipped: Existing memoization could not be preserved
+E frontend\src\pages\ChatPage.jsx:1033:35 react-hooks/preserve-manual-memoization Compilation Skipped: Existing memoization could not be preserved
+E frontend\src\pages\ChatPage.jsx:1098:5 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\pages\ChatPage.jsx:1103:7 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+W frontend\src\pages\ChatPage.jsx:1255:6 react-hooks/exhaustive-deps React Hook useCallback has a missing dependency: 'patchActiveCallLog'. Either include it or remove the dependency array.
+E frontend\src\pages\ChatPage.jsx:1542:5 react-hooks/immutability Error: This value cannot be modified
+E frontend\src\pages\ChatPage.jsx:1542:5 react-hooks/immutability Error: This value cannot be modified
+W frontend\src\pages\ChatPage.jsx:2025:6 react-hooks/exhaustive-deps React Hook useEffect has missing dependencies: 'decryptMessageForMe', 'finalizeActiveCallLog', and 'patchActiveCallLog'. Either include them or remove the dependency array.
+E frontend\src\pages\ChatPage.jsx:2034:20 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\pages\ChatPage.jsx:2040:76 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+W frontend\src\pages\ChatPage.jsx:2045:5 null Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps').
+E frontend\src\pages\ChatPage.jsx:2050:39 react-hooks/set-state-in-effect Error: Calling setState synchronously within an effect can trigger cascading renders
+E frontend\src\theme-init.js:8:10 no-unused-vars 'e' is defined but never used.
+E frontend\src\utils\socket.js:147:44 no-unused-vars 'data' is defined but never used.

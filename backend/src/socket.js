@@ -1,0 +1,795 @@
+import { Server } from "socket.io";
+import cookie from "cookie";
+import { createClient } from "redis";
+import { createAdapter } from "@socket.io/redis-adapter";
+import { verifyToken } from "./services/tokens.js";
+import { getDb, getNextSequence } from "./db.js";
+import {
+  directPeerId,
+  getChatMembership,
+  getChatParticipantIds,
+  getDirectBlockState,
+  usersAreConnectedByChat
+} from "./utils/chatDb.js";
+
+// Connection monitoring
+const connectionMetrics = {
+  totalConnections: 0,
+  activeConnections: 0,
+  totalDisconnects: 0,
+  totalReconnects: 0,
+  connectionErrors: 0
+};
+
+// Monitoring events storage (in production, this would go to a database)
+const monitoringEvents = [];
+const MAX_MONITORING_EVENTS = 1000;
+
+async function persistErrorLog(entry) {
+  try {
+    const db = await getDb();
+    await db.collection("error_logs").insertOne({
+      ...entry,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('[Error Logger] Failed to persist error log:', err?.message || err);
+  }
+}
+
+function logMonitoringEvent(eventData) {
+  const payload = {
+    id: Date.now().toString(),
+    timestamp: new Date().toISOString(),
+    ...eventData
+  };
+
+  monitoringEvents.unshift(payload);
+
+  // Keep only recent events
+  if (monitoringEvents.length > MAX_MONITORING_EVENTS) {
+    monitoringEvents.splice(MAX_MONITORING_EVENTS);
+  }
+
+  // Broadcast monitoring events to connected sockets for live admin dashboards
+  if (io) {
+    io.emit('monitoring_update', payload);
+  }
+
+  // In production, emit to admin dashboard
+  console.log('[Monitoring]', payload);
+}
+
+function userRoom(userId) {
+  return `user_${userId}`;
+}
+
+function notifyChatUpdated(io, userIds, chatId) {
+  const unique = [...new Set(userIds.filter(Boolean))];
+  unique.forEach((id) => {
+    io.to(userRoom(id)).emit("chat_updated", { chatId });
+  });
+}
+
+function normalizeWatchUrl(rawUrl) {
+  const value = (rawUrl || "").toString().trim();
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith("/")) return value;
+  return "";
+}
+
+function normalizeWatchTitle(rawTitle) {
+  return (rawTitle || "").toString().trim().slice(0, 80);
+}
+
+function normalizeWatchPosition(rawPosition) {
+  const value = Number(rawPosition);
+  if (!Number.isFinite(value) || value < 0) return 0;
+  return Math.round(value * 1000) / 1000;
+}
+
+function normalizeWatchRate(rawRate) {
+  const value = Number(rawRate);
+  if (!Number.isFinite(value)) return 1;
+  return Math.max(0.25, Math.min(2, Math.round(value * 100) / 100));
+}
+
+async function createRedisAdapterIfConfigured(io) {
+  const redisUrl = process.env.REDIS_URL?.trim();
+  if (!redisUrl) {
+    console.log("[Socket.IO] Redis adapter disabled (REDIS_URL not set) - using in-memory adapter");
+    return null;
+  }
+
+  try {
+    const pubClient = createClient({ url: redisUrl });
+    const subClient = pubClient.duplicate();
+    await Promise.all([pubClient.connect(), subClient.connect()]);
+    io.adapter(createAdapter(pubClient, subClient));
+    console.log("[Socket.IO] Redis adapter enabled successfully");
+    return { pubClient, subClient };
+  } catch (error) {
+    console.warn("[Socket.IO] Redis adapter connection failed:", error.message);
+    console.warn("[Socket.IO] Falling back to in-memory adapter");
+    return null;
+  }
+}
+
+let io = null; // Module-level io instance for monitoring
+
+export async function initSocket(httpServer) {
+  const clientOriginConfig = process.env.CLIENT_ORIGIN || process.env.CLIENT_URL || "https://chat.myana.site,https://www.chat.myana.site,https://api.chat.myana.site,http://localhost:3000,http://localhost:5173";
+  const allowedOrigins = clientOriginConfig
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+  function originAllowed(origin) {
+    if (!origin) return true;
+    if (allowedOrigins.includes(origin)) return true;
+    if (process.env.NODE_ENV !== "production" && /^https?:\/\/[^/]+$/.test(origin)) return true;
+    console.warn("[Socket.IO] CORS origin rejected:", origin);
+    return false;
+  }
+
+  io = new Server(httpServer, {
+    cors: {
+      origin(origin, callback) {
+        if (originAllowed(origin)) return callback(null, true);
+        console.error("[Socket.IO] CORS blocked origin:", origin);
+        return callback(new Error("CORS blocked"));
+      },
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization", "x-device-fingerprint", "X-Requested-With", "Accept", "Origin"],
+      credentials: true
+    },
+    // ===== CRITICAL FIX 6: WebSocket-first with proper transport config =====
+    transports: ["websocket", "polling"],
+    
+    // ===== CRITICAL FIX 7: Connection timeouts and heartbeat =====
+    pingInterval: 25000,    // Send ping every 25 seconds
+    pingTimeout: 60000,     // Expect pong within 60 seconds, then disconnect
+    
+    // ===== CRITICAL FIX 8: Upgrade configuration =====
+    upgradeTimeout: 10000,  // Wait 10s for upgrade to websocket
+    
+    // ===== CRITICAL FIX 9: Preserve HTTP long-polling as fallback =====
+    maxHttpBufferSize: 1e6, // 1MB max buffer for polling
+    
+    // ===== CRITICAL FIX 10: Engine.IO configuration =====
+    allowEIO3: true,        // Support older Socket.IO clients
+    
+    // ===== CRITICAL FIX 11: Connection settings for reverse proxy =====
+    serveClient: false,     // Don't serve client files (nginx handles this)
+    path: "/socket.io/",    // Keep consistent with NGINX config
+  });
+
+  await createRedisAdapterIfConfigured(io);
+
+  const watchSessions = new Map();
+
+  io.use(async (socket, next) => {
+    try {
+      const rawCookie = socket.handshake.headers.cookie || "";
+      const parsed = cookie.parse(rawCookie);
+      const headerAuth = socket.handshake.headers.authorization || socket.handshake.headers.Authorization || "";
+      const headerToken = headerAuth.startsWith("Bearer ") ? headerAuth.slice(7).trim() : null;
+      const handshakeToken = socket.handshake.auth?.token;
+      const authToken = handshakeToken || parsed.access_token || headerToken;
+
+      console.log("[SOCKET AUTH] TOKEN RECEIVED", {
+        socketId: socket.id,
+        origin: socket.handshake.headers.origin,
+        hasHandshakeToken: Boolean(handshakeToken),
+        hasCookieToken: Boolean(parsed.access_token),
+        hasHeaderToken: Boolean(headerToken)
+      });
+
+      if (!authToken) {
+        connectionMetrics.connectionErrors++;
+        console.log("[SOCKET AUTH] TOKEN MISSING", {
+          socketId: socket.id,
+          origin: socket.handshake.headers.origin,
+          cookieKeys: Object.keys(parsed)
+        });
+        void persistErrorLog({
+          type: 'socket_handshake_error',
+          reason: 'missing_token',
+          origin: socket.handshake.headers.origin,
+          userAgent: socket.handshake.headers['user-agent'],
+          ip: socket.handshake.address
+        });
+        return next(new Error("Unauthorized"));
+      }
+
+      try {
+        const payload = verifyToken(authToken);
+        console.log("[SOCKET AUTH] TOKEN VERIFIED", {
+          socketId: socket.id,
+          userId: payload.uid,
+          sessionId: payload.sid,
+          tokenType: payload.typ
+        });
+        if (payload.typ !== "access") {
+          connectionMetrics.connectionErrors++;
+          console.log("[SOCKET AUTH] TOKEN INVALID", { reason: "Invalid token type", socketId: socket.id, tokenType: payload.typ });
+          void persistErrorLog({
+            type: 'socket_handshake_error',
+            reason: 'invalid_token_type',
+            origin: socket.handshake.headers.origin,
+            userAgent: socket.handshake.headers['user-agent'],
+            ip: socket.handshake.address
+          });
+          return next(new Error("Unauthorized"));
+        }
+
+        const db = await getDb();
+        const [user, session] = await Promise.all([
+          db.collection("users").findOne(
+            { id: Number(payload.uid) },
+            { projection: { _id: 0, id: 1, name: 1, avatar_url: 1, is_blocked: 1, is_verified: 1 } }
+          ),
+          db.collection("sessions").findOne(
+            { id: Number(payload.sid), user_id: Number(payload.uid) },
+            { projection: { _id: 0, id: 1, revoked_at: 1 } }
+          )
+        ]);
+
+        if (!user || !session || session.revoked_at || user.is_blocked || !user.is_verified) {
+          connectionMetrics.connectionErrors++;
+          console.log("[SOCKET AUTH] TOKEN INVALID", {
+            socketId: socket.id,
+            userExists: Boolean(user),
+            sessionExists: Boolean(session),
+            revoked: Boolean(session?.revoked_at),
+            blocked: Boolean(user?.is_blocked),
+            verified: Boolean(user?.is_verified)
+          });
+          return next(new Error("Unauthorized"));
+        }
+
+        socket.userId = user.id;
+        socket.sessionId = session.id;
+        socket.userName = (user.name || "").toString().trim() || `User ${user.id}`;
+        socket.userAvatar = user.avatar_url || null;
+        return next();
+      } catch (verifyError) {
+        connectionMetrics.connectionErrors++;
+        console.log("[SOCKET AUTH] TOKEN INVALID", { message: verifyError.message, name: verifyError.name });
+        void persistErrorLog({
+          type: 'socket_handshake_error',
+          reason: 'invalid_token',
+          message: verifyError.message,
+          origin: socket.handshake.headers.origin,
+          userAgent: socket.handshake.headers['user-agent'],
+          ip: socket.handshake.address
+        });
+        return next(new Error("Invalid token"));
+      }
+
+      const db = await getDb();
+      const [user, session] = await Promise.all([
+        db.collection("users").findOne(
+          { id: Number(payload.uid) },
+          { projection: { _id: 0, id: 1, name: 1, avatar_url: 1, is_blocked: 1, is_verified: 1 } }
+        ),
+        db.collection("sessions").findOne(
+          { id: Number(payload.sid), user_id: Number(payload.uid) },
+          { projection: { _id: 0, id: 1, revoked_at: 1 } }
+        )
+      ]);
+
+      if (!user || !session || session.revoked_at || user.is_blocked || !user.is_verified) {
+        connectionMetrics.connectionErrors++;
+        return next(new Error("Unauthorized"));
+      }
+
+      socket.userId = user.id;
+      socket.sessionId = session.id;
+      socket.userName = (user.name || "").toString().trim() || `User ${user.id}`;
+      socket.userAvatar = user.avatar_url || null;
+      return next();
+    } catch (err) {
+      connectionMetrics.connectionErrors++;
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[Socket.IO] token verification failed", { error: err?.message });
+      }
+      return next(new Error("Unauthorized"));
+    }
+  });
+
+  io.on("connection", async (socket) => {
+    connectionMetrics.totalConnections++;
+    connectionMetrics.activeConnections++;
+    console.log("[SOCKET AUTH] USER CONNECTED", { socketId: socket.id, userId: socket.userId, origin: socket.handshake.headers.origin });
+    logMonitoringEvent({
+      type: 'socket_connect',
+      userId: socket.userId,
+      socketId: socket.id,
+      userAgent: socket.handshake.headers['user-agent'],
+      ip: socket.handshake.address
+    });
+
+    const userId = socket.userId;
+    socket.join(userRoom(userId));
+
+    try {
+      const db = await getDb();
+      await db.collection("users").updateOne({ id: Number(userId) }, { $set: { status: "online" } });
+      io.emit("user_status", { userId, status: "online", last_seen: null });
+    } catch {
+      // ignore status update failures
+    }
+
+    // Heartbeat handler
+    socket.on('ping', (data) => {
+      socket.emit('pong', data);
+    });
+
+    // Monitoring event handler
+    socket.on('monitoring_event', (eventData) => {
+      logMonitoringEvent({
+        ...eventData,
+        socketId: socket.id,
+        userId: socket.userId
+      });
+    });
+
+    socket.on("join_room", async (chatId) => {
+      const normalizedChatId = Number(chatId);
+      if (!normalizedChatId) return;
+      const db = await getDb();
+      const chat = await getChatMembership(db, normalizedChatId, userId);
+      if (!chat) return;
+      socket.join(`chat_${normalizedChatId}`);
+      console.log("[SOCKET] joined chat room", { socketId: socket.id, chatId: normalizedChatId });
+      const session = watchSessions.get(normalizedChatId);
+      if (session) {
+        socket.emit("watch_session_state", session);
+      } else {
+        socket.emit("watch_session_state", { chatId: normalizedChatId, active: false });
+      }
+    });
+
+    socket.on("leave_room", async (chatId) => {
+      const normalizedChatId = Number(chatId);
+      if (!normalizedChatId) return;
+      socket.leave(`chat_${normalizedChatId}`);
+      console.log("[SOCKET] left chat room", { socketId: socket.id, chatId: normalizedChatId });
+    });
+
+    socket.on("message_delivered", async ({ messageId, chatId }) => {
+      if (!messageId || !chatId) return;
+      const db = await getDb();
+
+      try {
+        const now = new Date();
+        await db.collection("messages").updateOne(
+          { id: Number(messageId), chat_id: Number(chatId), sender_id: Number(userId) },
+          { $set: { delivery_status: 'delivered', delivered_at: now } }
+        );
+
+        // Notify sender that message was delivered
+        io.to(userRoom(userId)).emit("message_status_update", {
+          messageId,
+          chatId,
+          status: 'delivered',
+          timestamp: now
+        });
+      } catch (error) {
+        logMonitoringEvent({
+          type: 'message_delivery_update_failed',
+          userId,
+          messageId,
+          chatId,
+          error: error.message
+        });
+      }
+    });
+
+    socket.on("typing", async ({ chatId }) => {
+      if (!chatId) return;
+      const db = await getDb();
+      const chat = await getChatMembership(db, Number(chatId), userId);
+      if (!chat) return;
+      if (chat.chat_type !== "group") {
+        const peerId = directPeerId(chat, userId);
+        const blocked = await getDirectBlockState(db, userId, peerId);
+        if (blocked.blocked) return;
+      }
+      socket.to(`chat_${chatId}`).emit("typing", {
+        chatId,
+        userId,
+        name: socket.userName || null,
+        avatar_url: socket.userAvatar || null
+      });
+    });
+
+    socket.on("seen", async ({ chatId }) => {
+      if (!chatId) return;
+      const db = await getDb();
+      const chat = await getChatMembership(db, Number(chatId), userId);
+      if (!chat) return;
+      if (chat.chat_type !== "group") {
+        const peerId = directPeerId(chat, userId);
+        const blocked = await getDirectBlockState(db, userId, peerId);
+        if (blocked.blocked) return;
+      }
+
+      const now = new Date();
+      try {
+        // Get messages that will be marked as read
+        const unreadMessages = await db.collection("messages").find({
+          chat_id: Number(chatId),
+          sender_id: { $ne: Number(userId) },
+          delivery_status: { $ne: 'read' }
+        }).toArray();
+
+        // Update messages as read
+        await db.collection("messages").updateMany(
+          { chat_id: Number(chatId), sender_id: { $ne: Number(userId) } },
+          { $set: { seen: true, delivery_status: 'read', read_at: now } }
+        );
+
+        // Emit read receipts for each message to all participants
+        const participantIds = await getChatParticipantIds(db, chat);
+        unreadMessages.forEach((message) => {
+          participantIds.forEach((participantId) => {
+            if (participantId !== userId) {
+              io.to(userRoom(participantId)).emit("message_read", {
+                messageId: message.id,
+                chatId,
+                userId,
+                timestamp: now
+              });
+            }
+          });
+        });
+      } catch {
+        // ignore
+      }
+    });
+
+    socket.on("send_message", async ({ chatId, body }) => {
+      if (!chatId || !body) return;
+      const db = await getDb();
+      const chat = await getChatMembership(db, Number(chatId), userId);
+      if (!chat) return;
+      if (chat.chat_type !== "group") {
+        const peerId = directPeerId(chat, userId);
+        const blocked = await getDirectBlockState(db, userId, peerId);
+        if (blocked.blockedByA) return;
+        if (blocked.blockedByB) return;
+      }
+      const participantIds = await getChatParticipantIds(db, chat);
+
+      try {
+        const now = new Date();
+        const messageId = await getNextSequence("messages");
+        const normalizedBody = (body || "").toString().trim();
+        if (!normalizedBody) return;
+
+        const message = {
+          id: messageId,
+          chat_id: Number(chatId),
+          sender_id: Number(userId),
+          client_message_id: clientMessageId,
+          reply_to_message_id: null,
+          body: normalizedBody,
+          image_url: null,
+          seen: false,
+          delivery_status: 'sent', // sent, delivered, read
+          delivered_at: null,
+          read_at: null,
+          created_at: now,
+          updated_at: null,
+          deleted_for_everyone: false,
+          deleted_by_user_id: null,
+          deleted_at: null
+        };
+
+        await db.collection("messages").insertOne(message);
+        await db.collection("chats").updateOne({ id: Number(chatId) }, { $set: { last_message_at: now } });
+
+        participantIds.forEach((participantId) => {
+          io.to(userRoom(participantId)).emit("receive_message", message);
+        });
+
+        // Emit delivery status to sender - message is now delivered to recipients
+        io.to(userRoom(userId)).emit("message_delivered", {
+          messageId,
+          chatId,
+          status: 'delivered',
+          timestamp: now
+        });
+
+        notifyChatUpdated(io, participantIds, chatId);
+      } catch {
+        // ignore
+      }
+    });
+
+    socket.on("call_offer", async ({ toUserId, offer, chatId, callType, mode }) => {
+      const targetId = Number(toUserId);
+      const selectedCallType = callType === "video" ? "video" : "voice";
+      const selectedMode = mode === "video_chat" ? "video_chat" : "standard";
+      const normalizedChatId = chatId ? Number(chatId) : null;
+
+      if (!targetId || targetId === userId || !offer) return;
+      const db = await getDb();
+      const allowed = await usersAreConnectedByChat(db, userId, targetId, normalizedChatId);
+      if (!allowed) {
+        socket.emit("call_error", { message: "Call target not allowed" });
+        return;
+      }
+      const blocked = await getDirectBlockState(db, userId, targetId);
+      if (blocked.blockedByA) {
+        socket.emit("call_error", { message: "You blocked this user. Unblock to call." });
+        return;
+      }
+      if (blocked.blockedByB) {
+        socket.emit("call_error", { message: "This user blocked you." });
+        return;
+      }
+
+      const caller = await db.collection("users").findOne(
+        { id: Number(userId) },
+        { projection: { _id: 0, id: 1, name: 1, avatar_url: 1 } }
+      );
+
+      io.to(userRoom(targetId)).emit("call_offer", {
+        fromUserId: userId,
+        toUserId: targetId,
+        fromUserName: caller?.name || "Unknown",
+        fromUserAvatar: caller?.avatar_url || null,
+        offer,
+        chatId: normalizedChatId,
+        callType: selectedCallType,
+        mode: selectedMode
+      });
+    });
+
+    socket.on("call_answer", async ({ toUserId, answer, chatId, callType, mode }) => {
+      const targetId = Number(toUserId);
+      const normalizedChatId = chatId ? Number(chatId) : null;
+      const selectedMode = mode === "video_chat" ? "video_chat" : "standard";
+      if (!targetId || !answer) return;
+
+      const db = await getDb();
+      const allowed = await usersAreConnectedByChat(db, userId, targetId, normalizedChatId);
+      if (!allowed) return;
+      const blocked = await getDirectBlockState(db, userId, targetId);
+      if (blocked.blocked) return;
+
+      io.to(userRoom(targetId)).emit("call_answer", {
+        fromUserId: userId,
+        toUserId: targetId,
+        answer,
+        chatId: normalizedChatId,
+        callType: callType === "video" ? "video" : "voice",
+        mode: selectedMode
+      });
+    });
+
+    socket.on("call_ice_candidate", async ({ toUserId, candidate, chatId }) => {
+      const targetId = Number(toUserId);
+      const normalizedChatId = chatId ? Number(chatId) : null;
+      if (!targetId || !candidate) return;
+
+      const db = await getDb();
+      const allowed = await usersAreConnectedByChat(db, userId, targetId, normalizedChatId);
+      if (!allowed) return;
+      const blocked = await getDirectBlockState(db, userId, targetId);
+      if (blocked.blocked) return;
+
+      io.to(userRoom(targetId)).emit("call_ice_candidate", {
+        fromUserId: userId,
+        toUserId: targetId,
+        candidate,
+        chatId: normalizedChatId
+      });
+    });
+
+    socket.on("call_end", ({ toUserId, reason, chatId }) => {
+      const targetId = Number(toUserId);
+      if (!targetId) return;
+
+      io.to(userRoom(targetId)).emit("call_end", {
+        fromUserId: userId,
+        toUserId: targetId,
+        reason: reason || "ended",
+        chatId: chatId ? Number(chatId) : null
+      });
+    });
+
+    socket.on("call_reject", ({ toUserId, reason, chatId }) => {
+      const targetId = Number(toUserId);
+      if (!targetId) return;
+
+      io.to(userRoom(targetId)).emit("call_reject", {
+        fromUserId: userId,
+        toUserId: targetId,
+        reason: reason || "rejected",
+        chatId: chatId ? Number(chatId) : null
+      });
+    });
+
+    socket.on("watch_session_set", async ({ chatId, sourceUrl, title }) => {
+      const normalizedChatId = Number(chatId);
+      const normalizedSourceUrl = normalizeWatchUrl(sourceUrl);
+      if (!normalizedChatId || !normalizedSourceUrl) {
+        socket.emit("watch_error", { message: "Enter a valid video URL." });
+        return;
+      }
+
+      const db = await getDb();
+      const chat = await getChatMembership(db, normalizedChatId, userId);
+      if (!chat) {
+        socket.emit("watch_error", { message: "Chat access denied." });
+        return;
+      }
+
+      if (chat.chat_type !== "group") {
+        const peerId = directPeerId(chat, userId);
+        const blocked = await getDirectBlockState(db, userId, peerId);
+        if (blocked.blocked) {
+          socket.emit("watch_error", { message: "Watch Together is unavailable in blocked chats." });
+          return;
+        }
+      }
+
+      const nextSession = {
+        chatId: normalizedChatId,
+        active: true,
+        sourceUrl: normalizedSourceUrl,
+        title: normalizeWatchTitle(title),
+        position: 0,
+        isPlaying: false,
+        playbackRate: 1,
+        updatedBy: userId,
+        updatedAt: new Date().toISOString()
+      };
+
+      watchSessions.set(normalizedChatId, nextSession);
+      io.to(`chat_${normalizedChatId}`).emit("watch_session_state", nextSession);
+    });
+
+    socket.on("watch_session_clear", async ({ chatId }) => {
+      const normalizedChatId = Number(chatId);
+      if (!normalizedChatId) return;
+
+      const db = await getDb();
+      const chat = await getChatMembership(db, normalizedChatId, userId);
+      if (!chat) return;
+
+      if (chat.chat_type !== "group") {
+        const peerId = directPeerId(chat, userId);
+        const blocked = await getDirectBlockState(db, userId, peerId);
+        if (blocked.blocked) return;
+      }
+
+      watchSessions.delete(normalizedChatId);
+      io.to(`chat_${normalizedChatId}`).emit("watch_session_state", {
+        chatId: normalizedChatId,
+        active: false,
+        updatedBy: userId,
+        updatedAt: new Date().toISOString()
+      });
+    });
+
+    socket.on("watch_playback_sync", async ({ chatId, action, position, playbackRate, isPlaying }) => {
+      const normalizedChatId = Number(chatId);
+      const normalizedAction = ["play", "pause", "seek", "rate"].includes(action) ? action : "";
+      if (!normalizedChatId || !normalizedAction) return;
+
+      const db = await getDb();
+      const chat = await getChatMembership(db, normalizedChatId, userId);
+      if (!chat) return;
+
+      if (chat.chat_type !== "group") {
+        const peerId = directPeerId(chat, userId);
+        const blocked = await getDirectBlockState(db, userId, peerId);
+        if (blocked.blocked) return;
+      }
+
+      const existing = watchSessions.get(normalizedChatId);
+      if (!existing?.active) return;
+
+      const nextSession = {
+        ...existing,
+        updatedBy: userId,
+        updatedAt: new Date().toISOString()
+      };
+      const nextPosition = normalizeWatchPosition(position ?? existing.position);
+
+      if (normalizedAction === "play") {
+        nextSession.position = nextPosition;
+        nextSession.isPlaying = true;
+      } else if (normalizedAction === "pause") {
+        nextSession.position = nextPosition;
+        nextSession.isPlaying = false;
+      } else if (normalizedAction === "seek") {
+        nextSession.position = nextPosition;
+        if (typeof isPlaying === "boolean") nextSession.isPlaying = isPlaying;
+      } else if (normalizedAction === "rate") {
+        nextSession.playbackRate = normalizeWatchRate(playbackRate ?? existing.playbackRate);
+        nextSession.position = nextPosition;
+        if (typeof isPlaying === "boolean") nextSession.isPlaying = isPlaying;
+      }
+
+      watchSessions.set(normalizedChatId, nextSession);
+
+      socket.to(`chat_${normalizedChatId}`).emit("watch_playback_sync", {
+        chatId: normalizedChatId,
+        action: normalizedAction,
+        position: nextSession.position,
+        playbackRate: nextSession.playbackRate,
+        isPlaying: nextSession.isPlaying,
+        updatedBy: userId,
+        updatedAt: nextSession.updatedAt
+      });
+    });
+
+    socket.on("disconnect", async (reason) => {
+      connectionMetrics.activeConnections--;
+      connectionMetrics.totalDisconnects++;
+      console.log("[SOCKET AUTH] USER DISCONNECTED", { socketId: socket.id, userId: socket.userId, reason });
+      logMonitoringEvent({
+        type: 'socket_disconnect',
+        userId: socket.userId,
+        socketId: socket.id,
+        reason: reason || 'user_disconnect'
+      });
+
+      const room = io.sockets.adapter.rooms.get(userRoom(userId));
+      if (room && room.size > 0) return;
+
+      try {
+        const db = await getDb();
+        const now = new Date();
+        await db.collection("users").updateOne(
+          { id: Number(userId) },
+          { $set: { status: "offline", last_seen: now } }
+        );
+        io.emit("user_status", { userId, status: "offline", last_seen: now });
+      } catch {
+        // ignore
+      }
+    });
+  });
+
+  // Global connection error monitoring
+  io.on('connection_error', (error) => {
+    connectionMetrics.connectionErrors++;
+    const eventData = {
+      type: 'socket_connection_error',
+      error: error.message,
+      code: error.code,
+      context: error.context
+    };
+    logMonitoringEvent(eventData);
+    void persistErrorLog({
+      type: 'socket_connection_error',
+      message: error.message,
+      code: error.code,
+      context: error.context
+    });
+  });
+
+  return io;
+}
+
+// Export monitoring data for admin panel
+export function getSocketMonitoringData() {
+  return {
+    connectionMetrics,
+    recentEvents: monitoringEvents.slice(0, 100),
+    activeSockets: io ? Array.from(io.sockets?.sockets || []).map(socket => ({
+      id: socket.id,
+      userId: socket.userId,
+      connectedAt: socket.handshake.time,
+      userAgent: socket.handshake.headers['user-agent']
+    })) : []
+  };
+}

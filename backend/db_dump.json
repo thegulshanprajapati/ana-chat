@@ -1,0 +1,469 @@
+{
+  "admins": [
+    {
+      "_id": "69fd5d023865d618e6e3ed9d",
+      "id": 1,
+      "name": "QuickPing Super Admin",
+      "username": "quickping_admin",
+      "email": "admin@quickping.local",
+      "mobile": "8709131702",
+      "role": "super_admin",
+      "password_hash": "$2a$10$fZniF9XYva12uf.BdJQnOe4.dSYfej9HmpO40k5lwEtDL1iZHzWhm",
+      "created_at": "2026-05-08T03:48:18.966Z"
+    },
+    {
+      "_id": "69fe97d434c29863cdb4b93d",
+      "id": 2,
+      "name": "Love 💕",
+      "username": "7992316557",
+      "email": "7992316557@anach.at",
+      "role": "admin",
+      "password_hash": "$2a$10$DuwBOIbh45skeFTUOGnGMebfNqanNcKGxdJboEM8/g.o.x4t791oy",
+      "created_at": "2026-05-09T02:11:32.328Z"
+    },
+    {
+      "_id": "6a10ae47a6ad29e1546a4ead",
+      "id": 3,
+      "name": "ana sup",
+      "username": "8709131702",
+      "email": "8709131702@anach.at",
+      "role": "super_admin",
+      "password_hash": "$2a$10$8lbyxxnPc9eU1bkxFvZeJe94YH1cf.jp6re2ljvPSWabsDMe.LDDa",
+      "created_at": "2026-05-22T19:28:07.518Z"
+    }
+  ],
+  "users": [
+    {
+      "_id": "69fd5d043865d618e6e3ed9e",
+      "id": 7,
+      "name": "Super Admin",
+      "email": "admin@ana.chat",
+      "mobile": "8709131702",
+      "phone": "8709131702",
+      "avatar_url": "/uploads/avatar-1779021338947-92430538.png",
+      "status": "offline",
+      "last_seen": "2026-05-22T19:20:39.922Z",
+      "is_admin": true,
+      "is_blocked": false,
+      "is_verified": true,
+      "auth_provider": "admin",
+      "generated_password_plain": null,
+      "public_key": {
+        "alg": "RSA-OAEP-256",
+        "e": "AQAB",
+        "ext": true,
+        "key_ops": [
+          "encrypt"
+        ],
+        "kty": "RSA",
+        "n": "u93YLhiFd-Z71lBx1WzvO-vIxektX_iGnOLnmUPLSz5ZuEhUpVWLsoLZWxM2jr5fDHEBmd5Yz_MoZZPdHuJYws70NdoHXqCvS0DTbNcwDiA6YETj0GCVvb9srWuWf-zpUxKtblMcG3RKEhODgSRmA68gYJGbGytv0Jyqv272wPm2tt4aOWLOVX2SA94ED1KtaWHnTdefxB-KZf9mcPn-dGEPGL1G4YFy2DPlyLoOKJStdSLaEitmVInlj9UyTD7-8B8ijKdIwvg5G--H87w1Ws-YL1FOJbPLkeKTCIADBL_sAnE4QIT_3YV1Qy2pdWr4Q-mtrPq2hxYQU-cX-JumMw"
+      },
+      "settings_json": "{\"compactMode\":true,\"showOnlineStatus\":true,\"enterToSend\":true,\"soundEffects\":true,\"notificationsEnabled\":true}",
+      "created_at": "2026-05-08T03:48:20.837Z",
+      "about_bio": "🫶🍁",
+      "security_pin_hash": "$2a$10$L0UZy8tiLw3ZXZgMpcrVFeuWalUjQdQCzat.VlJpSz3B4pOXOgBcm",
+      "security_pin_set_at": "2026-05-17T13:44:02.831Z"
+    },
+    {
+      "_id": "69fd8866662c26619e30c493",
+      "id": 9,
+      "name": "GULSHAN KUMAR",
+      "email": "gulshankumargaurav54@gmail.com",
+      "mobile": "8544513765",
+      "phone": "8544513765",
+      "avatar_url": "https://lh3.googleusercontent.com/a/ACg8ocLoumfOwOSPC10gE0GUcAD1CuO5zI7nPbY8lSH-pS9-FpNedPIWIw=s96-c",
+      "status": "offline",
+      "last_seen": "2026-06-13T11:59:41.588Z",
+      "is_admin": false,
+      "is_blocked": false,
+      "is_verified": true,
+      "auth_provider": "local",
+      "generated_password_plain": null,
+      "public_key": {
+        "alg": "RSA-OAEP-256",
+        "e": "AQAB",
+        "ext": true,
+        "key_ops": [
+          "encrypt"
+        ],
+        "kty": "RSA",
+        "n": "4LLhMbk070sabk59iw7zJIcqYr-uSdZe1_nt119dcDovukR2KWCtlH04OLtIGzqzYMpfNtmFBQHbUO4vDn-ZLhiHtI7jV5VoJd8_k1jB_hWDY5z9KwIGb_38bGl1it5PR7SRoHS04xAFCQyNZxnMzQhpxE05wh_qGUL7Pcu1ambPqUbu6234pjG6hvN9WeQSmYP109IHsTUYuWMsVznodM1mo9MirszrOpL1sgT_55ox04CrPnniAd1w8gYVPaWs-9kWw1wJF1kVntUyBrqR36bQuseSfI3qMoBbItqn2cswYxI9XzuQfnFlngwILunBJFJbNRN3s_zPZzoU63_fpw"
+      },
+      "settings_json": "{\"compactMode\":true,\"showOnlineStatus\":true,\"enterToSend\":true,\"soundEffects\":true,\"notificationsEnabled\":true}",
+      "created_at": "2026-05-08T06:53:26.418Z",
+      "google_sub": "110953015017270951099",
+      "security_pin_hash": "$2a$10$Occf.f.SDI1bWIlxljSJQevIaM7uYMZbQMOVmg/dTDpQ3XC1cd9US",
+      "security_pin_set_at": "2026-05-22T13:55:17.150Z",
+      "security_pin_last_used_at": "2026-05-23T09:49:42.967Z"
+    },
+    {
+      "_id": "69fe3f52dc6efa53cd46e4cb",
+      "id": 12,
+      "name": "Ankita Kumari",
+      "email": "ankitasharma851205@gmail.com",
+      "mobile": "7979058991",
+      "phone": "7979058991",
+      "avatar_url": null,
+      "status": "offline",
+      "last_seen": "2026-05-08T19:53:54.961Z",
+      "is_admin": false,
+      "is_blocked": false,
+      "is_verified": true,
+      "auth_provider": "local",
+      "generated_password_plain": null,
+      "public_key": {
+        "alg": "RSA-OAEP-256",
+        "e": "AQAB",
+        "ext": true,
+        "key_ops": [
+          "encrypt"
+        ],
+        "kty": "RSA",
+        "n": "pDS9DDvzWjKt7uQuG4x3RX8-eDXls1RXY2HeR2LgpQySXQ1k8cV9Y_Sp3qRhGXNAne4rNAafxeum1Fq6vDRjm3ZX91gzeL_I38lg4DmJ4OjgqkTZ2Ki9YIiffPYY0g2h0Yp_vWYG_lxNaLHnXHtunpEr818sNL-22p9dZXF1Sb_15qn9BsJeOOZu92q83C-LgsiL1jqg5NTQdJtIZQimv4I8dy8V1-Ihf_1b9gHaMhmbIGEUP47D9gwRuzH9wDf0dfGsoPGEX7UmnE2ALjfUe3fpTftAKOBIkPaxPbfePaYPbtSQvQxjw_Kft8Jn-23rWZgvTcLM0Hz2ljIbAm1Tdw"
+      },
+      "settings_json": "{\"compactMode\":false,\"showOnlineStatus\":true,\"enterToSend\":true,\"soundEffects\":true,\"notificationsEnabled\":true}",
+      "created_at": "2026-05-08T19:53:54.961Z"
+    },
+    {
+      "_id": "69fe4124dc6efa53cd46e4f6",
+      "id": 13,
+      "name": "Andrew",
+      "email": "faceboook.ofline@gmail.com",
+      "mobile": "g39317040146599",
+      "phone": "g39317040146599",
+      "auth_provider": "google",
+      "google_sub": "108764639317040146599",
+      "generated_password_plain": "CH-MLLqhRWvGzWt",
+      "avatar_url": "https://lh3.googleusercontent.com/a/ACg8ocJE8HLhbNdA3yOTI1SI2IXoYTML00n7PqSf5xD5Rj8eYszfY4o=s96-c",
+      "status": "offline",
+      "last_seen": "2026-05-17T07:50:52.872Z",
+      "is_admin": false,
+      "is_blocked": false,
+      "is_verified": true,
+      "public_key": {
+        "alg": "RSA-OAEP-256",
+        "e": "AQAB",
+        "ext": true,
+        "key_ops": [
+          "encrypt"
+        ],
+        "kty": "RSA",
+        "n": "vrSW7UGiyXhtoXSGkqYFENmtqC-xz4kYvaeI40qohD0XjLs63Y5EfODFJElGyCUiox-QLuweJZf6_bRHTxe_XNuZvsVOmdCdhjVE1rZS1EObwso31b6leFltO3f08ZL6GuLrakFT6Y194ERlFE3pP2h65As80P7FSc0Q7Evx2jaOzIbBwmfCyPVpeuO0WCBGnP8WCn0qkG6Xi8HRd9UITacLJXkOADX5olnVCMgcYd6Uq6NKzgsaVen6ZxCvQ2vABtbuaTPjdIU5hBAI7bKWFmpkxUM2Vdd6mbytS591xHoHyFJLWRtfqfEMUookkGN-j8wQHUzSxYJir11Fpjk74Q"
+      },
+      "created_at": "2026-05-08T20:01:40.887Z"
+    },
+    {
+      "_id": "69fe90e534c29863cdb4b905",
+      "id": 14,
+      "name": "Kanak Prabha",
+      "email": "kanakprabha22@gmail.com",
+      "mobile": "+917992316557",
+      "phone": "+917992316557",
+      "avatar_url": "avatar-1778950855754-454345507.jpg",
+      "status": "offline",
+      "last_seen": "2026-06-14T12:07:56.356Z",
+      "is_admin": false,
+      "is_blocked": false,
+      "is_verified": true,
+      "auth_provider": "local",
+      "generated_password_plain": null,
+      "public_key": {
+        "alg": "RSA-OAEP-256",
+        "e": "AQAB",
+        "ext": true,
+        "key_ops": [
+          "encrypt"
+        ],
+        "kty": "RSA",
+        "n": "sYBGS2j1lJaujMlk20G8hJPqeKacNy4St0lqJZlFzUxCXipCKrOYBe6GjbEKIue76AKcOdfy3wfvDhRZHs55_NcTIbgQKFLA0QTTE-ayMX0SIODMDWWD92xFDzAGGIfc6vEl00-zEtjQJFOenUOYJhYgHBo9uD5Azm1lgPQUNRB8auCrGBTVI6ejeDxM5VogP7weqHpqPX_E3TjByGp4Nk2jOTdkRLgNIESyWSnVUtba7kmA4LvYwTsETFitYiVx2d2zORY8ez9Qb94iknuXglr5KYCBsJ-Gf-E9ceBfsCfzwhCae1UXNdqYomNVNOphyiStro6mX93VWhLeB7-w6Q"
+      },
+      "settings_json": "{\"compactMode\":true,\"showOnlineStatus\":true,\"enterToSend\":true,\"soundEffects\":true,\"notificationsEnabled\":true}",
+      "created_at": "2026-05-09T01:41:57.450Z",
+      "about_bio": "🫶🍁"
+    },
+    {
+      "_id": "69fe982834c29863cdb4b941",
+      "id": 15,
+      "name": "Love 💕",
+      "email": "7992316557@anach.at",
+      "mobile": "admin_2",
+      "phone": "admin_2",
+      "avatar_url": null,
+      "status": "offline",
+      "last_seen": "2026-05-17T12:21:15.298Z",
+      "is_admin": true,
+      "is_blocked": false,
+      "is_verified": true,
+      "auth_provider": "admin",
+      "generated_password_plain": null,
+      "public_key": {
+        "alg": "RSA-OAEP-256",
+        "e": "AQAB",
+        "ext": true,
+        "key_ops": [
+          "encrypt"
+        ],
+        "kty": "RSA",
+        "n": "qLWGKUBSB7mPG66POJenbsuoeK3yWuNHmFo3amQ7vGURrb7Ck-9QrNpmKuQksxd-pxxaXv3GKAMUHwPWx6H8EAotHmaQ9P4Ykkp5gU2OTWeFC2wjucvwSAOHkkqSe7hpPlqAQtcIjYQu6rYrYPzkc8KoL_qJD1-y-Kv1DIdCMXfOGH3EWvXHnsOO4F2nIXZk1Ib3NKNG5Nb6DcgyFasQ-8DGLuiUe33pNFCSEyUY-uvnkH4SfE-4TRzhlaYUInQJLe8OKe13lO73ElRm4ptBiz80eTl7cZme9hTWvdk5PJQ965GqcE8FPHP2UG6e_Y2fi_gYcm7SL1_SyoEC7hzg0Q"
+      },
+      "settings_json": "{\"compactMode\":false,\"showOnlineStatus\":true,\"enterToSend\":true,\"soundEffects\":true,\"notificationsEnabled\":true}",
+      "created_at": "2026-05-09T02:12:56.532Z"
+    },
+    {
+      "_id": "69feebdfef6b14e02b379707",
+      "id": 16,
+      "name": "Swechha Gupta",
+      "email": "swechhagupta829@gmail.com",
+      "mobile": "+917909081485",
+      "phone": "+917909081485",
+      "avatar_url": null,
+      "status": "offline",
+      "last_seen": "2026-05-09T08:10:07.557Z",
+      "is_admin": false,
+      "is_blocked": false,
+      "is_verified": true,
+      "auth_provider": "local",
+      "generated_password_plain": null,
+      "public_key": {
+        "alg": "RSA-OAEP-256",
+        "e": "AQAB",
+        "ext": true,
+        "key_ops": [
+          "encrypt"
+        ],
+        "kty": "RSA",
+        "n": "3b9JBcudFiJqXqCKRD4i1ebkUk2KjYBgEjgLKhz7MruUF8gI59ma2lCtwSgEgsS7h7rOn9OwKlxoF8PHPNd-0PJ8e3x9ROPR2Wy8FEJvgKJHyEdK5XEgLCw4SOzXFvmMKvvAkxE7n75wPsCvd1SfTG-brQZBRBM0PrvD5O6MSa18_pgE3PxQgelFYFaYaAdhdI_BRXlfTznJjM_DKMp3-yuDAzyE55h7qzL2bNCKOxfgm_TNyWmz1KM-ZIIlS79IXfbGi74x9u1BbD0faE-6zCJFnA7yLZnIKFdXcfnXE47lOGTDbfGTAnBx8iiyW0U8krBbNLVc8RYq1s8MzGIZLw"
+      },
+      "settings_json": "{\"compactMode\":false,\"showOnlineStatus\":true,\"enterToSend\":true,\"soundEffects\":true,\"notificationsEnabled\":true}",
+      "created_at": "2026-05-09T08:10:07.557Z"
+    },
+    {
+      "_id": "6a09c7a21e28bc557a53ebb5",
+      "id": 20,
+      "name": "Sanjay Kumar",
+      "email": "sanjaykumarkgg1819@gmail.com",
+      "mobile": "g69014322865154",
+      "phone": "g69014322865154",
+      "auth_provider": "google",
+      "google_sub": "100865769014322865154",
+      "generated_password_plain": "CH-n6-EpfrfswG1",
+      "avatar_url": "https://lh3.googleusercontent.com/a/ACg8ocLN5WkL2DdGZCtJLHFIWLkIICqURvJBz7kzhwdEw-rOPK_aqQ=s96-c",
+      "status": "offline",
+      "last_seen": "2026-05-22T19:24:30.700Z",
+      "is_admin": false,
+      "is_blocked": false,
+      "is_verified": true,
+      "public_key": {
+        "alg": "RSA-OAEP-256",
+        "e": "AQAB",
+        "ext": true,
+        "key_ops": [
+          "encrypt"
+        ],
+        "kty": "RSA",
+        "n": "tTBrE5QwuobCtBQKpn8HX6NEVt1rNXQuS1p36DYudCQszI3D91LNOYMIncu17WeFEssIhGKkokdg2100sD0YUxAHGB69ghMvsfHXIj9WjC_VNXLaaVtba3nhGG4tB0EuVAWsho2evOrb1DnVjLt23q4_tBPzxmlzrhv1keeMwEseQK4_HawexKw9bBl1-VUkzPybvDQ9hOTFw7YcLbty3xvzCniKiLeRhQS784nE2jyw6PdDTAINdHlBYWM_cuCt13_XuDjtyl6ihYLMDggZkfgJHUWR-apegUX10viyku93OlhFDImBr0J-bIYYHQTMMf1B2mn8dNrRTIp00cUxHw"
+      },
+      "created_at": "2026-05-17T13:50:26.093Z"
+    },
+    {
+      "_id": "6a100c852669fd234365b89a",
+      "id": 21,
+      "name": "Saheli Singharoy",
+      "email": "sahelisingharoy4@gmail.com",
+      "mobile": "9732132917",
+      "phone": "9732132917",
+      "avatar_url": null,
+      "status": "offline",
+      "last_seen": "2026-05-22T08:07:22.756Z",
+      "is_admin": false,
+      "is_blocked": false,
+      "is_verified": true,
+      "auth_provider": "local",
+      "generated_password_plain": null,
+      "public_key": {
+        "alg": "RSA-OAEP-256",
+        "e": "AQAB",
+        "ext": true,
+        "key_ops": [
+          "encrypt"
+        ],
+        "kty": "RSA",
+        "n": "wvcrB8rcnOyPGbqrtzv04UGjNw8ioWm2RE3o44kIY2Ghh0uT4taRg8FOu01DCKgip5yDyZOZuEKlyx9CADpszapb-X4vJknQk0JWXUek9meBC-P81fSwT4ab2BoLqijU40TCA8o_5_083sCk3F4vSj_y0P463CW3yfa9tLTD-oU8nmxS6rJoMYZq7n3Q-GHJ9wgcWam0-PYwbOMPwcY-xpe3moHtDTGJZhY3olIlq0IyOXq-z7ph4TWEUh9nU6jeI9MciIOhBAmpja4AMKNclvr-SJY-iwRBilrMCZ1Ko0gBrKsjWO7Wjp0Y5OYc1L2EqFBW9Q1nR0HcYpq47hm3FQ"
+      },
+      "settings_json": "{\"compactMode\":false,\"showOnlineStatus\":true,\"enterToSend\":true,\"soundEffects\":true,\"notificationsEnabled\":true}",
+      "created_at": "2026-05-22T07:57:57.623Z"
+    },
+    {
+      "_id": "6a10adfba6ad29e1546a4ea1",
+      "id": 23,
+      "name": "QuickPing Super Admin",
+      "email": "admin@quickping.local",
+      "mobile": "admin_1",
+      "phone": "admin_1",
+      "avatar_url": null,
+      "status": "offline",
+      "last_seen": "2026-06-15T09:05:21.806Z",
+      "is_admin": true,
+      "is_blocked": false,
+      "is_verified": true,
+      "auth_provider": "admin",
+      "generated_password_plain": null,
+      "public_key": {
+        "alg": "RSA-OAEP-256",
+        "e": "AQAB",
+        "ext": true,
+        "key_ops": [
+          "encrypt"
+        ],
+        "kty": "RSA",
+        "n": "yNgHxUo1bjLlhORqGGSqwaadtxG4ytIz2y5Nhnr5IfbgtoykoXAUdiPcDnKfQSn8rfeYXU7GmBRHoPm3Zm90Mfvy3a6iDrsVaBXxO9QoGDiph0jS0SPO4JrURjVi1LIBeo7QLHVAh31plCcHy9Kn_-mDXXpulS0eJcKmNBTU-SSmRubdU94SiG93rCH_GhrKldXMz7f1o2RH-cnUcem05VnBSBFmmo9ntgp7xlufyNQ8hk812jTdZJDSvMum1ZI73irbu7hWGCt77PQ_4ote3JOd3iKY6xajnbR_yQXq8TD6pN0HU-ja2a0gnKkruXVv6-gF8uf6VOQ8KMn6xMCeKQ"
+      },
+      "settings_json": "{\"compactMode\":false,\"showOnlineStatus\":true,\"enterToSend\":true,\"soundEffects\":true,\"notificationsEnabled\":true}",
+      "created_at": "2026-05-22T19:26:51.452Z"
+    },
+    {
+      "_id": "6a1154c12d87f70a40fdaa9c",
+      "id": 24,
+      "name": "rj",
+      "email": "raushankumarj157@gmail.com",
+      "mobile": "7992428750",
+      "phone": "7992428750",
+      "avatar_url": null,
+      "status": "offline",
+      "last_seen": "2026-05-23T11:42:05.150Z",
+      "is_admin": false,
+      "is_blocked": false,
+      "is_verified": true,
+      "auth_provider": "local",
+      "generated_password_plain": null,
+      "public_key": {
+        "alg": "RSA-OAEP-256",
+        "e": "AQAB",
+        "ext": true,
+        "key_ops": [
+          "encrypt"
+        ],
+        "kty": "RSA",
+        "n": "wvRcoqbkVAKz1lvZVU4mEj55ncwE6qkjXv73o55jIKcFkNPB6g5_r_lrhykT-Z3PbY_1S9w4FhA8QX_so6Ed69PvXpCyvwZKqQek2WAkzplelYI6i2L7Twdz_kMTRvTeyd1tYZU3tjAfcnw9kEZ_b9wG-vBVEOn0V231V62EfSJpOYLcPcY9mRtK2C6A6NhxJyzReXSbhyJjiXzbSb8YDrRBF2CGyFLyl11Ib2XetL__qNnDblrQE7DM2xDb7pO59OEEy3mw4UOcoo8bpqPAsDQJNHpDjfJndL6VcHeCcyaJ8p_UMAJc0Qw2-sNQ9vZixVgD3tCpsTGsZroMvtFeOQ"
+      },
+      "settings_json": "{\"compactMode\":true,\"showOnlineStatus\":true,\"enterToSend\":true,\"soundEffects\":true,\"notificationsEnabled\":false}",
+      "created_at": "2026-05-23T07:18:25.614Z"
+    },
+    {
+      "_id": "6a141f8b71d269bfcc02e873",
+      "id": 25,
+      "name": "Phul Kumar",
+      "email": "phulkumarsharma90@gmail.com",
+      "mobile": "8544685498",
+      "phone": "8544685498",
+      "auth_provider": "google",
+      "google_sub": "107107872250720628892",
+      "generated_password_plain": "CH-kolW7EDXDVgu",
+      "avatar_url": "https://lh3.googleusercontent.com/a/ACg8ocKbfRqymz_GLyvt6ASnUxrUwBSIRcPdBk9XqT6gDlEW1ATCeO0K=s96-c",
+      "status": "offline",
+      "last_seen": "2026-05-25T10:54:33.430Z",
+      "is_admin": false,
+      "is_blocked": false,
+      "is_verified": true,
+      "public_key": {
+        "alg": "RSA-OAEP-256",
+        "e": "AQAB",
+        "ext": true,
+        "key_ops": [
+          "encrypt"
+        ],
+        "kty": "RSA",
+        "n": "2mark8LRLw2aY3A4qe396i9eNiww_HJ0bWIO7KkkDfQ69ph7bLHo_mVufaBY5awGu8i8OXnCRng5TwfsyV-fn8i06_-F8Vss2jr6DhRYTyF1RrbR_EbsrzB2Y20lZmIyQrWM8WJ_4zfdRc6J8CKfuowYCF6tGv-kuFkaAw5fHszS9JycGM7DsNwyIyalxiSW2KgSbUNcqQRHMbnqtJruKxOUJEzUT-beIbzoafXQJImdBzB2ZGWx2S22gOJqZzSqDNcAHD_gZXJn6Tnc9T60C6ZH1g2nlYdT_ZN4nxCCov4THsIOoxfo2lsQBjmNJHghotHYDwb6r-zX3RM6Gp9HKQ"
+      },
+      "created_at": "2026-05-25T10:08:11.232Z",
+      "security_pin_hash": "$2a$10$GqLpKDIC4iGA0agINTwxYOYhN5c9Yjx9bbrx3Kjg5BOcWDVJRgFoS",
+      "security_pin_set_at": "2026-05-25T10:23:50.860Z",
+      "about_bio": "",
+      "security_pin_last_used_at": "2026-05-25T10:29:56.467Z"
+    },
+    {
+      "_id": "6a23c92b74fe980223b667eb",
+      "id": 26,
+      "name": "Sourav Kumar",
+      "email": "souravb160063me@gmail.com",
+      "mobile": "g16460204570044",
+      "phone": "g16460204570044",
+      "auth_provider": "google",
+      "google_sub": "104127816460204570044",
+      "generated_password_plain": "CH-I9TrskQOtnAZ",
+      "avatar_url": "https://lh3.googleusercontent.com/a/ACg8ocJXRPiYrAlilhPc-umXYGwwdukpkcglmQix7CgWdd2foqIGTPd8=s96-c",
+      "status": "offline",
+      "last_seen": "2026-06-06T07:19:19.172Z",
+      "is_admin": false,
+      "is_blocked": false,
+      "is_verified": true,
+      "public_key": {
+        "alg": "RSA-OAEP-256",
+        "e": "AQAB",
+        "ext": true,
+        "key_ops": [
+          "encrypt"
+        ],
+        "kty": "RSA",
+        "n": "oU0fbyDC4NCod8MOSmVvjMUFbhtmR93TpsyeFQlTp6WJZbii3tb9f7H48Y8nQJ82BvbUKwdEVVqyEja05g5m0HbUencrPWE92RN2SaGnsVhQ2bwd7Z2K3KydxGLLd3q2YoQxHyPsMXJOt43fYD3reZ198j3J4PuDCsO733SldCDxmzf6fVJF9FVge09BLE6xgg4wwPzTao5Mjh7FtxwIXqOEghQmvXEGyXGx3NIdNVI1aXGhRt-ZXJzp9D_4vO4PFxzciAQf_nU5JFsrxO82dE98OAAslHOUfGTe4YIZqLHra9A2MdNq_fW1c63ABhBQvGLb9uV8FBk2je19ioo-Sw"
+      },
+      "created_at": "2026-06-06T07:15:55.579Z"
+    },
+    {
+      "_id": "6a23d274a34225868cdb7ad6",
+      "id": 27,
+      "name": "Ronak Patel",
+      "email": "ronakpatelinusa@gmail.com",
+      "mobile": "g29675097890133",
+      "phone": "g29675097890133",
+      "auth_provider": "google",
+      "google_sub": "101920729675097890133",
+      "generated_password_plain": "CH-w-ek2KJTE-5g",
+      "avatar_url": "https://lh3.googleusercontent.com/a/ACg8ocK515f_-Mk3xbC_iNDXAz6ZcqLFOEirZrStbhnVTrc33RofNg=s96-c",
+      "status": "offline",
+      "last_seen": "2026-06-06T08:02:44.017Z",
+      "is_admin": false,
+      "is_blocked": false,
+      "is_verified": true,
+      "public_key": {
+        "alg": "RSA-OAEP-256",
+        "e": "AQAB",
+        "ext": true,
+        "key_ops": [
+          "encrypt"
+        ],
+        "kty": "RSA",
+        "n": "up7NmwBukxKwXmhhXjYt3jtc9e2hNsxFWBHK9twvKHnwUpVQUehcOWbJGkYNYp0_27RFqL0Ww0DF6PeX3eMXP6do1mVpSVBQvzGCWWJmkPEF2_eJrjp1CJGI1MP7goW2kfCTV4sayy4InDTuJSQw6hSqwY0BF3BFVmVOOCuO_4QaaFkCe3YWqa6rIT5jszuob8BiRNuLmvosXMOB5UU4VdDFr6JtPPSyyGUDy75OaRc1q_epucFPHsd5kXReWxn7wvFzJns_6tAGGOTTj0xSVFqE_CB1XmD7Nl40-P7OTRDHvAQfBwaaRNqbIE_cco1cnvv4HdaV0A3XjPolzru9Tw"
+      },
+      "created_at": "2026-06-06T07:55:32.052Z"
+    },
+    {
+      "_id": "6a259b822bce3c31a326eed1",
+      "id": 28,
+      "name": "Jitendra Kumar ",
+      "email": "jitendrakumar74@gmail.com",
+      "mobile": "7488453735",
+      "phone": "7488453735",
+      "avatar_url": null,
+      "status": "offline",
+      "last_seen": "2026-06-07T16:31:25.018Z",
+      "is_admin": false,
+      "is_blocked": false,
+      "is_verified": true,
+      "auth_provider": "local",
+      "generated_password_plain": null,
+      "public_key": {
+        "alg": "RSA-OAEP-256",
+        "e": "AQAB",
+        "ext": true,
+        "key_ops": [
+          "encrypt"
+        ],
+        "kty": "RSA",
+        "n": "wxCu_N8fq9bF7yk1tLCEQj-Ms0aCMwHnEleWmwlMAVb9KZ_5DEk-srS0MgnSf4QqRqV7LqlzKpGBho2qs9Du7IfjsWpNT7V3nIox8t7i1RXHeFEiiWispsZBf4RLYnovzzXyMIFv3fdDVIIwCirBgdJO2ekSGRjpsXVVyk1YpyZtnWfZ-mQ9XTdX0fCJJsptw8LKChhRdGFlCiLTbhgK9XIdrminMgod4ShB-7qKXbaCqk6lpbhP6UB7BHo6ara-yVOb7CYXppg44V30ay610vzooNYbQJ2POMV2QxiNnX0GcjI_FjFvEH3RB_PuQEE-E6mWupKeafBx-clDa7hGAQ"
+      },
+      "settings_json": "{\"compactMode\":false,\"showOnlineStatus\":true,\"enterToSend\":true,\"soundEffects\":true,\"notificationsEnabled\":true}",
+      "created_at": "2026-06-07T16:25:38.572Z"
+    }
+  ]
+}
