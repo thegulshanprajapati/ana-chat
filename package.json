@@ -1,7 +1,7 @@
 {
-  "name": "chat-app-root",
+  "name": "anachat-root",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.1",
   "scripts": {
     "dev": "concurrently -k \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "npm --prefix frontend run dev",
