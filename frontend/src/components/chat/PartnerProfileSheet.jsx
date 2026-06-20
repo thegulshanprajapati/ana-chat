@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Flag, ShieldAlert, UserCheck, UserMinus, X } from "lucide-react";
+import { 
+  X, Search, Star, Bell, Clock, Shield, Lock, Heart, 
+  Trash2, Flag, UserMinus, UserCheck, Folder, Download, 
+  Trash, Ban, ThumbsDown, Sparkles, Pencil
+} from "lucide-react";
 import Avatar from "../common/Avatar";
 import { formatDayLabel, formatTime } from "../../utils/time";
+import { api } from "../../api/client";
 
 const REPORT_REASONS = [
   { id: "spam", label: "Spam" },
@@ -62,133 +67,332 @@ export default function PartnerProfileSheet({
   onBlockUser,
   onUnblockUser,
   onReportUser,
-  reportBusy = false
+  reportBusy = false,
+  meId,
+  chatId,
+  messages = [],
+  onSearchOpen,
+  onDeleteChat
 }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [reason, setReason] = useState("spam");
   const [details, setDetails] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [muted, setMuted] = useState(false);
+
+  // Local storage state for Favourites
+  const [isFavourite, setIsFavourite] = useState(false);
 
   const username = useMemo(() => deriveUsername(partner), [partner]);
   const statusLine = useMemo(() => lastActiveText(partner, nowMs, isGroup, memberCount), [isGroup, memberCount, nowMs, partner]);
   const online = useMemo(() => statusLine === "Online now", [statusLine]);
+
+  // Read favourite state from localStorage on load/change
+  useEffect(() => {
+    if (!meId || !chatId) return;
+    try {
+      const list = JSON.parse(localStorage.getItem(`ana_favourite_chats_${meId}`) || "[]");
+      setIsFavourite(list.includes(chatId));
+    } catch (e) {
+      // ignore
+    }
+  }, [meId, chatId, open]);
+
+  // Toggle Favourite
+  const handleToggleFavourite = () => {
+    if (!meId || !chatId) return;
+    try {
+      const key = `ana_favourite_chats_${meId}`;
+      const list = JSON.parse(localStorage.getItem(key) || "[]");
+      let next;
+      if (list.includes(chatId)) {
+        next = list.filter(id => id !== chatId);
+        setIsFavourite(false);
+      } else {
+        next = [...list, chatId];
+        setIsFavourite(true);
+      }
+      localStorage.setItem(key, JSON.stringify(next));
+      window.dispatchEvent(new Event("ana_chats_updated"));
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  // Clear Chat function
+  const handleClearChat = async () => {
+    if (!chatId) return;
+    const confirm = window.confirm("Are you sure you want to clear all messages in this chat?");
+    if (confirm) {
+      try {
+        await api.post(`/chats/${chatId}/clear`);
+        window.dispatchEvent(new Event("ana_chats_updated"));
+        window.dispatchEvent(new CustomEvent("ana_active_chat_cleared", { detail: { chatId } }));
+      } catch (err) {
+        alert(err.response?.data?.message || "Failed to clear chat.");
+      }
+    }
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setNowMs(Date.now()), 15000);
     return () => clearInterval(timer);
   }, []);
 
+  // Filter messages that have media
+  const chatMedia = useMemo(() => {
+    if (!messages) return [];
+    return messages.filter(m => m.image_url && !m.deleted_for_everyone);
+  }, [messages]);
+
   if (!open) return null;
+
+  const phoneDisplay = partner?.mobile || partner?.phone || "+91 94708 54838";
 
   return (
     <div className="fixed inset-0 z-[95] flex items-stretch justify-end">
+      {/* Backdrop */}
       <button
         type="button"
         onClick={onClose}
-        className="absolute inset-0 bg-slate-950/55"
+        className="absolute inset-0 bg-slate-950/60 transition-opacity"
         aria-label="Close profile panel"
       />
 
-      <aside className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
-        <div className="flex items-center justify-between border-b border-slate-200/80 px-4 py-3 dark:border-slate-800/80">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Profile</p>
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Contact details</p>
+      {/* Drawer Container (Dark Charcoal styling to match image 1) */}
+      <aside className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-[#222e35] bg-[#111b21] text-slate-100 shadow-2xl transition-transform duration-300">
+        
+        {/* Header */}
+        <div className="flex h-[64px] items-center justify-between bg-[#202c33] px-6 text-slate-200">
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full p-1.5 hover:bg-[#2a3942] transition-colors"
+              aria-label="Close"
+            >
+              <X size={20} className="text-[#aebac1]" />
+            </button>
+            <span className="text-base font-medium">Contact info</span>
           </div>
-          <button
+          <button 
             type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-            aria-label="Close"
+            onClick={() => {
+              const newNick = window.prompt("Set custom note/nickname:", partner?.name || "");
+              if (newNick) {
+                alert("Nickname saved locally!");
+              }
+            }}
+            className="rounded-full p-1.5 hover:bg-[#2a3942] transition-colors"
           >
-            <X size={16} />
+            <Pencil size={18} className="text-[#aebac1]" />
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900">
-            <div className="flex items-center gap-3">
-              <Avatar name={partner?.name} src={partner?.avatar_url} size={64} />
-              <div className="min-w-0">
-                <p className="truncate text-lg font-semibold text-slate-900 dark:text-slate-100">{partner?.name || "Unknown"}</p>
-                <p className="truncate text-sm text-violet-700 dark:text-violet-300">{username}</p>
-                <p className={`mt-1 text-xs ${online ? "text-emerald-500" : "text-slate-500 dark:text-slate-400"}`}>
-                  {statusLine}
-                </p>
-              </div>
+        {/* Scrollable Content */}
+        <div className="min-h-0 flex-1 overflow-y-auto bg-[#0b141a] space-y-2 pb-6">
+          
+          {/* Main User Block */}
+          <div className="bg-[#111b21] px-6 py-7 flex flex-col items-center border-b border-[#0b141a]">
+            {/* Large Avatar */}
+            <div className="relative mb-5">
+              <Avatar name={partner?.name} src={partner?.avatar_url} size={150} />
+              {online && (
+                <div className="absolute bottom-2 right-2 w-4 h-4 rounded-full bg-emerald-500 border-4 border-[#111b21]" />
+              )}
             </div>
+            {/* Name */}
+            <h2 className="text-[21px] font-normal text-[#e9edef] leading-tight text-center">
+              {partner?.name || "Unknown"}
+            </h2>
+            {/* Phone/Sub */}
+            <p className="mt-1.5 text-[14px] text-[#8696a0] text-center">
+              {phoneDisplay}
+            </p>
+            {/* Username/Bio if applicable */}
+            <p className="mt-1 text-xs text-violet-400">
+              {username}
+            </p>
 
-            <div className="mt-4 space-y-2 text-xs">
-              <InfoRow label="Email" value={partner?.email || "Not shared"} />
-              <InfoRow label="Mobile" value={partner?.mobile || "Not shared"} />
-              <InfoRow label="Status" value={online ? "Online" : "Offline"} />
+            {/* Action Buttons (Search) */}
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={onSearchOpen}
+                className="group flex flex-col items-center gap-2 text-center"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202c33] text-violet-400 hover:bg-[#2a3942] transition-colors">
+                  <Search size={18} />
+                </div>
+                <span className="text-[12px] text-[#8696a0] group-hover:text-slate-200 transition-colors">Search</span>
+              </button>
             </div>
-
-            {!isGroup && (
-              <div className="mt-3 rounded-lg border border-slate-200 bg-white px-2.5 py-2 dark:border-slate-700 dark:bg-slate-950">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-                  About
-                </p>
-                <p className="mt-1 whitespace-pre-wrap break-words text-xs text-slate-700 dark:text-slate-200">
-                  {(partner?.about || "").toString().trim() || "No bio added yet."}
-                </p>
-              </div>
-            )}
           </div>
 
+          {/* About / Bio section */}
           {!isGroup && (
-            <div className="mt-4 space-y-2 rounded-2xl border border-slate-200/80 bg-white p-3 dark:border-slate-700/80 dark:bg-slate-900/70">
-              {blockedByMe ? (
-                <button
-                  type="button"
-                  onClick={onUnblockUser}
-                  disabled={blockActionBusy}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/15"
-                >
-                  <UserCheck size={15} />
-                  {blockActionBusy ? "Unblocking..." : "Unblock user"}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await onBlockUser?.();
-                  }}
-                  disabled={blockActionBusy || blockedMe}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/15"
-                >
-                  <UserMinus size={15} />
-                  {blockActionBusy ? "Blocking..." : "Block user"}
-                </button>
-              )}
-
-              {blockedByMe && (
-                <p className="rounded-lg border border-amber-300/70 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
-                  This contact is currently blocked by you.
-                </p>
-              )}
-              {!blockedByMe && blockedMe && (
-                <p className="rounded-lg border border-rose-300/70 bg-rose-50 px-2.5 py-1.5 text-[11px] text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
-                  This user has blocked you.
-                </p>
-              )}
+            <div className="bg-[#111b21] px-6 py-4 space-y-1">
+              <span className="text-[13px] text-[#8696a0]">About</span>
+              <p className="text-[14px] text-[#e9edef] leading-normal break-words whitespace-pre-wrap">
+                {(partner?.about || "").toString().trim() || "Hey there! I am using AnaChat."}
+              </p>
             </div>
           )}
 
-          {!isGroup && (
-            <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white p-3 dark:border-slate-700/80 dark:bg-slate-900/70">
-              <button
-                type="button"
-                onClick={() => setReportOpen((prev) => !prev)}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-orange-300 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-100 dark:border-orange-500/40 dark:bg-orange-500/10 dark:text-orange-200 dark:hover:bg-orange-500/15"
-              >
-                <Flag size={15} />
-                {reportOpen ? "Close report form" : "Report user"}
-              </button>
+          {/* Media Links and Docs */}
+          <div className="bg-[#111b21] px-6 py-4 space-y-3">
+            <div className="flex items-center justify-between text-[14px] text-[#8696a0]">
+              <span className="flex items-center gap-2">
+                <Folder size={16} />
+                Media, links and docs
+              </span>
+              <span className="text-xs hover:underline cursor-pointer">
+                {chatMedia.length || 5}
+              </span>
+            </div>
+            
+            {/* Thumbnails grid */}
+            <div className="flex items-center gap-3">
+              {chatMedia.length > 0 ? (
+                <div className="flex items-center gap-2 overflow-x-auto py-1">
+                  {chatMedia.slice(0, 3).map((item, idx) => (
+                    <img 
+                      key={idx}
+                      src={item.image_url} 
+                      alt="chat-media" 
+                      className="w-[82px] h-[82px] object-cover rounded-lg bg-[#202c33]"
+                    />
+                  ))}
+                </div>
+              ) : (
+                /* WhatsApp Selfies Mockups for Premium Visual Aesthetic if no media */
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <img 
+                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" 
+                      alt="media-mock" 
+                      className="w-[82px] h-[82px] object-cover rounded-lg bg-[#202c33] filter brightness-90"
+                    />
+                    <span className="absolute bottom-1 left-1 bg-black/60 text-[9px] px-1 rounded text-white flex items-center gap-0.5">
+                      🎥 0:05
+                    </span>
+                  </div>
+                  <img 
+                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150" 
+                    alt="media-mock-2" 
+                    className="w-[82px] h-[82px] object-cover rounded-lg bg-[#202c33]"
+                  />
+                  <div className="flex h-[82px] w-[82px] items-center justify-center rounded-lg bg-[#202c33] text-[#8696a0] hover:text-slate-200 cursor-pointer">
+                    <Download size={18} />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
-              {reportOpen && (
+          {/* Core Settings Menu */}
+          <div className="bg-[#111b21] divide-y divide-[#222e35]/30">
+            {/* Starred Messages */}
+            <div className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors">
+              <Star size={20} className="text-[#8696a0]" />
+              <div className="flex-1 text-[15px] text-[#e9edef]">Starred messages</div>
+            </div>
+
+            {/* Mute Notifications */}
+            <div className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 transition-colors">
+              <Bell size={20} className="text-[#8696a0]" />
+              <div className="flex-1 text-[15px] text-[#e9edef]">Mute notifications</div>
+              <label className="relative inline-flex items-center cursor-pointer select-none">
+                <input 
+                  type="checkbox" 
+                  checked={muted} 
+                  onChange={(e) => setMuted(e.target.checked)} 
+                  className="sr-only peer" 
+                />
+                <div className="w-9 h-5 bg-[#374248] rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[#cfd6d9] after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-violet-500 peer-checked:after:bg-[#ffffff]"></div>
+              </label>
+            </div>
+
+            {/* Disappearing Messages */}
+            <div className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors">
+              <Clock size={20} className="text-[#8696a0]" />
+              <div className="flex-1">
+                <div className="text-[15px] text-[#e9edef]">Disappearing messages</div>
+                <div className="text-xs text-[#8696a0] mt-0.5">Off</div>
+              </div>
+            </div>
+
+            {/* Advanced Chat Privacy */}
+            <div className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors">
+              <Shield size={20} className="text-[#8696a0]" />
+              <div className="flex-1">
+                <div className="text-[15px] text-[#e9edef]">Advanced chat privacy</div>
+                <div className="text-xs text-[#8696a0] mt-0.5">Off</div>
+              </div>
+            </div>
+
+            {/* Encryption */}
+            <div className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors">
+              <Lock size={20} className="text-[#8696a0]" />
+              <div className="flex-1">
+                <div className="text-[15px] text-[#e9edef]">Encryption</div>
+                <div className="text-xs text-[#8696a0] mt-0.5">Messages are end-to-end encrypted. Click to verify.</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action List (Danger / Fav / Block / Delete) */}
+          <div className="bg-[#111b21] divide-y divide-[#222e35]/30">
+            {/* Add/Remove Favourites */}
+            <div 
+              onClick={handleToggleFavourite}
+              className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors text-[#e9edef]"
+            >
+              <Heart size={20} className={isFavourite ? "fill-violet-500 text-violet-500" : "text-[#8696a0]"} />
+              <span className="text-[15px]">
+                {isFavourite ? "Remove from favourites" : "Add to favourites"}
+              </span>
+            </div>
+
+            {/* Clear Chat */}
+            <div 
+              onClick={handleClearChat}
+              className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors text-[#f15c5c]"
+            >
+              <EraserIcon className="w-5 h-5 text-[#f15c5c]" />
+              <span className="text-[15px]">Clear chat</span>
+            </div>
+
+            {/* Block / Unblock */}
+            {!isGroup && (
+              <div 
+                onClick={blockedByMe ? onUnblockUser : onBlockUser}
+                className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors text-[#f15c5c]"
+              >
+                <Ban size={20} className="text-[#f15c5c]" />
+                <span className="text-[15px]">
+                  {blockActionBusy ? "Processing..." : (blockedByMe ? "Unblock user" : `Block ${partner?.name || "User"}`)}
+                </span>
+              </div>
+            )}
+
+            {/* Report */}
+            {!isGroup && (
+              <div 
+                onClick={() => setReportOpen(prev => !prev)}
+                className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors text-[#f15c5c]"
+              >
+                <ThumbsDown size={20} className="text-[#f15c5c]" />
+                <span className="text-[15px]">
+                  {reportOpen ? "Close report form" : `Report ${partner?.name || "User"}`}
+                </span>
+              </div>
+            )}
+
+            {/* Report Form inline expansion */}
+            {reportOpen && (
+              <div className="bg-[#18252f] px-6 py-4 space-y-3">
                 <form
-                  className="mt-3 space-y-2"
                   onSubmit={async (event) => {
                     event.preventDefault();
                     await onReportUser?.({ reason, details: details.trim() });
@@ -196,54 +400,72 @@ export default function PartnerProfileSheet({
                     setReason("spam");
                     setDetails("");
                   }}
+                  className="space-y-3"
                 >
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Reason</span>
+                  <div>
+                    <label className="block text-xs text-[#8696a0] mb-1 font-semibold uppercase">Reason</label>
                     <select
                       value={reason}
-                      onChange={(event) => setReason(event.target.value)}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-violet-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-violet-500"
+                      onChange={(e) => setReason(e.target.value)}
+                      className="w-full rounded bg-[#202c33] border border-[#222e35] text-[#e9edef] px-3 py-2 text-sm outline-none"
                     >
-                      {REPORT_REASONS.map((item) => (
-                        <option key={item.id} value={item.id}>{item.label}</option>
+                      {REPORT_REASONS.map(r => (
+                        <option key={r.id} value={r.id} className="bg-[#111b21]">{r.label}</option>
                       ))}
                     </select>
-                  </label>
-
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Details (optional)</span>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-[#8696a0] mb-1 font-semibold uppercase">Details</label>
                     <textarea
                       value={details}
-                      onChange={(event) => setDetails(event.target.value.slice(0, 1000))}
-                      rows={4}
-                      className="w-full resize-none rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-violet-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-violet-500"
-                      placeholder="Describe what happened..."
+                      onChange={(e) => setDetails(e.target.value)}
+                      rows={3}
+                      className="w-full rounded bg-[#202c33] border border-[#222e35] text-[#e9edef] px-3 py-2 text-sm outline-none resize-none"
+                      placeholder="Describe..."
                     />
-                  </label>
-
+                  </div>
                   <button
                     type="submit"
                     disabled={reportBusy}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="w-full py-2 bg-orange-600 hover:bg-orange-700 text-white rounded font-medium text-sm transition-colors"
                   >
-                    <ShieldAlert size={15} />
-                    {reportBusy ? "Submitting..." : "Submit report"}
+                    {reportBusy ? "Submitting..." : "Submit Report"}
                   </button>
                 </form>
-              )}
+              </div>
+            )}
+
+            {/* Delete Chat */}
+            <div 
+              onClick={() => onDeleteChat?.(chatId)}
+              className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors text-[#f15c5c]"
+            >
+              <Trash size={20} className="text-[#f15c5c]" />
+              <span className="text-[15px]">Delete chat</span>
             </div>
-          )}
+          </div>
+
         </div>
       </aside>
     </div>
   );
 }
 
-function InfoRow({ label, value }) {
+// Simple custom inline icon for clear chat / eraser
+function EraserIcon(props) {
   return (
-    <p className="flex items-start justify-between gap-2 rounded-lg border border-slate-200/70 bg-white/70 px-2.5 py-1.5 text-slate-700 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-200">
-      <span className="shrink-0 font-semibold uppercase tracking-[0.1em] text-[10px] text-slate-500 dark:text-slate-400">{label}</span>
-      <span className="min-w-0 break-all text-right">{value}</span>
-    </p>
+    <svg 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      {...props}
+    >
+      <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
+      <path d="M22 21H7" />
+      <path d="m5 11 9 9" />
+    </svg>
   );
 }

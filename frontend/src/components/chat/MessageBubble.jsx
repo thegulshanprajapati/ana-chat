@@ -1442,7 +1442,7 @@ function MessageBubble({
                 ref={menuPopupRef}
                 onContextMenu={(event) => event.preventDefault()}
                 style={{ left: menuStyle.left, top: menuStyle.top }}
-                className="chat-menu-in hidden sm:block sm:fixed sm:z-[120] sm:w-56 sm:max-h-[calc(100vh-24px)] sm:overflow-y-auto sm:overscroll-contain sm:rounded-2xl sm:border sm:border-slate-200 sm:bg-white p-2.5 shadow-2xl dark:sm:border-slate-700 dark:sm:bg-slate-900"
+                className="chat-menu-in hidden sm:block sm:fixed sm:z-[120] sm:w-56 sm:max-h-[calc(100vh-24px)] sm:overflow-y-auto sm:overscroll-contain sm:rounded-2xl sm:bg-white p-2.5 shadow-2xl dark:sm:bg-slate-900"
               >
                 {deleteConfirm && (
                   <div className="mb-2 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-100">
@@ -1656,7 +1656,7 @@ function MenuButton({ icon, label, className = "", onClick, disabled = false }) 
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`flex w-full items-center gap-2 rounded-lg border border-transparent px-2.5 py-2.5 text-[13px] font-medium text-slate-700 transition hover:border-slate-200 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-800 ${className}`}
+      className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-[13px] font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800 ${className}`}
     >
       {icon}
       {label}
@@ -1721,6 +1721,8 @@ function AudioMessagePlayer({ src }) {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
+  const percentage = duration ? (currentTime / duration) * 100 : 0;
+
   return (
     <div className="flex items-center gap-3 w-full min-w-[220px] bg-black/10 dark:bg-white/10 rounded-2xl p-3 select-none">
       <audio
@@ -1750,7 +1752,10 @@ function AudioMessagePlayer({ src }) {
           value={currentTime}
           onChange={handleSeek}
           onClick={(e) => e.stopPropagation()}
-          className="w-full accent-accent h-1 rounded-lg cursor-pointer bg-slate-300 dark:bg-slate-700"
+          className="audio-seekbar w-full cursor-pointer"
+          style={{
+            background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${percentage}%, rgba(148, 163, 184, 0.3) ${percentage}%, rgba(148, 163, 184, 0.3) 100%)`
+          }}
         />
         <div className="flex items-center justify-between text-[10px] opacity-75 font-mono">
           <span>{formatAudioTime(currentTime)}</span>

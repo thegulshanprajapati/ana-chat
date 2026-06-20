@@ -570,8 +570,8 @@ export default function ChatPage() {
     if (isMobile) setMobileChatOpen(true);
   }, [activeChat?.id, getChatRecipients, isMobile, loadMessages, socket]);
 
-  const loadChats = useCallback(async () => {
-    setLoadingChats(true);
+  const loadChats = useCallback(async (showSkeleton = false) => {
+    if (showSkeleton) setLoadingChats(true);
     try {
       const [{ data }, { data: hiddenCountData }] = await Promise.all([
         api.get("/chats"),
@@ -1378,7 +1378,25 @@ export default function ChatPage() {
   }, [filteredChats, pinnedChatIds]);
 
   useEffect(() => {
-    loadChats();
+    loadChats(true);
+  }, [loadChats]);
+
+  useEffect(() => {
+    const handleChatsUpdated = () => {
+      loadChats(false);
+    };
+    const handleChatCleared = (e) => {
+      const clearedChatId = Number(e.detail?.chatId);
+      if (clearedChatId && activeChatIdRef.current === clearedChatId) {
+        setMessages([]);
+      }
+    };
+    window.addEventListener("ana_chats_updated", handleChatsUpdated);
+    window.addEventListener("ana_active_chat_cleared", handleChatCleared);
+    return () => {
+      window.removeEventListener("ana_chats_updated", handleChatsUpdated);
+      window.removeEventListener("ana_active_chat_cleared", handleChatCleared);
+    };
   }, [loadChats]);
 
   useEffect(() => {
@@ -2400,7 +2418,6 @@ export default function ChatPage() {
 
   return (
     <div className="relative h-[100dvh] overflow-hidden chat-surface p-0">
-      <div className="chat-noise pointer-events-none absolute inset-0 opacity-[0.08] dark:opacity-[0.10]" aria-hidden />
       <div className="relative grid h-full w-full grid-cols-1 md:grid-cols-[minmax(280px,330px)_minmax(0,1fr)] gap-0">
         {showSidebar && (
           <div className="min-h-0 min-w-0 h-full">
@@ -2490,6 +2507,7 @@ export default function ChatPage() {
                 onSetChatBackground={setChatBackground}
                 onClearChatBackground={clearChatBackground}
                 onHideChat={hideActiveChat}
+                onDeleteChat={deleteChatById}
                 onBlockUser={blockActiveUser}
                 onUnblockUser={unblockActiveUser}
                 onReportUser={reportUser}

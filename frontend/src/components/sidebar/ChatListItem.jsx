@@ -287,7 +287,7 @@ export default function ChatListItem({
           try {
             await api.post(`/chats/${chat.id}/clear`);
             window.dispatchEvent(new Event("ana_chats_updated"));
-            window.location.reload();
+            window.dispatchEvent(new CustomEvent("ana_active_chat_cleared", { detail: { chatId: chat.id } }));
           } catch (err) {
             alert(err.response?.data?.message || "Failed to clear chat.");
           }
@@ -308,7 +308,6 @@ export default function ChatListItem({
             try {
               await api.post(`/chats/${chat.id}/exit`);
               window.dispatchEvent(new Event("ana_chats_updated"));
-              window.location.reload();
             } catch (err) {
               alert(err.response?.data?.message || "Failed to exit group.");
             }

@@ -7,7 +7,6 @@ export default function ReactionMockup() {
       className="thread-surface relative min-h-[100dvh] w-full overflow-hidden"
       onContextMenu={(event) => event.preventDefault()}
     >
-      <div className="pointer-events-none absolute inset-0 chat-noise opacity-[0.08] dark:opacity-[0.10]" aria-hidden />
 
       <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-[1100px] items-center justify-center px-6 py-10">
         <div className="relative w-full max-w-[520px]">

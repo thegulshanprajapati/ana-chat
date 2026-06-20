@@ -529,3 +529,81 @@ h4 {
   animation: reply-highlight 1.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
+/* Custom Seekbar Styles for input[type="range"].audio-seekbar */
+input[type="range"].audio-seekbar {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.3); /* Default slate track */
+  outline: none;
+  transition: background 0.15s ease;
+  position: relative;
+}
+
+.dark input[type="range"].audio-seekbar {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Chrome / Safari / Opera / Edge */
+input[type="range"].audio-seekbar::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 4px;
+  cursor: pointer;
+  border-radius: 9999px;
+  background: transparent;
+}
+
+input[type="range"].audio-seekbar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent, #a855f7);
+  cursor: pointer;
+  margin-top: -4px; /* Center thumb */
+  transition: transform 0.1s ease, background-color 0.1s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+input[type="range"].audio-seekbar:hover::-webkit-slider-thumb,
+input[type="range"].audio-seekbar:active::-webkit-slider-thumb {
+  transform: scale(1.3);
+  background: #ffffff;
+}
+
+/* Firefox */
+input[type="range"].audio-seekbar::-moz-range-track {
+  width: 100%;
+  height: 4px;
+  cursor: pointer;
+  border-radius: 9999px;
+  background: transparent;
+}
+
+input[type="range"].audio-seekbar::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent, #a855f7);
+  cursor: pointer;
+  border: none;
+  transition: transform 0.1s ease, background-color 0.1s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+input[type="range"].audio-seekbar:hover::-moz-range-thumb,
+input[type="range"].audio-seekbar:active::-moz-range-thumb {
+  transform: scale(1.3);
+  background: #ffffff;
+}
+
+/* Firefox progress fill */
+input[type="range"].audio-seekbar::-moz-range-progress {
+  background: var(--accent, #a855f7);
+  height: 4px;
+  border-radius: 9999px;
+}
+

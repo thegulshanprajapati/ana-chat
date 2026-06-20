@@ -36,6 +36,7 @@ export default function ChatPane({
   onSetChatBackground,
   onClearChatBackground,
   onHideChat,
+  onDeleteChat,
   onBlockUser,
   onUnblockUser,
   onReportUser,
@@ -540,6 +541,14 @@ export default function ChatPane({
             }
           }}
           reportBusy={reportBusy}
+          meId={meId}
+          chatId={activeChat?.id}
+          messages={messages}
+          onSearchOpen={() => {
+            setProfileOpen(false);
+            setSearchOpen(true);
+          }}
+          onDeleteChat={onDeleteChat}
         />
       )}
     </section>
