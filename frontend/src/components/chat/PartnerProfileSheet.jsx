@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { 
-  X, Search, Star, Bell, Clock, Shield, Lock, Heart, 
+  X, Search, Star, Bell, Clock, Heart, 
   Trash2, Flag, UserMinus, UserCheck, Folder, Download, 
-  Trash, Ban, ThumbsDown, Sparkles, Pencil
+  Trash, Ban, ThumbsDown, Pencil, ChevronDown, Check
 } from "lucide-react";
 import Avatar from "../common/Avatar";
 import { formatDayLabel, formatTime } from "../../utils/time";
@@ -72,30 +72,49 @@ export default function PartnerProfileSheet({
   chatId,
   messages = [],
   onSearchOpen,
-  onDeleteChat
+  onDeleteChat,
+  theme = "dark"
 }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [reason, setReason] = useState("spam");
   const [details, setDetails] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const [muted, setMuted] = useState(false);
 
-  // Local storage state for Favourites
+  // Real localStorage states
   const [isFavourite, setIsFavourite] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [disappearingDuration, setDisappearingDuration] = useState(0); // 0 = off, 3600 = 1hr, 86400 = 24hr
+  const [disappearingOpen, setDisappearingOpen] = useState(false);
+
+  const isDark = theme === "dark";
 
   const username = useMemo(() => deriveUsername(partner), [partner]);
   const statusLine = useMemo(() => lastActiveText(partner, nowMs, isGroup, memberCount), [isGroup, memberCount, nowMs, partner]);
   const online = useMemo(() => statusLine === "Online now", [statusLine]);
 
-  // Read favourite state from localStorage on load/change
+  // Read state from local storage and sync on events
   useEffect(() => {
     if (!meId || !chatId) return;
-    try {
-      const list = JSON.parse(localStorage.getItem(`ana_favourite_chats_${meId}`) || "[]");
-      setIsFavourite(list.includes(chatId));
-    } catch (e) {
-      // ignore
-    }
+    const handleSync = () => {
+      try {
+        // Favourites
+        const favs = JSON.parse(localStorage.getItem(`ana_favourite_chats_${meId}`) || "[]");
+        setIsFavourite(favs.map(String).includes(String(chatId)));
+
+        // Muted
+        const mutes = JSON.parse(localStorage.getItem(`ana_muted_chats_${meId}`) || "[]");
+        setMuted(mutes.map(String).includes(String(chatId)));
+
+        // Disappearing duration
+        const disaps = JSON.parse(localStorage.getItem(`ana_disappearing_chats_${meId}`) || "{}");
+        setDisappearingDuration(Number(disaps[chatId]) || 0);
+      } catch (e) {
+        // ignore
+      }
+    };
+    handleSync();
+    window.addEventListener("ana_chats_updated", handleSync);
+    return () => window.removeEventListener("ana_chats_updated", handleSync);
   }, [meId, chatId, open]);
 
   // Toggle Favourite
@@ -105,14 +124,57 @@ export default function PartnerProfileSheet({
       const key = `ana_favourite_chats_${meId}`;
       const list = JSON.parse(localStorage.getItem(key) || "[]");
       let next;
-      if (list.includes(chatId)) {
-        next = list.filter(id => id !== chatId);
+      const cidStr = String(chatId);
+      if (list.map(String).includes(cidStr)) {
+        next = list.filter(id => String(id) !== cidStr);
         setIsFavourite(false);
       } else {
         next = [...list, chatId];
         setIsFavourite(true);
       }
       localStorage.setItem(key, JSON.stringify(next));
+      window.dispatchEvent(new Event("ana_chats_updated"));
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  // Toggle Mute Notifications
+  const handleToggleMute = () => {
+    if (!meId || !chatId) return;
+    try {
+      const key = `ana_muted_chats_${meId}`;
+      const list = JSON.parse(localStorage.getItem(key) || "[]");
+      let next;
+      const cidStr = String(chatId);
+      if (list.map(String).includes(cidStr)) {
+        next = list.filter(id => String(id) !== cidStr);
+        setMuted(false);
+      } else {
+        next = [...list, chatId];
+        setMuted(true);
+      }
+      localStorage.setItem(key, JSON.stringify(next));
+      window.dispatchEvent(new Event("ana_chats_updated"));
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  // Set Disappearing Duration
+  const handleSetDisappearing = (durationValue) => {
+    if (!meId || !chatId) return;
+    try {
+      const key = `ana_disappearing_chats_${meId}`;
+      const currentConfig = JSON.parse(localStorage.getItem(key) || "{}");
+      if (durationValue === 0) {
+        delete currentConfig[chatId];
+      } else {
+        currentConfig[chatId] = durationValue;
+      }
+      localStorage.setItem(key, JSON.stringify(currentConfig));
+      setDisappearingDuration(durationValue);
+      setDisappearingOpen(false);
       window.dispatchEvent(new Event("ana_chats_updated"));
     } catch (e) {
       // ignore
@@ -134,6 +196,31 @@ export default function PartnerProfileSheet({
     }
   };
 
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempName, setTempName] = useState(partner?.name || "");
+
+  useEffect(() => {
+    setTempName(partner?.name || "");
+  }, [partner?.name]);
+
+  // Rename Contact function
+  const handleRenameContact = async () => {
+    if (!partner?.id) return;
+    if (isEditingName) {
+      if (tempName.trim() && tempName.trim() !== partner?.name) {
+        try {
+          await api.patch(`/users/${partner.id}/rename`, { name: tempName.trim() });
+          window.dispatchEvent(new Event("ana_chats_updated"));
+        } catch (err) {
+          alert(err.response?.data?.message || "Failed to rename contact.");
+        }
+      }
+      setIsEditingName(false);
+    } else {
+      setIsEditingName(true);
+    }
+  };
+
   useEffect(() => {
     const timer = setInterval(() => setNowMs(Date.now()), 15000);
     return () => clearInterval(timer);
@@ -147,10 +234,17 @@ export default function PartnerProfileSheet({
 
   if (!open) return null;
 
-  const phoneDisplay = partner?.mobile || partner?.phone || "+91 94708 54838";
+  const phoneDisplay = partner?.mobile || partner?.phone || "No phone added";
+
+  // Disappearing label helper
+  const disappearingLabel = () => {
+    if (disappearingDuration === 3600) return "1 hr after seen";
+    if (disappearingDuration === 86400) return "24 hr";
+    return "Off";
+  };
 
   return (
-    <div className="fixed inset-0 z-[95] flex items-stretch justify-end">
+    <div className="fixed inset-0 z-[95] flex items-stretch justify-end select-none">
       {/* Backdrop */}
       <button
         type="button"
@@ -159,58 +253,96 @@ export default function PartnerProfileSheet({
         aria-label="Close profile panel"
       />
 
-      {/* Drawer Container (Dark Charcoal styling to match image 1) */}
-      <aside className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-[#222e35] bg-[#111b21] text-slate-100 shadow-2xl transition-transform duration-300">
+      {/* Drawer Container (Adapts perfectly to Light/Dark Mode) */}
+      <aside className={`relative z-10 flex h-full w-full max-w-md flex-col border-l transition-transform duration-300 shadow-2xl ${
+        isDark 
+          ? "border-[var(--panel-border)] bg-[var(--panel-bg)] text-slate-100" 
+          : "border-slate-200 bg-[#f0f2f5] text-slate-800"
+      }`}>
         
         {/* Header */}
-        <div className="flex h-[64px] items-center justify-between bg-[#202c33] px-6 text-slate-200">
-          <div className="flex items-center gap-4">
+        <div className={`flex h-[64px] items-center justify-between px-6 ${
+          isDark ? "bg-[var(--panel-bg-2)] text-slate-200" : "bg-[#f0f2f5] text-slate-700 border-b border-slate-200"
+        }`}>
+          <div className="flex-1 flex items-center gap-4 min-w-0 mr-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-full p-1.5 hover:bg-[#2a3942] transition-colors"
+              className={`rounded-full p-1.5 transition-colors shrink-0 ${
+                isDark ? "hover:bg-[var(--accent-soft-18)]" : "hover:bg-slate-200"
+              }`}
               aria-label="Close"
             >
-              <X size={20} className="text-[#aebac1]" />
+              <X size={20} className={isDark ? "text-[var(--panel-muted)]" : "text-slate-600"} />
             </button>
-            <span className="text-base font-medium">Contact info</span>
+            {isEditingName ? (
+              <input
+                type="text"
+                value={tempName}
+                onChange={(e) => setTempName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleRenameContact();
+                  if (e.key === "Escape") setIsEditingName(false);
+                }}
+                autoFocus
+                className="flex-1 min-w-0 bg-transparent border-b outline-none text-sm px-1 py-0.5"
+                style={{
+                  borderColor: "var(--accent)",
+                  color: "var(--text-primary)"
+                }}
+              />
+            ) : (
+              <span className="text-base font-semibold truncate">Contact info</span>
+            )}
           </div>
           <button 
             type="button"
-            onClick={() => {
-              const newNick = window.prompt("Set custom note/nickname:", partner?.name || "");
-              if (newNick) {
-                alert("Nickname saved locally!");
-              }
-            }}
-            className="rounded-full p-1.5 hover:bg-[#2a3942] transition-colors"
+            onClick={handleRenameContact}
+            className={`rounded-full p-1.5 transition-colors ${
+              isDark ? "hover:bg-[var(--accent-soft-18)]" : "hover:bg-slate-200"
+            }`}
+            aria-label={isEditingName ? "Save name" : "Rename contact"}
           >
-            <Pencil size={18} className="text-[#aebac1]" />
+            {isEditingName ? (
+              <Check size={18} style={{ color: "var(--accent)" }} />
+            ) : (
+              <Pencil size={18} className={isDark ? "text-[var(--panel-muted)]" : "text-slate-600"} />
+            )}
           </button>
         </div>
 
         {/* Scrollable Content */}
-        <div className="min-h-0 flex-1 overflow-y-auto bg-[#0b141a] space-y-2 pb-6">
+        <div className={`min-h-0 flex-1 overflow-y-auto space-y-2 pb-6 ${
+          isDark ? "bg-[var(--body-bg-dark)]" : "bg-[#f0f2f5]"
+        }`}>
           
           {/* Main User Block */}
-          <div className="bg-[#111b21] px-6 py-7 flex flex-col items-center border-b border-[#0b141a]">
+          <div className={`px-6 py-7 flex flex-col items-center border-b ${
+            isDark ? "bg-[var(--panel-bg)] border-[var(--panel-border)]" : "bg-[#ffffff] border-slate-200"
+          }`}>
             {/* Large Avatar */}
             <div className="relative mb-5">
               <Avatar name={partner?.name} src={partner?.avatar_url} size={150} />
               {online && (
-                <div className="absolute bottom-2 right-2 w-4 h-4 rounded-full bg-emerald-500 border-4 border-[#111b21]" />
+                <div className={`absolute bottom-2 right-2 w-4 h-4 rounded-full bg-emerald-500 border-4 ${
+                  isDark ? "border-[var(--panel-bg)]" : "border-[#ffffff]"
+                }`} />
               )}
             </div>
             {/* Name */}
-            <h2 className="text-[21px] font-normal text-[#e9edef] leading-tight text-center">
+            <h2 className={`text-[21px] font-normal leading-tight text-center ${
+              isDark ? "text-[var(--panel-text)]" : "text-slate-900"
+            }`}>
               {partner?.name || "Unknown"}
             </h2>
             {/* Phone/Sub */}
-            <p className="mt-1.5 text-[14px] text-[#8696a0] text-center">
+            <p className={`mt-1.5 text-[14px] text-center ${
+              isDark ? "text-[var(--panel-muted)]" : "text-slate-500"
+            }`}>
               {phoneDisplay}
             </p>
-            {/* Username/Bio if applicable */}
-            <p className="mt-1 text-xs text-violet-400">
+            {/* Username */}
+            <p className="mt-1 text-xs text-accent">
               {username}
             </p>
 
@@ -221,27 +353,39 @@ export default function PartnerProfileSheet({
                 onClick={onSearchOpen}
                 className="group flex flex-col items-center gap-2 text-center"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#202c33] text-violet-400 hover:bg-[#2a3942] transition-colors">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+                  isDark ? "bg-[var(--panel-bg-2)] text-accent hover:bg-[var(--accent-soft-18)]" : "bg-slate-100 text-accent hover:bg-slate-200"
+                }`}>
                   <Search size={18} />
                 </div>
-                <span className="text-[12px] text-[#8696a0] group-hover:text-slate-200 transition-colors">Search</span>
+                <span className={`text-[12px] transition-colors ${
+                  isDark ? "text-[var(--panel-muted)] group-hover:text-slate-200" : "text-slate-500 group-hover:text-slate-800"
+                }`}>Search</span>
               </button>
             </div>
           </div>
 
           {/* About / Bio section */}
           {!isGroup && (
-            <div className="bg-[#111b21] px-6 py-4 space-y-1">
-              <span className="text-[13px] text-[#8696a0]">About</span>
-              <p className="text-[14px] text-[#e9edef] leading-normal break-words whitespace-pre-wrap">
+            <div className={`px-6 py-4 space-y-1 ${
+              isDark ? "bg-[var(--panel-bg)]" : "bg-[#ffffff] border-b border-slate-200"
+            }`}>
+              <span className={`text-[13px] ${isDark ? "text-[var(--panel-muted)]" : "text-slate-500"}`}>About</span>
+              <p className={`text-[14px] leading-normal break-words whitespace-pre-wrap ${
+                isDark ? "text-[var(--panel-text)]" : "text-slate-800"
+              }`}>
                 {(partner?.about || "").toString().trim() || "Hey there! I am using AnaChat."}
               </p>
             </div>
           )}
 
           {/* Media Links and Docs */}
-          <div className="bg-[#111b21] px-6 py-4 space-y-3">
-            <div className="flex items-center justify-between text-[14px] text-[#8696a0]">
+          <div className={`px-6 py-4 space-y-3 ${
+            isDark ? "bg-[var(--panel-bg)]" : "bg-[#ffffff] border-b border-slate-200"
+          }`}>
+            <div className={`flex items-center justify-between text-[14px] ${
+              isDark ? "text-[var(--panel-muted)]" : "text-slate-500"
+            }`}>
               <span className="flex items-center gap-2">
                 <Folder size={16} />
                 Media, links and docs
@@ -260,18 +404,22 @@ export default function PartnerProfileSheet({
                       key={idx}
                       src={item.image_url} 
                       alt="chat-media" 
-                      className="w-[82px] h-[82px] object-cover rounded-lg bg-[#202c33]"
+                      className={`w-[82px] h-[82px] object-cover rounded-lg ${
+                        isDark ? "bg-[var(--panel-bg-2)]" : "bg-slate-100"
+                      }`}
                     />
                   ))}
                 </div>
               ) : (
-                /* WhatsApp Selfies Mockups for Premium Visual Aesthetic if no media */
+                /* Mockups for Visual Aesthetic if no media */
                 <div className="flex items-center gap-2">
                   <div className="relative">
                     <img 
                       src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" 
                       alt="media-mock" 
-                      className="w-[82px] h-[82px] object-cover rounded-lg bg-[#202c33] filter brightness-90"
+                      className={`w-[82px] h-[82px] object-cover rounded-lg filter brightness-90 ${
+                        isDark ? "bg-[var(--panel-bg-2)]" : "bg-slate-100"
+                      }`}
                     />
                     <span className="absolute bottom-1 left-1 bg-black/60 text-[9px] px-1 rounded text-white flex items-center gap-0.5">
                       🎥 0:05
@@ -280,9 +428,13 @@ export default function PartnerProfileSheet({
                   <img 
                     src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150" 
                     alt="media-mock-2" 
-                    className="w-[82px] h-[82px] object-cover rounded-lg bg-[#202c33]"
+                    className={`w-[82px] h-[82px] object-cover rounded-lg ${
+                      isDark ? "bg-[var(--panel-bg-2)]" : "bg-slate-100"
+                    }`}
                   />
-                  <div className="flex h-[82px] w-[82px] items-center justify-center rounded-lg bg-[#202c33] text-[#8696a0] hover:text-slate-200 cursor-pointer">
+                  <div className={`flex h-[82px] w-[82px] items-center justify-center rounded-lg cursor-pointer ${
+                    isDark ? "bg-[var(--panel-bg-2)] text-[var(--panel-muted)] hover:text-slate-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                  }`}>
                     <Download size={18} />
                   </div>
                 </div>
@@ -291,64 +443,104 @@ export default function PartnerProfileSheet({
           </div>
 
           {/* Core Settings Menu */}
-          <div className="bg-[#111b21] divide-y divide-[#222e35]/30">
+          <div className={`divide-y ${
+            isDark ? "bg-[var(--panel-bg)] divide-[var(--panel-border)]/30" : "bg-[#ffffff] divide-slate-100 border-b border-slate-200"
+          }`}>
             {/* Starred Messages */}
-            <div className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors">
-              <Star size={20} className="text-[#8696a0]" />
-              <div className="flex-1 text-[15px] text-[#e9edef]">Starred messages</div>
+            <div className={`flex items-center gap-5 px-6 py-4 cursor-pointer transition-colors ${
+              isDark ? "hover:bg-[var(--accent-soft-10)] text-[#e9edef]" : "hover:bg-slate-50 text-slate-800"
+            }`}>
+              <Star size={20} className={isDark ? "text-[var(--panel-muted)]" : "text-slate-400"} />
+              <div className="flex-1 text-[15px]">Starred messages</div>
             </div>
 
             {/* Mute Notifications */}
-            <div className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 transition-colors">
-              <Bell size={20} className="text-[#8696a0]" />
-              <div className="flex-1 text-[15px] text-[#e9edef]">Mute notifications</div>
+            <div className={`flex items-center gap-5 px-6 py-4 transition-colors ${
+              isDark ? "hover:bg-[var(--accent-soft-10)] text-[#e9edef]" : "hover:bg-slate-50 text-slate-800"
+            }`}>
+              <Bell size={20} className={isDark ? "text-[var(--panel-muted)]" : "text-slate-400"} />
+              <div className="flex-1 text-[15px]">Mute notifications</div>
               <label className="relative inline-flex items-center cursor-pointer select-none">
                 <input 
                   type="checkbox" 
                   checked={muted} 
-                  onChange={(e) => setMuted(e.target.checked)} 
+                  onChange={handleToggleMute} 
                   className="sr-only peer" 
                 />
-                <div className="w-9 h-5 bg-[#374248] rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[#cfd6d9] after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-violet-500 peer-checked:after:bg-[#ffffff]"></div>
+                <div 
+                  className={`w-9 h-5 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:rounded-full after:h-4 after:w-4 after:transition-all ${
+                    isDark 
+                      ? "bg-[var(--panel-bg-2)] after:bg-[#cfd6d9] peer-checked:after:bg-[#ffffff]" 
+                      : "bg-slate-200 after:bg-white"
+                  }`}
+                  style={{ backgroundColor: muted ? "var(--accent)" : "" }}
+                ></div>
               </label>
             </div>
 
             {/* Disappearing Messages */}
-            <div className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors">
-              <Clock size={20} className="text-[#8696a0]" />
-              <div className="flex-1">
-                <div className="text-[15px] text-[#e9edef]">Disappearing messages</div>
-                <div className="text-xs text-[#8696a0] mt-0.5">Off</div>
+            <div className="relative">
+              <div 
+                onClick={() => setDisappearingOpen(prev => !prev)}
+                className={`flex items-center gap-5 px-6 py-4 cursor-pointer transition-colors ${
+                  isDark ? "hover:bg-[var(--accent-soft-10)] text-[#e9edef]" : "hover:bg-slate-50 text-slate-800"
+                }`}
+              >
+                <Clock size={20} className={isDark ? "text-[var(--panel-muted)]" : "text-slate-400"} />
+                <div className="flex-1">
+                  <div className="text-[15px]">Disappearing messages</div>
+                  <div className={`text-xs mt-0.5 ${isDark ? "text-[var(--panel-muted)]" : "text-slate-500"}`}>
+                    {disappearingLabel()}
+                  </div>
+                </div>
+                <ChevronDown size={16} className={isDark ? "text-[var(--panel-muted)]" : "text-slate-400"} />
               </div>
-            </div>
 
-            {/* Advanced Chat Privacy */}
-            <div className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors">
-              <Shield size={20} className="text-[#8696a0]" />
-              <div className="flex-1">
-                <div className="text-[15px] text-[#e9edef]">Advanced chat privacy</div>
-                <div className="text-xs text-[#8696a0] mt-0.5">Off</div>
-              </div>
-            </div>
-
-            {/* Encryption */}
-            <div className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors">
-              <Lock size={20} className="text-[#8696a0]" />
-              <div className="flex-1">
-                <div className="text-[15px] text-[#e9edef]">Encryption</div>
-                <div className="text-xs text-[#8696a0] mt-0.5">Messages are end-to-end encrypted. Click to verify.</div>
-              </div>
+              {/* Disappearing Messages Options Dropdown */}
+              {disappearingOpen && (
+                <div className={`absolute right-6 top-full mt-1 z-30 w-52 rounded-xl shadow-xl border p-1.5 ${
+                  isDark ? "bg-[var(--panel-bg-2)] border-[var(--panel-border)] text-slate-100" : "bg-white border-slate-200 text-slate-800"
+                }`}>
+                  {[
+                    { val: 0, label: "Off" },
+                    { val: 3600, label: "1 hr after seen" },
+                    { val: 86400, label: "24 hr" }
+                  ].map(option => (
+                    <button
+                      key={option.val}
+                      type="button"
+                      onClick={() => handleSetDisappearing(option.val)}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
+                        isDark 
+                          ? "hover:bg-[var(--accent-soft-18)]" 
+                          : "hover:bg-slate-100"
+                      }`}
+                    >
+                      <span>{option.label}</span>
+                      {disappearingDuration === option.val && <Check size={14} className="text-accent" />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Action List (Danger / Fav / Block / Delete) */}
-          <div className="bg-[#111b21] divide-y divide-[#222e35]/30">
+          {/* Action List (Danger / Fav / Delete) */}
+          <div className={`divide-y ${
+            isDark ? "bg-[var(--panel-bg)] divide-[var(--panel-border)]/30" : "bg-[#ffffff] divide-slate-100 border-b border-slate-200"
+          }`}>
             {/* Add/Remove Favourites */}
             <div 
               onClick={handleToggleFavourite}
-              className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors text-[#e9edef]"
+              className={`flex items-center gap-5 px-6 py-4 cursor-pointer transition-colors ${
+                isDark ? "hover:bg-[var(--accent-soft-10)] text-[#e9edef]" : "hover:bg-slate-50 text-slate-850"
+              }`}
             >
-              <Heart size={20} className={isFavourite ? "fill-violet-500 text-violet-500" : "text-[#8696a0]"} />
+              <Heart 
+                size={20} 
+                className={isFavourite ? "" : (isDark ? "text-[var(--panel-muted)]" : "text-slate-400")} 
+                style={isFavourite ? { fill: "var(--accent)", color: "var(--accent)" } : {}}
+              />
               <span className="text-[15px]">
                 {isFavourite ? "Remove from favourites" : "Add to favourites"}
               </span>
@@ -357,7 +549,9 @@ export default function PartnerProfileSheet({
             {/* Clear Chat */}
             <div 
               onClick={handleClearChat}
-              className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors text-[#f15c5c]"
+              className={`flex items-center gap-5 px-6 py-4 cursor-pointer transition-colors ${
+                isDark ? "hover:bg-[var(--accent-soft-10)]" : "hover:bg-slate-50"
+              } text-[#f15c5c]`}
             >
               <EraserIcon className="w-5 h-5 text-[#f15c5c]" />
               <span className="text-[15px]">Clear chat</span>
@@ -367,7 +561,9 @@ export default function PartnerProfileSheet({
             {!isGroup && (
               <div 
                 onClick={blockedByMe ? onUnblockUser : onBlockUser}
-                className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors text-[#f15c5c]"
+                className={`flex items-center gap-5 px-6 py-4 cursor-pointer transition-colors ${
+                  isDark ? "hover:bg-[var(--accent-soft-10)]" : "hover:bg-slate-50"
+                } text-[#f15c5c]`}
               >
                 <Ban size={20} className="text-[#f15c5c]" />
                 <span className="text-[15px]">
@@ -380,7 +576,9 @@ export default function PartnerProfileSheet({
             {!isGroup && (
               <div 
                 onClick={() => setReportOpen(prev => !prev)}
-                className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors text-[#f15c5c]"
+                className={`flex items-center gap-5 px-6 py-4 cursor-pointer transition-colors ${
+                  isDark ? "hover:bg-[var(--accent-soft-10)]" : "hover:bg-slate-50"
+                } text-[#f15c5c]`}
               >
                 <ThumbsDown size={20} className="text-[#f15c5c]" />
                 <span className="text-[15px]">
@@ -391,7 +589,9 @@ export default function PartnerProfileSheet({
 
             {/* Report Form inline expansion */}
             {reportOpen && (
-              <div className="bg-[#18252f] px-6 py-4 space-y-3">
+              <div className={`px-6 py-4 space-y-3 ${
+                isDark ? "bg-[var(--body-bg-dark)]" : "bg-slate-50"
+              }`}>
                 <form
                   onSubmit={async (event) => {
                     event.preventDefault();
@@ -403,24 +603,32 @@ export default function PartnerProfileSheet({
                   className="space-y-3"
                 >
                   <div>
-                    <label className="block text-xs text-[#8696a0] mb-1 font-semibold uppercase">Reason</label>
+                    <label className={`block text-xs mb-1 font-semibold uppercase ${isDark ? "text-[var(--panel-muted)]" : "text-slate-500"}`}>Reason</label>
                     <select
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
-                      className="w-full rounded bg-[#202c33] border border-[#222e35] text-[#e9edef] px-3 py-2 text-sm outline-none"
+                      className={`w-full rounded border px-3 py-2 text-sm outline-none ${
+                        isDark 
+                          ? "bg-[var(--panel-bg-2)] border-[var(--panel-border)] text-[#e9edef]" 
+                          : "bg-white border-slate-200 text-slate-800"
+                      }`}
                     >
                       {REPORT_REASONS.map(r => (
-                        <option key={r.id} value={r.id} className="bg-[#111b21]">{r.label}</option>
+                        <option key={r.id} value={r.id} className={isDark ? "bg-[var(--panel-bg)]" : "bg-white"}>{r.label}</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs text-[#8696a0] mb-1 font-semibold uppercase">Details</label>
+                    <label className={`block text-xs mb-1 font-semibold uppercase ${isDark ? "text-[var(--panel-muted)]" : "text-slate-500"}`}>Details</label>
                     <textarea
                       value={details}
                       onChange={(e) => setDetails(e.target.value)}
                       rows={3}
-                      className="w-full rounded bg-[#202c33] border border-[#222e35] text-[#e9edef] px-3 py-2 text-sm outline-none resize-none"
+                      className={`w-full rounded border px-3 py-2 text-sm outline-none resize-none ${
+                        isDark 
+                          ? "bg-[var(--panel-bg-2)] border-[var(--panel-border)] text-[#e9edef]" 
+                          : "bg-white border-slate-200 text-slate-800"
+                      }`}
                       placeholder="Describe..."
                     />
                   </div>
@@ -438,7 +646,9 @@ export default function PartnerProfileSheet({
             {/* Delete Chat */}
             <div 
               onClick={() => onDeleteChat?.(chatId)}
-              className="flex items-center gap-5 px-6 py-4 hover:bg-[#202c33]/40 cursor-pointer transition-colors text-[#f15c5c]"
+              className={`flex items-center gap-5 px-6 py-4 cursor-pointer transition-colors ${
+                isDark ? "hover:bg-[var(--accent-soft-10)]" : "hover:bg-slate-50"
+              } text-[#f15c5c]`}
             >
               <Trash size={20} className="text-[#f15c5c]" />
               <span className="text-[15px]">Delete chat</span>

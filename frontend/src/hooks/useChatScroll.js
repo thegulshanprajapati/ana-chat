@@ -63,12 +63,16 @@ export default function useChatScroll({
   }, [containerRef, scheduleCompute]);
 
   const scrollToBottom = useCallback((behavior = "smooth") => {
+    const container = containerRef?.current;
+    if (!container) return;
+    if (behavior === "auto") {
+      container.scrollTop = container.scrollHeight;
+      return;
+    }
     if (bottomRef?.current?.scrollIntoView) {
       bottomRef.current.scrollIntoView({ behavior, block: "end" });
       return;
     }
-    const container = containerRef?.current;
-    if (!container) return;
     container.scrollTo({ top: container.scrollHeight, behavior });
   }, [bottomRef, containerRef]);
 

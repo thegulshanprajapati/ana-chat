@@ -44,7 +44,32 @@ export default function MessageThread({
   const scrollRef = useRef(null);
   const bottomRef = useRef(null);
   const celebratedChatIdsRef = useRef(new Set());
-  const grouped = useMemo(() => groupMessages(messages), [messages]);
+  const filteredMessages = useMemo(() => {
+    if (!chatId || !meId || !messages) return messages || [];
+    try {
+      const config = JSON.parse(localStorage.getItem(`ana_disappearing_chats_${meId}`) || "{}");
+      const duration = Number(config[chatId]);
+      if (!duration) return messages;
+
+      const now = Date.now();
+      return messages.filter((msg) => {
+        const createdAt = new Date(msg.created_at).getTime();
+        if (duration === 86400) {
+          return now - createdAt < 86400 * 1000;
+        }
+        if (duration === 3600) {
+          if (!msg.seen) return true;
+          const seenAt = msg.updated_at ? new Date(msg.updated_at).getTime() : createdAt;
+          return now - seenAt < 3600 * 1000;
+        }
+        return true;
+      });
+    } catch (e) {
+      return messages;
+    }
+  }, [messages, chatId, meId]);
+
+  const grouped = useMemo(() => groupMessages(filteredMessages), [filteredMessages]);
   const threadBackgroundStyle = useMemo(
     () => chatBackgroundStyle(chatBackground, uploadBase),
     [chatBackground, uploadBase]
@@ -93,21 +118,27 @@ export default function MessageThread({
     refresh();
   }, [messages.length, refresh]);
 
+  // Use useLayoutEffect or a fast frame request to snap scroll position before paint
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+    // Fallback if height calculations are still running
+    const timer = setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [chatId, messages.length]);
+
   useEffect(() => {
     if (atBottom) {
       scrollToBottom("smooth");
       onSeen?.();
     }
   }, [atBottom, grouped, onSeen, scrollToBottom, typing]);
-
-  useEffect(() => {
-    const normalizedChatId = Number(chatId);
-    if (!normalizedChatId || !messages.length) return;
-    if (!atTop) return;
-    if (celebratedChatIdsRef.current.has(normalizedChatId)) return;
-    celebratedChatIdsRef.current.add(normalizedChatId);
-    requestAnimationFrame(() => setSparkle(true));
-  }, [atTop, chatId, messages.length]);
 
   if (loading) {
     return (
@@ -116,7 +147,7 @@ export default function MessageThread({
           ref={scrollRef}
           style={threadBackgroundStyle || undefined}
           onContextMenu={(event) => event.preventDefault()}
-          className="thread-surface chat-scroll min-h-0 h-full w-full flex-1 scroll-smooth overflow-y-auto px-3 pt-3 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-4 sm:pt-4 sm:pb-16"
+          className="thread-surface chat-scroll min-h-0 h-full w-full flex-1 overflow-y-auto px-3 pt-3 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-4 sm:pt-4 sm:pb-16"
           aria-label="Loading messages"
         >
           <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-sm text-slate-500 dark:text-slate-400">
@@ -137,7 +168,7 @@ export default function MessageThread({
           ref={scrollRef}
           style={threadBackgroundStyle || undefined}
           onContextMenu={(event) => event.preventDefault()}
-          className="thread-surface chat-scroll min-h-0 h-full w-full flex-1 scroll-smooth overflow-y-auto px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] text-sm text-slate-500 dark:text-slate-400"
+          className="thread-surface chat-scroll min-h-0 h-full w-full flex-1 overflow-y-auto px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] text-sm text-slate-500 dark:text-slate-400"
         >
           <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3">
             <EncryptionNotice />
@@ -154,7 +185,7 @@ export default function MessageThread({
         ref={scrollRef}
         style={threadBackgroundStyle || undefined}
         onContextMenu={(event) => event.preventDefault()}
-        className="thread-surface chat-scroll min-h-0 h-full w-full flex-1 scroll-smooth space-y-2.5 overflow-y-auto px-3 pt-3 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-4 sm:pt-4 sm:pb-16"
+        className="thread-surface chat-scroll min-h-0 h-full w-full flex-1 space-y-2.5 overflow-y-auto px-3 pt-3 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-4 sm:pt-4 sm:pb-16"
       >
         <EncryptionNotice />
         {grouped.map((entry) => {

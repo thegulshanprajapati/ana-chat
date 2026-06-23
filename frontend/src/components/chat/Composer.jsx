@@ -25,7 +25,8 @@ import {
   Video,
   X,
   IndianRupee,
-  Mic
+  Mic,
+  RefreshCw
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import EmojiPicker from "emoji-picker-react";
@@ -139,6 +140,93 @@ export default function Composer({
   const [toolStep, setToolStep] = useState("root");
   const [dragActive, setDragActive] = useState(false);
   const imageRef = useRef(null);
+  const cameraVideoRef = useRef(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
+  const [cameraFacing, setCameraFacing] = useState("user");
+  const [selectedFilter, setSelectedFilter] = useState("normal");
+  const [cameraError, setCameraError] = useState("");
+
+  useEffect(() => {
+    let activeStream = null;
+    if (cameraOpen) {
+      setCameraError("");
+      const constraints = {
+        video: { facingMode: cameraFacing },
+        audio: false
+      };
+      navigator.mediaDevices.getUserMedia(constraints)
+        .then((stream) => {
+          activeStream = stream;
+          setCameraStream(stream);
+          if (cameraVideoRef.current) {
+            cameraVideoRef.current.srcObject = stream;
+          }
+        })
+        .catch((err) => {
+          console.error("Camera access failed:", err);
+          setCameraError("Could not access your camera. Make sure permissions are granted.");
+        });
+    }
+
+    return () => {
+      if (activeStream) {
+        activeStream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [cameraOpen, cameraFacing]);
+
+  const handleCapture = () => {
+    if (!cameraVideoRef.current) return;
+    const video = cameraVideoRef.current;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext("2d");
+    
+    let filterStr = "none";
+    if (selectedFilter === "grayscale") filterStr = "grayscale(1)";
+    else if (selectedFilter === "sepia") filterStr = "sepia(1)";
+    else if (selectedFilter === "invert") filterStr = "invert(1)";
+    else if (selectedFilter === "warm") filterStr = "contrast(1.25) brightness(0.95) saturate(1.5)";
+    else if (selectedFilter === "blur") filterStr = "blur(2px)";
+    
+    ctx.filter = filterStr;
+
+    // If front camera, mirror image on canvas too
+    if (cameraFacing === "user") {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const file = new File([blob], `camera_shot_${Date.now()}.jpg`, { type: "image/jpeg" });
+        validateAndSet(file);
+        closeCamera();
+      }
+    }, "image/jpeg", 0.90);
+  };
+
+  const toggleCameraFacing = () => {
+    setCameraFacing(prev => prev === "user" ? "environment" : "user");
+  };
+
+  const handleGalleryClick = () => {
+    imageRef.current?.click();
+    closeCamera();
+  };
+
+  const closeCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+    }
+    setCameraStream(null);
+    setCameraOpen(false);
+    setCameraError("");
+  };
   const photoCaptureRef = useRef(null);
   const videoRef = useRef(null);
   const videoCaptureRef = useRef(null);
@@ -161,6 +249,8 @@ export default function Composer({
   const audioStreamRef = useRef(null);
   const audioChunksRef = useRef([]);
   const timerIntervalRef = useRef(null);
+
+
 
   useEffect(() => {
     return () => {
@@ -619,7 +709,7 @@ export default function Composer({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onContextMenu={(event) => event.preventDefault()}
-      className={`w-full relative shrink-0 border-t border-slate-200 bg-[#f0f2f5] dark:border-white/5 dark:bg-[#1f2c34] px-4 py-2.5 flex flex-col gap-2 ${dragActive ? "ring-2 ring-accent" : ""}`}
+      className={`w-full relative shrink-0 border-t border-slate-200 bg-slate-50 dark:border-white/5 dark:bg-[var(--panel-bg-2)] px-4 py-2.5 flex flex-col gap-2 ${dragActive ? "ring-2 ring-accent" : ""}`}
       ref={toolsRef}
     >
       {dragActive && !disabled && (
@@ -750,7 +840,8 @@ export default function Composer({
             <button
               type="button"
               onClick={stopAndSendRecording}
-              className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-[#00a884] text-white shadow-md hover:scale-105 active:scale-95 transition"
+              className="flex h-[36px] w-[36px] items-center justify-center rounded-full text-white shadow-md hover:scale-105 active:scale-95 transition"
+              style={{ backgroundColor: "var(--accent)", color: "var(--accent-contrast)" }}
             >
               <SendHorizonal size={16} />
             </button>
@@ -907,7 +998,7 @@ export default function Composer({
               disabled={disabled}
               onClick={() => {
                 if (disabled) return;
-                openPicker(imageRef);
+                setCameraOpen(true);
               }}
             >
               <Camera size={19} />
@@ -918,7 +1009,8 @@ export default function Composer({
           {canSend ? (
             <button
               type="submit"
-              className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-[#00a884] dark:bg-[#00a884] text-white shadow-md transition duration-150 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[#00a884]/30"
+              className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full text-white shadow-md transition duration-150 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2"
+              style={{ backgroundColor: "var(--accent)", color: "var(--accent-contrast)", "--tw-ring-color": "var(--accent-ring)" }}
               aria-label="Send message"
             >
               <SendHorizonal size={18} className={sending ? "animate-pulse" : ""} />
@@ -927,7 +1019,8 @@ export default function Composer({
             <button
               type="button"
               onClick={startRecording}
-              className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-[#00a884] dark:bg-[#00a884] text-white shadow-md transition duration-150 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[#00a884]/30"
+              className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full text-white shadow-md transition duration-150 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2"
+              style={{ backgroundColor: "var(--accent)", color: "var(--accent-contrast)", "--tw-ring-color": "var(--accent-ring)" }}
               aria-label="Record voice note"
             >
               <Mic size={18} />
@@ -995,6 +1088,140 @@ export default function Composer({
         className="hidden"
         onChange={(e) => validateAndSet(e.target.files?.[0] || null)}
       />
+
+      {cameraOpen && createPortal(
+        <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-200" role="dialog" aria-modal="true">
+          <div className="relative w-full max-w-[580px] overflow-hidden rounded-3xl border shadow-2xl flex flex-col" style={{ backgroundColor: "var(--panel-bg)", borderColor: "var(--border-color, rgba(255,255,255,0.1))", color: "var(--text-primary)" }}>
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b px-5 py-3.5" style={{ backgroundColor: "var(--panel-bg-2)", borderColor: "var(--border-color, rgba(255,255,255,0.1))" }}>
+              <div className="flex items-center gap-2">
+                <Camera size={18} style={{ color: "var(--accent)" }} />
+                <span className="font-semibold text-sm">Take a Photo</span>
+              </div>
+              <button
+                type="button"
+                onClick={closeCamera}
+                className="rounded-full p-1.5 hover:bg-white/10 transition"
+                aria-label="Close camera"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Video Preview */}
+            <div className="relative aspect-video w-full bg-black overflow-hidden flex items-center justify-center">
+              {cameraError ? (
+                <div className="text-center p-6 space-y-4">
+                  <p className="text-sm text-rose-300 max-w-[320px] mx-auto">{cameraError}</p>
+                  <button
+                    type="button"
+                    onClick={handleGalleryClick}
+                    className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold text-white transition shadow-lg active:scale-95"
+                    style={{ backgroundColor: "var(--accent)" }}
+                  >
+                    <FolderOpen size={14} />
+                    Choose from Gallery
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <video
+                    ref={cameraVideoRef}
+                    autoPlay
+                    playsInline
+                    className={`h-full w-full object-cover transition-all ${
+                      selectedFilter === "grayscale" ? "grayscale" :
+                      selectedFilter === "sepia" ? "sepia" :
+                      selectedFilter === "invert" ? "invert" :
+                      selectedFilter === "warm" ? "contrast-125 brightness-95 saturate-150" :
+                      selectedFilter === "blur" ? "blur-[2px]" : "filter-none"
+                    } ${cameraFacing === "user" ? "scale-x-[-1]" : ""}`}
+                  />
+                  {!cameraStream && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+                      <RefreshCw size={24} className="animate-spin text-white/70" />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Filters bar */}
+            {!cameraError && (
+              <div className="px-5 py-3.5 border-t" style={{ backgroundColor: "var(--panel-bg-2)", borderColor: "var(--border-color, rgba(255,255,255,0.1))" }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-2.5" style={{ color: "var(--text-secondary)" }}>Camera Filters</p>
+                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                  {[
+                    { id: "normal", label: "None" },
+                    { id: "grayscale", label: "Mono" },
+                    { id: "sepia", label: "Sepia" },
+                    { id: "invert", label: "Invert" },
+                    { id: "warm", label: "Warm" },
+                    { id: "blur", label: "Soft Focus" }
+                  ].map(f => {
+                    const isSelected = selectedFilter === f.id;
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setSelectedFilter(f.id)}
+                        className="shrink-0 rounded-full px-3.5 py-1 text-xs font-medium transition active:scale-95"
+                        style={{
+                          backgroundColor: isSelected ? "var(--accent)" : "rgba(255, 255, 255, 0.05)",
+                          color: isSelected ? "#fff" : "var(--text-primary)"
+                        }}
+                      >
+                        {f.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Bottom Actions */}
+            <div className="flex items-center justify-between border-t px-6 py-4" style={{ backgroundColor: "var(--panel-bg)", borderColor: "var(--border-color, rgba(255,255,255,0.1))" }}>
+              <button
+                type="button"
+                onClick={handleGalleryClick}
+                className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition active:scale-95"
+                style={{ backgroundColor: "rgba(255, 255, 255, 0.05)", color: "var(--text-primary)" }}
+                title="Select from gallery"
+              >
+                <FolderOpen size={16} />
+                Gallery
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCapture}
+                disabled={!cameraStream}
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-white shadow-lg transition duration-150 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ backgroundColor: "var(--accent)" }}
+                aria-label="Capture photo"
+              >
+                <div className="h-4.5 w-4.5 rounded-full bg-white active:scale-75 transition-all" />
+              </button>
+
+              <button
+                type="button"
+                onClick={toggleCameraFacing}
+                disabled={!!cameraError}
+                className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+                style={{ backgroundColor: "rgba(255, 255, 255, 0.05)", color: "var(--text-primary)" }}
+                title="Switch Camera"
+              >
+                <RefreshCw size={16} />
+                Rotate
+              </button>
+            </div>
+
+          </div>
+        </div>,
+        document.body
+      )}
 
       {attachmentPreviewOpen && preview?.url && createPortal(
         <div

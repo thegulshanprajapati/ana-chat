@@ -549,6 +549,7 @@ export default function ChatPane({
             setSearchOpen(true);
           }}
           onDeleteChat={onDeleteChat}
+          theme={theme}
         />
       )}
     </section>

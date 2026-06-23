@@ -222,21 +222,31 @@ export default function AuthPage({ onAuthed }) {
     );
     if (!restore) return;
 
-    const pin = window.prompt("Enter your restore PIN to restore old chats:");
-    if (!pin) return;
-
-    try {
-      const { data } = await api.post("/auth/restore-key", { pin });
-      const privateJwk = await decryptPrivateKeyBackup(data.encryptedPrivateKey, pin);
-      await persistRsaKeyPair(userData.id, {
-        publicJwk: userData.publicKey,
-        privateJwk,
-        createdAt: Date.now()
-      });
-    } catch (err) {
-      const message = err.response?.data?.message || err.message || "Restore failed";
-      await alertCustom("Restore Failed", message);
-    }
+    // Use our stateful PIN modal helper instead of window.prompt
+    setConfirmConfig({
+      type: "prompt",
+      title: "Restore Chats Key PIN",
+      message: "Please enter your restore PIN to decrypt your previous chat key backup.",
+      placeholder: "Enter restore PIN",
+      isPassword: true,
+      onConfirm: async (pinInput) => {
+        const pin = (pinInput || "").trim();
+        if (!pin) return;
+        try {
+          const { data } = await api.post("/auth/restore-key", { pin });
+          const privateJwk = await decryptPrivateKeyBackup(data.encryptedPrivateKey, pin);
+          await persistRsaKeyPair(userData.id, {
+            publicJwk: userData.publicKey,
+            privateJwk,
+            createdAt: Date.now()
+          });
+          await alertCustom("Success", "E2EE encryption key restored successfully!");
+        } catch (err) {
+          const message = err.response?.data?.message || err.message || "Restore failed";
+          await alertCustom("Restore Failed", message);
+        }
+      }
+    });
   }
 
   const handleGoogleCredential = useCallback(
@@ -1326,11 +1336,17 @@ export default function AuthPage({ onAuthed }) {
         title={confirmConfig?.title || "Confirmation"}
         message={confirmConfig?.message}
         type={confirmConfig?.type || "confirm"}
-        onConfirm={() => {
-          confirmConfig?.onConfirm?.();
+        placeholder={confirmConfig?.placeholder}
+        isPassword={confirmConfig?.isPassword}
+        defaultValue={confirmConfig?.defaultValue}
+        onConfirm={(val) => {
+          confirmConfig?.onConfirm?.(val);
           setConfirmConfig(null);
         }}
-        onCancel={() => setConfirmConfig(null)}
+        onCancel={() => {
+          confirmConfig?.onCancel?.();
+          setConfirmConfig(null);
+        }}
       />
     </Motion.div>
   );

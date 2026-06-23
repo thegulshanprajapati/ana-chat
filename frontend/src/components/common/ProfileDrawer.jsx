@@ -86,27 +86,27 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
       />
 
       {/* Drawer Container (Styled to match the premium dark charcoal look of the app) */}
-      <aside className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-[#222e35] bg-[#111b21] text-slate-100 shadow-2xl transition-transform duration-300">
+      <aside className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-[var(--panel-border)] bg-[var(--panel-bg)] text-slate-100 shadow-2xl transition-transform duration-300">
         
         {/* Header */}
-        <div className="flex h-[64px] items-center gap-4 bg-[#202c33] px-6 text-slate-200">
+        <div className="flex h-[64px] items-center gap-4 bg-[var(--panel-bg-2)] px-6 text-slate-200">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1.5 hover:bg-[#2a3942] transition-colors"
+            className="rounded-full p-1.5 hover:bg-[var(--accent-soft-18)] transition-colors"
             aria-label="Close profile drawer"
           >
-            <X size={20} className="text-[#aebac1]" />
+            <X size={20} className="text-[var(--panel-muted)]" />
           </button>
           <span className="text-base font-medium">Profile info</span>
         </div>
 
         {/* Scrollable Form Content */}
-        <form onSubmit={handleSubmit} className="min-h-0 flex-1 flex flex-col bg-[#0b141a]">
+        <form onSubmit={handleSubmit} className="min-h-0 flex-1 flex flex-col bg-[var(--body-bg-dark)]">
           <div className="min-h-0 flex-1 overflow-y-auto space-y-4 pb-6">
             
             {/* Avatar / Profile Picture Section */}
-            <div className="bg-[#111b21] px-6 py-8 flex flex-col items-center border-b border-[#0b141a]">
+            <div className="bg-[var(--panel-bg)] px-6 py-8 flex flex-col items-center border-b border-[var(--panel-border)]">
               <div 
                 className="relative group cursor-pointer rounded-full overflow-hidden" 
                 onClick={() => fileRef.current?.click()}
@@ -124,21 +124,21 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
                 className="hidden"
                 onChange={(e) => setAvatar(e.target.files?.[0] || null)}
               />
-              <p className="mt-3 text-[11px] text-[#8696a0]">
+              <p className="mt-3 text-[11px] text-[var(--panel-muted)]">
                 Click photo to upload custom avatar
               </p>
             </div>
 
             {/* Inputs Section */}
-            <div className="px-6 py-4 bg-[#111b21] space-y-5">
+            <div className="px-6 py-4 bg-[var(--panel-bg)] space-y-5">
               
               {/* Full Name */}
               <div className="space-y-1.5">
-                <label className="text-[13px] text-[#8696a0] flex items-center gap-1.5">
+                <label className="text-[13px] text-[var(--panel-muted)] flex items-center gap-1.5">
                   <User size={14} /> Full name
                 </label>
                 <input
-                  className="w-full rounded-lg bg-[#202c33] border border-[#222e35] text-[#e9edef] px-3.5 py-2.5 text-sm outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/25"
+                  className="w-full rounded-lg bg-[var(--panel-bg-2)] border border-[var(--panel-border)] text-[#e9edef] px-3.5 py-2.5 text-sm outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/25"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
@@ -148,12 +148,12 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
 
               {/* Email Address */}
               <div className="space-y-1.5">
-                <label className="text-[13px] text-[#8696a0] flex items-center gap-1.5">
+                <label className="text-[13px] text-[var(--panel-muted)] flex items-center gap-1.5">
                   <Mail size={14} /> Email address
                 </label>
                 <input
                   type="email"
-                  className="w-full rounded-lg bg-[#202c33] border border-[#222e35] text-[#e9edef] px-3.5 py-2.5 text-sm outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/25"
+                  className="w-full rounded-lg bg-[var(--panel-bg-2)] border border-[var(--panel-border)] text-[#e9edef] px-3.5 py-2.5 text-sm outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/25"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -163,11 +163,11 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
 
               {/* Mobile Number */}
               <div className="space-y-1.5">
-                <label className="text-[13px] text-[#8696a0] flex items-center gap-1.5">
+                <label className="text-[13px] text-[var(--panel-muted)] flex items-center gap-1.5">
                   <Phone size={14} /> Mobile number
                 </label>
                 <input
-                  className="w-full rounded-lg bg-[#202c33] border border-[#222e35] text-[#e9edef] px-3.5 py-2.5 text-sm outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/25"
+                  className="w-full rounded-lg bg-[var(--panel-bg-2)] border border-[var(--panel-border)] text-[#e9edef] px-3.5 py-2.5 text-sm outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/25"
                   value={mobile}
                   onChange={(e) => setMobile(e.target.value)}
                   required
@@ -178,13 +178,13 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
               {/* About / Bio */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-[13px] text-[#8696a0] flex items-center gap-1.5">
+                  <label className="text-[13px] text-[var(--panel-muted)] flex items-center gap-1.5">
                     <Info size={14} /> About / Bio
                   </label>
-                  <span className="text-[10px] text-[#8696a0] font-mono">{about.length}/500</span>
+                  <span className="text-[10px] text-[var(--panel-muted)] font-mono">{about.length}/500</span>
                 </div>
                 <textarea
-                  className="w-full rounded-lg bg-[#202c33] border border-[#222e35] text-[#e9edef] px-3.5 py-2.5 text-sm outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/25 min-h-[92px] resize-none"
+                  className="w-full rounded-lg bg-[var(--panel-bg-2)] border border-[var(--panel-border)] text-[#e9edef] px-3.5 py-2.5 text-sm outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/25 min-h-[92px] resize-none"
                   value={about}
                   onChange={(e) => setAbout(e.target.value.slice(0, 500))}
                   placeholder="Write something about yourself..."
@@ -194,13 +194,13 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
 
               {/* New Password */}
               <div className="space-y-1.5">
-                <label className="text-[13px] text-[#8696a0] flex items-center gap-1.5">
+                <label className="text-[13px] text-[var(--panel-muted)] flex items-center gap-1.5">
                   <Lock size={14} /> New Password (Optional)
                 </label>
                 <input
                   type="password"
                   placeholder="Enter new password to change"
-                  className="w-full rounded-lg bg-[#202c33] border border-[#222e35] text-[#e9edef] px-3.5 py-2.5 text-sm outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/25"
+                  className="w-full rounded-lg bg-[var(--panel-bg-2)] border border-[var(--panel-border)] text-[#e9edef] px-3.5 py-2.5 text-sm outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/25"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   aria-label="New Password"
@@ -209,10 +209,10 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
 
               {/* Generated Password (Fallback) */}
               <div className="space-y-1.5">
-                <label className="text-[13px] text-[#8696a0]">Generated fallback password</label>
+                <label className="text-[13px] text-[var(--panel-muted)]">Generated fallback password</label>
                 <div className="flex items-center gap-2">
                   <input
-                    className="flex-1 rounded-lg bg-[#202c33] border border-[#222e35] text-[#e9edef] px-3.5 py-2.5 text-sm outline-none"
+                    className="flex-1 rounded-lg bg-[var(--panel-bg-2)] border border-[var(--panel-border)] text-[#e9edef] px-3.5 py-2.5 text-sm outline-none"
                     value={me?.generated_password || "Not available for this account"}
                     type={showGeneratedPassword || !me?.generated_password ? "text" : "password"}
                     readOnly
@@ -221,7 +221,7 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
                   <button
                     type="button"
                     onClick={() => setShowGeneratedPassword((prev) => !prev)}
-                    className="rounded-lg bg-[#202c33] border border-[#222e35] p-2.5 text-[#8696a0] hover:text-slate-200 transition-colors"
+                    className="rounded-lg bg-[var(--panel-bg-2)] border border-[var(--panel-border)] p-2.5 text-[var(--panel-muted)] hover:text-slate-200 transition-colors"
                     aria-label={showGeneratedPassword ? "Hide generated password" : "Show generated password"}
                     title={showGeneratedPassword ? "Hide" : "Show"}
                   >
@@ -231,14 +231,14 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
                     type="button"
                     onClick={copyGeneratedPassword}
                     disabled={!me?.generated_password}
-                    className="rounded-lg bg-[#202c33] border border-[#222e35] p-2.5 text-[#8696a0] hover:text-slate-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="rounded-lg bg-[var(--panel-bg-2)] border border-[var(--panel-border)] p-2.5 text-[var(--panel-muted)] hover:text-slate-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label="Copy generated password"
                     title="Copy"
                   >
                     <Copy size={16} />
                   </button>
                 </div>
-                <p className="text-[11px] text-[#8696a0] leading-relaxed">
+                <p className="text-[11px] text-[var(--panel-muted)] leading-relaxed">
                   Auto-generated for OAuth login fallback. Keep confidential.
                 </p>
               </div>
@@ -248,7 +248,7 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
           </div>
 
           {/* Action button */}
-          <div className="p-6 bg-[#111b21] border-t border-[#222e35]/30">
+          <div className="p-6 bg-[var(--panel-bg)] border-t border-[var(--panel-border)]/30">
             <button
               type="submit"
               disabled={saving}

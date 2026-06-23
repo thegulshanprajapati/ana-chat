@@ -113,7 +113,7 @@ export default function ChatListItem({
   const [isFavourite, setIsFavourite] = useState(() => {
     try {
       const list = JSON.parse(localStorage.getItem(`ana_favourite_chats_${meId}`) || "[]");
-      return list.includes(chat.id);
+      return list.map(String).includes(String(chat.id));
     } catch {
       return false;
     }
@@ -122,7 +122,7 @@ export default function ChatListItem({
   const [isMarkedUnread, setIsMarkedUnread] = useState(() => {
     try {
       const list = JSON.parse(localStorage.getItem(`ana_unread_override_chats_${meId}`) || "[]");
-      return list.includes(chat.id);
+      return list.map(String).includes(String(chat.id));
     } catch {
       return false;
     }
@@ -132,13 +132,37 @@ export default function ChatListItem({
     return Boolean(chat.blocked_by_me);
   });
 
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const mutes = JSON.parse(localStorage.getItem(`ana_muted_chats_${meId}`) || "[]");
+        setIsMuted(mutes.map(String).includes(String(chat.id)));
+      } catch (e) {}
+      try {
+        const archived = JSON.parse(localStorage.getItem(`ana_archived_chats_${meId}`) || "[]");
+        setIsArchived(archived.map(String).includes(String(chat.id)));
+      } catch (e) {}
+      try {
+        const favs = JSON.parse(localStorage.getItem(`ana_favourite_chats_${meId}`) || "[]");
+        setIsFavourite(favs.map(String).includes(String(chat.id)));
+      } catch (e) {}
+      try {
+        const unreads = JSON.parse(localStorage.getItem(`ana_unread_override_chats_${meId}`) || "[]");
+        setIsMarkedUnread(unreads.map(String).includes(String(chat.id)));
+      } catch (e) {}
+    };
+    window.addEventListener("ana_chats_updated", handleSync);
+    return () => window.removeEventListener("ana_chats_updated", handleSync);
+  }, [meId, chat.id]);
+
   const toggleMute = () => {
     try {
       const key = `ana_muted_chats_${meId}`;
       const list = JSON.parse(localStorage.getItem(key) || "[]");
       let next;
-      if (list.includes(chat.id)) {
-        next = list.filter(id => id !== chat.id);
+      const cidStr = String(chat.id);
+      if (list.map(String).includes(cidStr)) {
+        next = list.filter(id => String(id) !== cidStr);
         setIsMuted(false);
       } else {
         next = [...list, chat.id];
@@ -156,8 +180,9 @@ export default function ChatListItem({
       const key = `ana_archived_chats_${meId}`;
       const list = JSON.parse(localStorage.getItem(key) || "[]");
       let next;
-      if (list.includes(chat.id)) {
-        next = list.filter(id => id !== chat.id);
+      const cidStr = String(chat.id);
+      if (list.map(String).includes(cidStr)) {
+        next = list.filter(id => String(id) !== cidStr);
         setIsArchived(false);
       } else {
         next = [...list, chat.id];
@@ -175,8 +200,9 @@ export default function ChatListItem({
       const key = `ana_favourite_chats_${meId}`;
       const list = JSON.parse(localStorage.getItem(key) || "[]");
       let next;
-      if (list.includes(chat.id)) {
-        next = list.filter(id => id !== chat.id);
+      const cidStr = String(chat.id);
+      if (list.map(String).includes(cidStr)) {
+        next = list.filter(id => String(id) !== cidStr);
         setIsFavourite(false);
       } else {
         next = [...list, chat.id];
@@ -194,8 +220,9 @@ export default function ChatListItem({
       const key = `ana_unread_override_chats_${meId}`;
       const list = JSON.parse(localStorage.getItem(key) || "[]");
       let next;
-      if (list.includes(chat.id)) {
-        next = list.filter(id => id !== chat.id);
+      const cidStr = String(chat.id);
+      if (list.map(String).includes(cidStr)) {
+        next = list.filter(id => String(id) !== cidStr);
         setIsMarkedUnread(false);
       } else {
         next = [...list, chat.id];
@@ -510,6 +537,19 @@ export default function ChatListItem({
                 )}
               </div>
               <div className="shrink-0 flex items-center gap-1.5">
+                 {isMuted && (
+                  <span
+                    className={`inline-flex h-5 w-5 items-center justify-center rounded-full border ${
+                      customDark
+                        ? "border-white/15 bg-white/10 text-slate-400"
+                        : "border-slate-200 bg-white/80 text-slate-400 dark:border-slate-700 dark:bg-slate-900/60"
+                    }`}
+                    aria-label="Muted chat"
+                    title="Muted"
+                  >
+                    <BellOff size={11} />
+                  </span>
+                )}
                 {isFavourite && (
                   <span
                     className={`inline-flex h-5 w-5 items-center justify-center rounded-full border ${
@@ -575,8 +615,13 @@ export default function ChatListItem({
         <div className="fixed inset-0 z-[80]">
           <div
             ref={menuPopupRef}
-            className="fixed min-w-[200px] overflow-hidden rounded-xl border border-slate-200/80 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.25)] backdrop-blur-md dark:border-slate-700/80 dark:bg-slate-950/92"
-            style={menuStyle}
+            className="fixed min-w-[200px] overflow-hidden rounded-xl border shadow-[0_20px_60px_rgba(15,23,42,0.25)] backdrop-blur-md"
+            style={{
+              ...menuStyle,
+              backgroundColor: "var(--panel-bg)",
+              borderColor: "var(--border-color, rgba(255,255,255,0.1))",
+              color: "var(--text-primary)"
+            }}
             role="menu"
             aria-label="Chat options"
           >
@@ -587,9 +632,12 @@ export default function ChatListItem({
                     type="button"
                     className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold transition ${
                       item.danger
-                        ? "text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
-                        : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                        ? "text-rose-500 hover:bg-rose-500/10"
+                        : "hover:bg-black/5 dark:hover:bg-white/5"
                     }`}
+                    style={{
+                      color: item.danger ? "var(--rose-500, #f43f5e)" : "var(--text-primary)"
+                    }}
                     role="menuitem"
                     onClick={() => {
                       item.onClick?.();
@@ -600,12 +648,12 @@ export default function ChatListItem({
                     <div className="flex flex-col min-w-0">
                       <span>{item.label}</span>
                       {item.desc && (
-                        <span className="text-[10px] text-slate-400 font-medium mt-0.5 leading-none">{item.desc}</span>
+                        <span className="text-[10px] font-medium mt-0.5 leading-none" style={{ color: "var(--text-secondary)" }}>{item.desc}</span>
                       )}
                     </div>
                   </button>
                   {item.dividerAfter && (
-                    <div className="my-1 border-t border-slate-100 dark:border-slate-800/80" />
+                    <div className="my-1 border-t" style={{ borderColor: "var(--border-color, rgba(255,255,255,0.1))" }} />
                   )}
                 </div>
               ))}
