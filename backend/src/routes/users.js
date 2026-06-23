@@ -194,6 +194,22 @@ router.get("/", requireUser, async (req, res) => {
   res.json(rows);
 });
 
+router.patch("/:userId/rename", requireUser, async (req, res) => {
+  const targetUserId = Number(req.params.userId);
+  const newName = (req.body.name || "").trim();
+  if (!targetUserId || !newName) {
+    return res.status(400).json({ message: "userId and name are required" });
+  }
+
+  const db = await getDb();
+  await db.collection("users").updateOne(
+    { id: targetUserId },
+    { $set: { name: newName, updated_at: new Date() } }
+  );
+
+  res.json({ success: true, name: newName });
+});
+
 router.patch("/me", requireUser, avatarUpload, async (req, res) => {
   const userId = req.user.id;
   const name = (req.body.name || "").toString().trim();

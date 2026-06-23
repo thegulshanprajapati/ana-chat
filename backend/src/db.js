@@ -29,7 +29,14 @@ export async function connectDb() {
   });
 
   console.log("[MongoDB] Connected to database", mongoose.connection.name);
-  return mongoose.connection.db;
+  const db = mongoose.connection.db;
+  try {
+    await db.collection("messages").createIndex({ chat_id: 1, created_at: 1 });
+    await db.collection("messages").createIndex({ client_message_id: 1 });
+  } catch (err) {
+    console.error("[MongoDB] Failed to create messages indexes:", err);
+  }
+  return db;
 }
 
 export function getDb() {
