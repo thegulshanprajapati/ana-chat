@@ -187,10 +187,13 @@ async function hydrateMessagesForUser(db, docs, userId) {
 
   const replyMap = new Map(replyDocs.map((doc) => [Number(doc.id), doc]));
   const replySenderIds = [...new Set(replyDocs.map((doc) => Number(doc.sender_id)).filter(Boolean))];
-  const replySenderRows = replySenderIds.length
-    ? await db.collection("users").find({ id: { $in: replySenderIds } }, { projection: { _id: 0, id: 1, name: 1, email: 1, mobile: 1 } }).toArray()
+  const mainSenderIds = [...new Set(list.map((doc) => Number(doc.sender_id)).filter(Boolean))];
+  const allSenderIds = [...new Set([...replySenderIds, ...mainSenderIds])];
+
+  const senderRows = allSenderIds.length
+    ? await db.collection("users").find({ id: { $in: allSenderIds } }, { projection: { _id: 0, id: 1, name: 1, email: 1, mobile: 1 } }).toArray()
     : [];
-  const senderNameMap = new Map(replySenderRows.map((row) => [Number(row.id), row.name || row.mobile || row.email || "User"]));
+  const senderNameMap = new Map(senderRows.map((row) => [Number(row.id), row.name || row.mobile || row.email || "User"]));
 
   return list.map((doc) => {
     const reply = doc.reply_to_message_id ? (replyMap.get(Number(doc.reply_to_message_id)) || null) : null;
@@ -199,6 +202,7 @@ async function hydrateMessagesForUser(db, docs, userId) {
       id: doc.id,
       chat_id: doc.chat_id,
       sender_id: doc.sender_id,
+      sender_name: senderNameMap.get(Number(doc.sender_id)) || "User",
       client_message_id: doc.client_message_id || null,
       body: doc.body || null, // legacy plaintext (pre-E2EE). New messages store body=null.
       image_url: doc.image_url || null, // encrypted blob filename for E2EE media
@@ -221,11 +225,12 @@ async function hydrateMessagesForUser(db, docs, userId) {
   });
 }
 
-function buildRealtimePayloadBase(doc, reply, replySenderName) {
+function buildRealtimePayloadBase(doc, reply, replySenderName, senderName = "User") {
   return {
     id: doc.id,
     chat_id: doc.chat_id,
     sender_id: doc.sender_id,
+    sender_name: senderName,
     client_message_id: doc.client_message_id || null,
     body: doc.body || null, // legacy plaintext (pre-E2EE). New messages store body=null.
     image_url: doc.image_url || null, // encrypted blob filename for E2EE media
@@ -396,7 +401,7 @@ async function sendMessageHandler(req, res) {
     }
   }
 
-  const base = buildRealtimePayloadBase(doc, reply, replySenderName);
+  const base = buildRealtimePayloadBase(doc, reply, replySenderName, req.user.name || req.user.mobile || req.user.email || "User");
   await emitMessageToParticipantsPerUser(io, participantIdsUnique, "receive_message", (userId) => (
     buildRealtimePayloadForUser(base, { doc, reply, userId })
   ));

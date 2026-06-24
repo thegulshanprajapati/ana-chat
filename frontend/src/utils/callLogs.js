@@ -59,6 +59,7 @@ export function appendCallLog(userId, entry) {
   // Also save to backend asynchronously
   try {
     api.post("/users/call-logs", {
+      id,
       direction: entry.direction,
       status: entry.status,
       callType: entry.callType,

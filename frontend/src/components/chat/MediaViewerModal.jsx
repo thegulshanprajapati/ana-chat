@@ -832,13 +832,18 @@ export default function MediaViewerModal({
               {currentIsPdf ? (
                 <div className="h-full w-full px-2 pt-14 pb-16 sm:px-6">
                   {currentUrl ? (
-                      <iframe
-                        src={currentUrl}
-                        title="PDF preview"
+                      <object
+                        data={currentUrl}
+                        type="application/pdf"
                         className="h-full w-full rounded-2xl border border-[color:var(--overlay-border)] bg-white shadow-2xl"
-                        sandbox="allow-same-origin allow-scripts allow-downloads"
-                        referrerPolicy="no-referrer"
-                      />
+                      >
+                        <iframe
+                          src={currentUrl}
+                          title="PDF preview"
+                          className="h-full w-full rounded-2xl border border-[color:var(--overlay-border)] bg-white shadow-2xl"
+                          referrerPolicy="no-referrer"
+                        />
+                      </object>
                     ) : (
                       <div className="flex h-full w-full items-center justify-center rounded-2xl border border-[color:var(--overlay-border)] bg-[color:var(--overlay-btn-bg)] px-6 text-center text-sm text-[color:var(--overlay-muted)]">
                         {resolved.decrypting ? "Decrypting..." : "Unable to preview."}

@@ -252,12 +252,24 @@ export function ThemeProvider({ children }) {
     root.style.setProperty("--body-bg-dark", rgbToHex(body));
     root.style.setProperty("--body-bg", rgbToHex(lightBg));
 
-    root.style.setProperty("--panel-bg", rgba(panel, 0.92));
-    root.style.setProperty("--panel-bg-2", rgba(panel2, 0.92));
-    root.style.setProperty("--panel-border", rgba(accentUiRgb, 0.22));
-    root.style.setProperty("--panel-border-soft", "rgba(255, 255, 255, 0.08)");
-    root.style.setProperty("--panel-text", "#f8fafc");
-    root.style.setProperty("--panel-muted", "rgba(226, 232, 240, 0.70)");
+    const lightPanel = mixRgb({ r: 255, g: 255, b: 255 }, accentUiRgb, 0.04);
+    const lightPanel2 = mixRgb({ r: 245, g: 247, b: 250 }, accentUiRgb, 0.06);
+
+    if (isDarkTheme) {
+      root.style.setProperty("--panel-bg", rgba(panel, 0.92));
+      root.style.setProperty("--panel-bg-2", rgba(panel2, 0.92));
+      root.style.setProperty("--panel-border", rgba(accentUiRgb, 0.22));
+      root.style.setProperty("--panel-border-soft", "rgba(255, 255, 255, 0.08)");
+      root.style.setProperty("--panel-text", "#f8fafc");
+      root.style.setProperty("--panel-muted", "rgba(226, 232, 240, 0.70)");
+    } else {
+      root.style.setProperty("--panel-bg", rgba(lightPanel, 0.96));
+      root.style.setProperty("--panel-bg-2", rgba(lightPanel2, 0.96));
+      root.style.setProperty("--panel-border", rgba(accentUiRgb, 0.15));
+      root.style.setProperty("--panel-border-soft", "rgba(15, 23, 42, 0.06)");
+      root.style.setProperty("--panel-text", "#0f172a");
+      root.style.setProperty("--panel-muted", "rgba(71, 85, 105, 0.75)");
+    }
 
     const inkText = isDarkTheme ? { r: 248, g: 250, b: 252 } : { r: 15, g: 23, b: 42 };
     const inkMuted = isDarkTheme ? { r: 148, g: 163, b: 184 } : { r: 71, g: 85, b: 105 };

@@ -615,12 +615,12 @@ export default function ChatListItem({
         <div className="fixed inset-0 z-[80]">
           <div
             ref={menuPopupRef}
-            className="fixed min-w-[200px] overflow-hidden rounded-xl border shadow-[0_20px_60px_rgba(15,23,42,0.25)] backdrop-blur-md"
+            className="fixed min-w-[200px] overflow-hidden rounded-xl border shadow-[0_20px_60px_rgba(15,23,42,0.25)] backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
             style={{
               ...menuStyle,
               backgroundColor: "var(--panel-bg)",
-              borderColor: "var(--border-color, rgba(255,255,255,0.1))",
-              color: "var(--text-primary)"
+              borderColor: "var(--panel-border, rgba(255,255,255,0.1))",
+              color: "var(--panel-text)"
             }}
             role="menu"
             aria-label="Chat options"
@@ -636,7 +636,7 @@ export default function ChatListItem({
                         : "hover:bg-black/5 dark:hover:bg-white/5"
                     }`}
                     style={{
-                      color: item.danger ? "var(--rose-500, #f43f5e)" : "var(--text-primary)"
+                      color: item.danger ? "var(--rose-500, #f43f5e)" : "var(--panel-text)"
                     }}
                     role="menuitem"
                     onClick={() => {
@@ -648,12 +648,12 @@ export default function ChatListItem({
                     <div className="flex flex-col min-w-0">
                       <span>{item.label}</span>
                       {item.desc && (
-                        <span className="text-[10px] font-medium mt-0.5 leading-none" style={{ color: "var(--text-secondary)" }}>{item.desc}</span>
+                        <span className="text-[10px] font-medium mt-0.5 leading-none text-slate-400 dark:text-slate-500">{item.desc}</span>
                       )}
                     </div>
                   </button>
                   {item.dividerAfter && (
-                    <div className="my-1 border-t" style={{ borderColor: "var(--border-color, rgba(255,255,255,0.1))" }} />
+                    <div className="my-1 border-t" style={{ borderColor: "var(--panel-border, rgba(255,255,255,0.1))" }} />
                   )}
                 </div>
               ))}

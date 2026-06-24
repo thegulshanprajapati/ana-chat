@@ -571,6 +571,7 @@ router.post("/:userId/report", requireUser, async (req, res) => {
 router.post("/call-logs", requireUser, async (req, res) => {
   const userId = Number(req.user.id);
   const {
+    id,
     direction,
     status,
     callType,
@@ -589,7 +590,7 @@ router.post("/call-logs", requireUser, async (req, res) => {
 
   const db = await getDb();
   const now = new Date();
-  const logId = await getNextSequence("callLogs");
+  const logId = id ? id.toString() : await getNextSequence("callLogs");
 
   const callLog = {
     id: logId,
@@ -636,7 +637,8 @@ router.get("/call-logs", requireUser, async (req, res) => {
 // Update call log
 router.patch("/call-logs/:logId", requireUser, async (req, res) => {
   const userId = Number(req.user.id);
-  const logId = Number(req.params.logId);
+  const logIdRaw = req.params.logId;
+  const logId = /^\d+$/.test(logIdRaw) ? Number(logIdRaw) : logIdRaw;
   const { status, ended_at } = req.body || {};
 
   if (!logId) {
