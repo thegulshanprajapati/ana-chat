@@ -142,12 +142,17 @@ export async function initDb() {
       );
     `);
 
-    // Add missing columns to existing sessions table (for zero-downtime upgrades)
-    await query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS refresh_token_hash VARCHAR(255);`).catch(() => {});
-    await query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS device_fingerprint VARCHAR(255);`).catch(() => {});
-    await query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ip VARCHAR(100);`).catch(() => {});
-    await query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS user_agent TEXT;`).catch(() => {});
-    await query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;`).catch(() => {});
+    // Backwards compatibility: Add missing columns to existing sessions table
+    const alterQueries = [
+      `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS refresh_token_hash VARCHAR(255);`,
+      `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS device_fingerprint VARCHAR(255);`,
+      `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ip VARCHAR(100);`,
+      `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS user_agent TEXT;`,
+      `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;`
+    ];
+    for (const altQuery of alterQueries) {
+      await query(altQuery).catch(() => {});
+    }
 
     await query(`
       CREATE TABLE IF NOT EXISTS public_keys (
