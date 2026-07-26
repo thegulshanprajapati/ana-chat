@@ -1,18 +1,27 @@
 {
-  "name": "anachat-root",
+  "name": "anachat",
   "private": true,
-  "version": "3.1.3",
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "concurrently -k \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:client": "npm --prefix frontend run dev",
-    "dev:server": "npm --prefix backend run dev",
-    "db:init": "npm --prefix backend run db:init",
-    "build": "npm --prefix frontend run build",
-    "lint": "npm --prefix frontend run lint",
-    "preview": "npm --prefix frontend run preview",
-    "postinstall": "npm --prefix backend install && npm --prefix frontend install"
+    "dev": "npm run dev:backend & npm run dev:web",
+    "dev:backend": "npm --workspace @anachat/backend run dev",
+    "dev:web": "npm --workspace @anachat/web run dev",
+    "dev:admin": "npm --workspace @anachat/admin run dev",
+    "build": "npm run build:backend && npm run build:web && npm run build:admin",
+    "build:backend": "npm --workspace @anachat/backend run build",
+    "build:web": "npm --workspace @anachat/web run build",
+    "build:admin": "npm --workspace @anachat/admin run build",
+    "lint": "npm run lint:backend && npm run lint:web",
+    "lint:backend": "npm --workspace @anachat/backend run lint",
+    "lint:web": "npm --workspace @anachat/web run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
   },
-  "dependencies": {
-    "@vercel/speed-insights": "^2.0.0"
+  "devDependencies": {
+    "prettier": "^3.0.0",
+    "typescript": "^5.7.0"
   }
 }

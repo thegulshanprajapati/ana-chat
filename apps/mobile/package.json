@@ -1,0 +1,23 @@
+{
+  "name": "@anachat/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "npx react-native start",
+    "android": "npx react-native run-android",
+    "ios": "npx react-native run-ios"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-native": "^0.72.0",
+    "react-native-mmkv": "^2.0.0",
+    "react-native-sqlite-storage": "^6.0.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "@babel/runtime": "^7.24.0",
+    "@types/react": "^19.0.0",
+    "@types/react-native": "^0.72.0",
+    "typescript": "^5.7.0"
+  }
+}

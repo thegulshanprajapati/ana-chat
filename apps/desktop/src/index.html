@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AnaChat Desktop</title>
+    <style>
+      body {
+        margin: 0;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        font-family: Inter, system-ui, sans-serif;
+        background: radial-gradient(circle at top, #0f172a, #020617);
+        color: #f8fafc;
+      }
+      .panel {
+        padding: 3rem;
+        border-radius: 24px;
+        background: rgba(15, 23, 42, 0.94);
+        box-shadow: 0 30px 80px rgba(15, 23, 42, 0.45);
+        text-align: center;
+        max-width: 640px;
+      }
+      a {
+        color: #38bdf8;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="panel">
+      <h1>AnaChat Desktop</h1>
+      <p>Electron shell ready for local-first messaging with SQLite storage, secure sync, and native notifications.</p>
+      <p>Use the shared backend at <code>http://localhost:5000</code>.</p>
+      <p><a href="#" id="theme">Get theme</a></p>
+      <script>
+        const themeLink = document.getElementById('theme');
+        themeLink?.addEventListener('click', async () => {
+          const theme = await window.electron.getTheme();
+          alert('Current theme: ' + theme);
+        });
+      </script>
+    </div>
+  </body>
+</html>

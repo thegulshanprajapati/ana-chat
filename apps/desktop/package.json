@@ -1,0 +1,30 @@
+{
+  "name": "@anachat/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "electron .",
+    "build": "electron-builder"
+  },
+  "dependencies": {
+    "electron": "^26.0.0",
+    "electron-store": "^8.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sqlite3": "^5.1.6"
+  },
+  "devDependencies": {
+    "@types/electron": "^26.0.0",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.7.0",
+    "electron-builder": "^24.6.0"
+  },
+  "build": {
+    "appId": "com.anachat.desktop",
+    "files": ["dist/**/*", "public/**/*"],
+    "win": {
+      "target": ["nsis"]
+    }
+  }
+}

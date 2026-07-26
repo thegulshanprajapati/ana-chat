@@ -24,3 +24,12 @@ backend/.env
 *.njsproj
 *.sln
 *.sw?
+
+# Monorepo artifacts
+apps/**/node_modules
+packages/**/node_modules
+apps/**/dist
+apps/**/.next
+apps/**/.expo
+apps/**/build
+packages/**/dist
