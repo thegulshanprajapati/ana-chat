@@ -3,6 +3,7 @@ import AuthPage from "./components/AuthPage";
 import ChatPage from "./pages/ChatPage";
 import AdminPortal from "./components/AdminPortal";
 import ReactionMockup from "./pages/ReactionMockup";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import SpeedInsightsInjector from "./components/SpeedInsights";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { SocketProvider } from "./context/SocketContextNew";
@@ -86,6 +87,7 @@ function UserApp() {
 export default function App() {
   const isAdminRoute = isPathWithBase("admin");
   const isReactionMockRoute = isPathWithBase("mockups/reaction");
+  const isResetPasswordRoute = isPathWithBase("reset-password");
   const disableDevtools = import.meta.env.PROD && import.meta.env.VITE_DISABLE_DEVTOOLS === "true";
 
   useDisableDevtools(disableDevtools);
@@ -108,6 +110,8 @@ export default function App() {
         <AppErrorBoundary>
           {isReactionMockRoute ? (
             <ReactionMockup />
+          ) : isResetPasswordRoute ? (
+            <ResetPasswordPage />
           ) : isAdminRoute ? (
             <AdminPortal />
           ) : (

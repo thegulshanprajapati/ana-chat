@@ -706,4 +706,157 @@ router.get("/monitoring", requireAdmin, async (req, res) => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────
+// EMAIL TEMPLATES ADMIN ENDPOINTS
+// ─────────────────────────────────────────────────────────────
+
+/** GET /admin/email-templates — list all templates */
+router.get("/email-templates", requireAdmin, async (req, res) => {
+  const { getAllTemplates } = await import("../services/emailTemplate.js");
+  const templates = await getAllTemplates();
+  res.json({ templates });
+});
+
+/** GET /admin/email-templates/:key — get one template */
+router.get("/email-templates/:key", requireAdmin, async (req, res) => {
+  const { getTemplate } = await import("../services/emailTemplate.js");
+  const tpl = await getTemplate(req.params.key);
+  if (!tpl) return res.status(404).json({ message: "Template not found" });
+  res.json({ template: tpl });
+});
+
+/** PUT /admin/email-templates/:key — create or update a template */
+router.put("/email-templates/:key", requireAdmin, async (req, res) => {
+  const { upsertTemplate } = await import("../services/emailTemplate.js");
+  const { query: pgQuery } = await import("../dbPostgres.js");
+  const key = req.params.key;
+  const fields = req.body || {};
+
+  const updated = await upsertTemplate(key, { ...fields });
+  if (!updated) return res.status(500).json({ message: "Failed to save template" });
+
+  await audit(req, "EMAIL_TEMPLATE_EDITED", { key });
+  await pgQuery(
+    "INSERT INTO audit_logs (admin_id, action, metadata, ip) VALUES ($1,$2,$3,$4)",
+    [req.admin?.id || null, "EMAIL_TEMPLATE_EDITED", JSON.stringify({ key }), req.ip || null]
+  ).catch(() => {});
+
+  res.json({ template: updated });
+});
+
+/** POST /admin/email-templates/test — send test email */
+router.post("/email-templates/test", requireAdmin, async (req, res) => {
+  const { composeEmail } = await import("../services/emailTemplate.js");
+  const { sendEmail } = await import("../services/mailer.js");
+  const { query: pgQuery } = await import("../dbPostgres.js");
+
+  const { to, template_key } = req.body || {};
+  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+    return res.status(400).json({ message: "A valid recipient email is required." });
+  }
+  if (!template_key) {
+    return res.status(400).json({ message: "template_key is required." });
+  }
+
+  try {
+    const { subject, html, text, replyTo } = await composeEmail(template_key, {
+      user_name: "Test User",
+      user_email: to,
+      reset_link: "https://chat.myana.site/reset-password?token=test-token",
+      expiry_time: "15 minutes"
+    });
+
+    await sendEmail({ to, subject: `[TEST] ${subject}`, html, text, replyTo });
+
+    await pgQuery(
+      "INSERT INTO audit_logs (admin_id, action, metadata, ip) VALUES ($1,$2,$3,$4)",
+      [req.admin?.id || null, "TEST_EMAIL_SENT", JSON.stringify({ to, template_key }), req.ip || null]
+    ).catch(() => {});
+
+    res.json({ message: `Test email sent to ${to}` });
+  } catch (err) {
+    console.error("[Admin/TestEmail]", err.message);
+    res.status(500).json({ message: `Failed to send test email: ${err.message}` });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// EMAIL SETTINGS ADMIN ENDPOINTS
+// ─────────────────────────────────────────────────────────────
+
+/** GET /admin/email-settings */
+router.get("/email-settings", requireAdmin, async (req, res) => {
+  const { query: pgQuery } = await import("../dbPostgres.js");
+  const result = await pgQuery("SELECT * FROM email_settings ORDER BY id DESC LIMIT 1");
+  const settings = result.rows[0] || null;
+  // Mask SMTP password and API key
+  if (settings) {
+    if (settings.smtp_pass) settings.smtp_pass = "••••••••";
+    if (settings.resend_api_key) settings.resend_api_key = "re_" + "•".repeat(20);
+  }
+  res.json({ settings });
+});
+
+/** PUT /admin/email-settings */
+router.put("/email-settings", requireAdmin, async (req, res) => {
+  const { query: pgQuery } = await import("../dbPostgres.js");
+  const { clearMailerCache } = await import("../services/mailer.js");
+
+  const {
+    provider, smtp_host, smtp_port, smtp_user, smtp_pass,
+    smtp_encryption, sender_email, sender_name, reply_to, resend_api_key
+  } = req.body || {};
+
+  // Don't overwrite password with masked value
+  const isPasswordMasked = (v) => v && v.includes("•");
+
+  // Get current settings to preserve masked fields
+  const current = await pgQuery("SELECT * FROM email_settings ORDER BY id DESC LIMIT 1");
+  const cur = current.rows[0] || {};
+
+  const finalSmtpPass = isPasswordMasked(smtp_pass) ? cur.smtp_pass || "" : (smtp_pass || "");
+  const finalResendKey = isPasswordMasked(resend_api_key) ? cur.resend_api_key || "" : (resend_api_key || "");
+
+  await pgQuery(
+    `INSERT INTO email_settings
+       (id, provider, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_encryption,
+        sender_email, sender_name, reply_to, resend_api_key, updated_at)
+     VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+     ON CONFLICT (id) DO UPDATE SET
+       provider = EXCLUDED.provider,
+       smtp_host = EXCLUDED.smtp_host,
+       smtp_port = EXCLUDED.smtp_port,
+       smtp_user = EXCLUDED.smtp_user,
+       smtp_pass = EXCLUDED.smtp_pass,
+       smtp_encryption = EXCLUDED.smtp_encryption,
+       sender_email = EXCLUDED.sender_email,
+       sender_name = EXCLUDED.sender_name,
+       reply_to = EXCLUDED.reply_to,
+       resend_api_key = EXCLUDED.resend_api_key,
+       updated_at = CURRENT_TIMESTAMP`,
+    [
+      provider || "smtp",
+      smtp_host || "",
+      Number(smtp_port) || 587,
+      smtp_user || "",
+      finalSmtpPass,
+      smtp_encryption || "tls",
+      sender_email || "",
+      sender_name || "AnaChat",
+      reply_to || "",
+      finalResendKey
+    ]
+  );
+
+  clearMailerCache();
+
+  await pgQuery(
+    "INSERT INTO audit_logs (admin_id, action, metadata, ip) VALUES ($1,$2,$3,$4)",
+    [req.admin?.id || null, "EMAIL_SETTINGS_UPDATED", JSON.stringify({ provider }), req.ip || null]
+  ).catch(() => {});
+
+  res.json({ message: "Email settings saved." });
+});
+
 export default router;
+

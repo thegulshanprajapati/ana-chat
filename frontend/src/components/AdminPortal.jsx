@@ -5,6 +5,7 @@ import {
   Bell,
   ClipboardList,
   LogOut,
+  Mail,
   Menu,
   Megaphone,
   MessageSquare,
@@ -17,12 +18,14 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import CustomConfirmDialog from "./common/CustomConfirmDialog";
+import EmailTemplatesPanel from "./panels/EmailTemplatesPanel";
 
 const tabs = [
   { id: "dashboard", label: "Dashboard", icon: Shield },
   { id: "users", label: "Users", icon: Users },
   { id: "notify", label: "Notify User", icon: Bell },
   { id: "broadcast", label: "Broadcast", icon: Megaphone },
+  { id: "email", label: "Email Templates", icon: Mail },
   { id: "admins", label: "Admins", icon: User }
 ];
 
@@ -1230,11 +1233,20 @@ export default function AdminPortal() {
     );
   }
 
+  function renderEmailTemplates() {
+    return (
+      <section className={`${panelClass} p-4 md:p-6 min-h-[600px]`}>
+        <EmailTemplatesPanel adminToken={admin?.token} />
+      </section>
+    );
+  }
+
   function renderCurrentSection() {
     if (tab === "users") return renderUsers();
     if (tab === "notify") return renderNotify();
     if (tab === "broadcast") return renderBroadcast();
     if (tab === "admins") return renderAdmins();
+    if (tab === "email") return renderEmailTemplates();
     return renderDashboard();
   }
 

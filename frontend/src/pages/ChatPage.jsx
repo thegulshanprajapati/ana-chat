@@ -153,9 +153,6 @@ export default function ChatPage() {
   } = useTheme();
   const isMobile = useIsMobile();
 
-  // Safety: ChatPage should not crash if auth state flips to null mid-render.
-  if (!user?.id) return null;
-
   const sidebarTabStorageKey = useMemo(() => `anach_sidebar_tab_v1_${user?.id || "guest"}`, [user?.id]);
   const [activeSidebarTab, setActiveSidebarTab] = useState(() => {
     try {
@@ -2585,6 +2582,8 @@ export default function ChatPage() {
   const isChatTab = activeSidebarTab === "chats";
   const showSidebar = !isMobile || (activeSidebarTab === "status" && !selectedStatusFeed) || (!isChatTab || !mobileChatOpen);
   const showRightPane = !isMobile || (isChatTab && mobileChatOpen) || (activeSidebarTab === "status" && selectedStatusFeed);
+
+  if (!user?.id) return null;
 
   return (
     <div className="relative h-[100dvh] overflow-hidden chat-surface p-0">

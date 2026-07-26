@@ -16,6 +16,7 @@ import {
   User
 } from "lucide-react";
 import { api, setStoredAccessToken } from "../api/client";
+import ForgotPasswordModal from "./ForgotPasswordModal";
 import { navigateTo } from "../utils/nav";
 import { useTheme } from "../context/ThemeContext";
 import { getStoredRsaKeyPair, persistRsaKeyPair, decryptPrivateKeyBackup } from "../utils/e2ee";
@@ -657,9 +658,12 @@ export default function AuthPage({ onAuthed }) {
           className="grid w-full lg:max-h-[90dvh] grid-cols-1 overflow-hidden rounded-[28px] border border-rose-100/60 dark:border-slate-800/50 bg-white/80 dark:bg-slate-950/60 backdrop-blur-xl shadow-[0_30px_90px_rgba(225,29,72,0.10)]"
           variants={itemVariants}
         >
-          <div className="grid grid-cols-1 lg:grid-cols-2 lg:h-[820px] lg:max-h-[85vh] min-h-0">
+          <div className="grid grid-cols-1 lg:grid-cols-2 lg:h-[700px] lg:max-h-[85vh] min-h-0">
             {/* ── Desktop left hero panel ── */}
-            <div className="relative hidden lg:flex flex-col justify-between p-8 xl:p-10 border-r border-rose-100/40 dark:border-slate-800/40 bg-gradient-to-br from-rose-600 via-rose-500 to-pink-500">
+            <div
+              className="relative hidden lg:flex flex-col justify-between p-8 xl:p-10 border-r border-rose-100/40 dark:border-slate-800/40 bg-gradient-to-br from-rose-600 via-rose-500 to-pink-500 overflow-y-auto"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            >
               <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-l-[28px]">
                 <div className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
                 <div className="absolute right-[-60px] top-32 h-64 w-64 rounded-full bg-pink-300/20 blur-3xl" />
@@ -1325,100 +1329,11 @@ export default function AuthPage({ onAuthed }) {
         </Motion.div>
       </div>
 
-      <AnimatePresence>
-        {showForgotPassword ? (
-          <Motion.div
-            className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowForgotPassword(false)}
-          >
-            <Motion.div
-              className="w-full max-w-md rounded-[24px] border border-slate-200/70 dark:border-slate-800/70 bg-white/85 dark:bg-slate-950/70 backdrop-blur-xl shadow-[0_30px_90px_rgba(15,23,42,0.35)] p-6"
-              initial={{ opacity: 0, y: 18, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 18, scale: 0.98 }}
-              transition={{ duration: 0.22 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-lg font-bold text-slate-900 dark:text-white">Reset password</div>
-                  <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                    We’ll email a reset link if the account exists.
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowForgotPassword(false)}
-                  className="rounded-xl border border-slate-200/70 dark:border-slate-800/70 bg-white/60 dark:bg-slate-950/40 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-900 transition"
-                >
-                  Close
-                </button>
-              </div>
-
-              <form onSubmit={handleForgotPassword} className="mt-6 space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-900 dark:text-slate-100">Email address</label>
-                  <input
-                    type="email"
-                    value={resetEmail}
-                    onChange={(e) => setResetEmail(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-4 py-3.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
-                    placeholder="name@email.com"
-                    required
-                  />
-                </div>
-
-                <AnimatePresence>
-                  {resetMessage ? (
-                    <Motion.div
-                      className={[
-                        "rounded-2xl border px-4 py-3 text-xs",
-                        resetMessage.includes("sent")
-                          ? "border-emerald-200/70 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/25 text-emerald-800 dark:text-emerald-200"
-                          : "border-rose-200/70 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/25 text-rose-800 dark:text-rose-200"
-                      ].join(" ")}
-                      initial={{ opacity: 0, y: -6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }}
-                    >
-                      {resetMessage}
-                    </Motion.div>
-                  ) : null}
-                </AnimatePresence>
-
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowForgotPassword(false)}
-                    className="flex-1 rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/70 dark:bg-slate-950/35 px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-900 transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={resetLoading}
-                    className="flex-1 rounded-2xl bg-gradient-to-r from-rose-600 to-fuchsia-600 hover:from-rose-500 hover:to-fuchsia-500 disabled:opacity-60 px-4 py-3 text-sm font-semibold text-white transition flex items-center justify-center gap-2"
-                  >
-                    {resetLoading ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <KeyRound className="h-4 w-4" />
-                        Send link
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </Motion.div>
-          </Motion.div>
-        ) : null}
-      </AnimatePresence>
+      {/* Forgot Password Modal — real API-backed */}
+      <ForgotPasswordModal
+        open={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+      />
       <CustomConfirmDialog
         isOpen={Boolean(confirmConfig)}
         title={confirmConfig?.title || "Confirmation"}

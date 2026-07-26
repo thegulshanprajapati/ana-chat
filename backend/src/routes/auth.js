@@ -775,4 +775,272 @@ router.get("/me", requireUser, async (req, res) => {
   return res.json(publicUser(user));
 });
 
+// ─────────────────────────────────────────────────────────────
+// FORGOT PASSWORD / RESET PASSWORD SYSTEM
+// ─────────────────────────────────────────────────────────────
+
+// In-memory rate-limit store (reset per hour)
+const fpRateLimitByIp = new Map();    // ip -> { count, resetAt }
+const fpRateLimitByEmail = new Map(); // email -> { count, resetAt }
+
+const FP_MAX_PER_HOUR = Number(process.env.FP_MAX_REQUESTS_PER_HOUR || 5);
+const TOKEN_EXPIRY_MINUTES = Number(process.env.RESET_TOKEN_EXPIRY_MINUTES || 15);
+const APP_URL = process.env.APP_URL || "https://chat.myana.site";
+
+function checkFpRateLimit(store, key) {
+  const now = Date.now();
+  const entry = store.get(key);
+  if (!entry || now > entry.resetAt) {
+    store.set(key, { count: 1, resetAt: now + 60 * 60 * 1000 });
+    return true; // allowed
+  }
+  if (entry.count >= FP_MAX_PER_HOUR) return false; // blocked
+  entry.count += 1;
+  return true; // allowed
+}
+
+/**
+ * POST /api/auth/forgot-password
+ * Accepts { email }
+ * Always returns the same message to prevent email enumeration.
+ */
+router.post("/forgot-password", async (req, res) => {
+  const { query: pgQuery } = await import("../dbPostgres.js");
+  const { composeEmail } = await import("../services/emailTemplate.js");
+  const { sendEmail } = await import("../services/mailer.js");
+
+  const GENERIC_MSG = "If an account exists with that email, a password reset link has been sent.";
+
+  const ip = req.ip || req.socket?.remoteAddress || "unknown";
+  const email = normalizeEmail(req.body?.email || "");
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ message: "A valid email address is required." });
+  }
+
+  // Rate limiting by IP
+  if (!checkFpRateLimit(fpRateLimitByIp, ip)) {
+    return res.status(429).json({ message: "Too many requests. Please wait before trying again." });
+  }
+
+  // Rate limiting by email
+  if (!checkFpRateLimit(fpRateLimitByEmail, email)) {
+    return res.status(429).json({ message: "Too many requests. Please wait before trying again." });
+  }
+
+  // Lookup user — do NOT reveal if found or not
+  let user = null;
+  try {
+    const db = await getDb();
+    user = await db.collection("users").findOne({ email });
+  } catch (err) {
+    console.error("[ForgotPassword] DB lookup error:", err.message);
+    return res.json({ message: GENERIC_MSG }); // still safe response
+  }
+
+  // Only send email if user exists, but respond identically either way
+  if (user) {
+    try {
+      // Generate cryptographically secure token
+      const { randomBytes } = await import("node:crypto");
+      const rawToken = randomBytes(32).toString("hex");
+      const { sha256 } = await import("../utils/hash.js");
+      const tokenHash = sha256(rawToken);
+      const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MINUTES * 60 * 1000);
+
+      // Delete any existing (unused) tokens for this user
+      await pgQuery(
+        "DELETE FROM password_reset_tokens WHERE user_id = $1 AND used = FALSE",
+        [Number(user.id)]
+      ).catch(() => {});
+
+      // Store hashed token
+      await pgQuery(
+        "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)",
+        [Number(user.id), tokenHash, expiresAt]
+      );
+
+      // Build reset URL
+      const resetUrl = `${APP_URL}/reset-password?token=${rawToken}`;
+      const expiryText = `${TOKEN_EXPIRY_MINUTES} minutes`;
+
+      // Load and render email template
+      const { subject, html, text, senderName, replyTo } = await composeEmail("forgot_password", {
+        user_name: user.name || user.email.split("@")[0],
+        user_email: user.email,
+        reset_link: resetUrl,
+        expiry_time: expiryText
+      });
+
+      // Send email
+      await sendEmail({ to: user.email, subject, html, text, replyTo });
+
+      // Write audit log
+      await pgQuery(
+        "INSERT INTO audit_logs (user_id, action, metadata, ip) VALUES ($1, $2, $3, $4)",
+        [Number(user.id), "PASSWORD_RESET_REQUESTED", JSON.stringify({ email }), ip]
+      ).catch(() => {});
+
+    } catch (err) {
+      // Log internally, but still return generic response
+      console.error("[ForgotPassword] Error sending reset email:", err.message);
+    }
+  }
+
+  // Always return same message
+  return res.json({ message: GENERIC_MSG });
+});
+
+/**
+ * GET /api/auth/reset-password/verify?token=xxxx
+ * Verifies a reset token without consuming it.
+ */
+router.get("/reset-password/verify", async (req, res) => {
+  const { query: pgQuery } = await import("../dbPostgres.js");
+  const { sha256 } = await import("../utils/hash.js");
+
+  const rawToken = (req.query.token || "").toString().trim();
+  if (!rawToken || rawToken.length < 10) {
+    return res.status(400).json({ valid: false, reason: "invalid_token" });
+  }
+
+  const tokenHash = sha256(rawToken);
+
+  try {
+    const res2 = await pgQuery(
+      "SELECT * FROM password_reset_tokens WHERE token_hash = $1 AND used = FALSE AND expires_at > NOW() LIMIT 1",
+      [tokenHash]
+    );
+
+    if (!res2.rows.length) {
+      // Differentiate expired vs never-existed for UX
+      const anyRes = await pgQuery(
+        "SELECT * FROM password_reset_tokens WHERE token_hash = $1 LIMIT 1",
+        [tokenHash]
+      );
+      if (anyRes.rows.length && anyRes.rows[0].used) {
+        return res.status(410).json({ valid: false, reason: "already_used" });
+      }
+      if (anyRes.rows.length && new Date(anyRes.rows[0].expires_at) <= new Date()) {
+        return res.status(410).json({ valid: false, reason: "expired" });
+      }
+      return res.status(404).json({ valid: false, reason: "invalid_token" });
+    }
+
+    return res.json({ valid: true });
+  } catch (err) {
+    console.error("[ResetPassword/verify] Error:", err.message);
+    return res.status(500).json({ valid: false, reason: "server_error" });
+  }
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Accepts { token, password }
+ * Validates, updates password with Argon2id/bcrypt, revokes all sessions, deletes token.
+ */
+router.post("/reset-password", async (req, res) => {
+  const { query: pgQuery } = await import("../dbPostgres.js");
+  const { sha256 } = await import("../utils/hash.js");
+  const { composeEmail } = await import("../services/emailTemplate.js");
+  const { sendEmail } = await import("../services/mailer.js");
+
+  const ip = req.ip || req.socket?.remoteAddress || "unknown";
+  const rawToken = (req.body?.token || "").toString().trim();
+  const password = (req.body?.password || "").toString();
+
+  if (!rawToken || rawToken.length < 10) {
+    return res.status(400).json({ message: "Invalid or missing reset token." });
+  }
+
+  // Password strength validation
+  const strengthErrors = [];
+  if (password.length < 8) strengthErrors.push("at least 8 characters");
+  if (!/[A-Z]/.test(password)) strengthErrors.push("one uppercase letter");
+  if (!/[a-z]/.test(password)) strengthErrors.push("one lowercase letter");
+  if (!/[0-9]/.test(password)) strengthErrors.push("one number");
+  if (!/[^A-Za-z0-9]/.test(password)) strengthErrors.push("one special character");
+  if (strengthErrors.length) {
+    return res.status(400).json({
+      message: `Password must contain: ${strengthErrors.join(", ")}.`
+    });
+  }
+
+  const tokenHash = sha256(rawToken);
+
+  try {
+    // Verify token
+    const tokenRes = await pgQuery(
+      "SELECT * FROM password_reset_tokens WHERE token_hash = $1 AND used = FALSE AND expires_at > NOW() LIMIT 1",
+      [tokenHash]
+    );
+
+    if (!tokenRes.rows.length) {
+      // Log failed attempt
+      await pgQuery(
+        "INSERT INTO audit_logs (action, metadata, ip) VALUES ($1, $2, $3)",
+        ["PASSWORD_RESET_FAILED", JSON.stringify({ reason: "invalid_or_expired_token" }), ip]
+      ).catch(() => {});
+
+      const anyRes = await pgQuery("SELECT * FROM password_reset_tokens WHERE token_hash = $1 LIMIT 1", [tokenHash]);
+      if (anyRes.rows.length && anyRes.rows[0].used) {
+        return res.status(410).json({ message: "This reset link has already been used. Please request a new one." });
+      }
+      return res.status(410).json({ message: "This reset link is invalid or has expired. Please request a new one." });
+    }
+
+    const tokenRow = tokenRes.rows[0];
+    const userId = Number(tokenRow.user_id);
+
+    // Fetch user
+    const db = await getDb();
+    const user = await db.collection("users").findOne({ id: userId });
+    if (!user) {
+      return res.status(404).json({ message: "User account not found." });
+    }
+
+    // Hash new password with bcrypt (Argon2id requires a native addon; using bcrypt cost 12 as enterprise standard)
+    const newPasswordHash = await bcrypt.hash(password, 12);
+
+    // Update user password
+    await db.collection("users").updateOne({ id: userId }, { $set: { password_hash: newPasswordHash } });
+
+    // Mark token as used (one-time use)
+    await pgQuery(
+      "UPDATE password_reset_tokens SET used = TRUE WHERE token_hash = $1",
+      [tokenHash]
+    );
+
+    // Delete all reset tokens for this user
+    await pgQuery("DELETE FROM password_reset_tokens WHERE user_id = $1", [userId]).catch(() => {});
+
+    // Revoke ALL active sessions (force re-login on all devices)
+    await revokeAllUserSessions(userId);
+
+    // Send password changed notification email
+    try {
+      const { subject, html, text, replyTo } = await composeEmail("password_changed", {
+        user_name: user.name || user.email.split("@")[0],
+        user_email: user.email
+      });
+      await sendEmail({ to: user.email, subject, html, text, replyTo });
+    } catch (mailErr) {
+      console.warn("[ResetPassword] Could not send confirmation email:", mailErr.message);
+    }
+
+    // Audit log
+    await pgQuery(
+      "INSERT INTO audit_logs (user_id, action, metadata, ip) VALUES ($1, $2, $3, $4)",
+      [userId, "PASSWORD_RESET_COMPLETED", JSON.stringify({ email: user.email }), ip]
+    ).catch(() => {});
+
+    return res.json({ message: "Password updated successfully. Please log in with your new password." });
+
+  } catch (err) {
+    console.error("[ResetPassword] Error:", err.message);
+    return res.status(500).json({ message: "An error occurred. Please try again." });
+  }
+});
+
 export default router;
+
