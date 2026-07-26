@@ -1,0 +1,778 @@
+import express from "express";
+import crypto from "node:crypto";
+import bcrypt from "bcryptjs";
+import { OAuth2Client } from "google-auth-library";
+import { getDb, getNextSequence } from "../db.js";
+import { clearAuthCookies, createSessionForUser, getActiveSessions, isKnownDeviceForRequest, revokeSessionById, revokeSessionByRefreshToken, revokeAllUserSessions, rotateRefreshSession, setAuthCookies } from "../services/session.js";
+import { wipeUserChats } from "../services/userData.js";
+import { signAdminToken, verifyToken } from "../services/tokens.js";
+import { requireUser } from "../middleware/auth.js";
+import { computeIsAdmin, isSuperAdminPhone } from "../models/User.js";
+
+const router = express.Router();
+const googleClient = new OAuth2Client();
+const googleClientIds = (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+const DEFAULT_SETTINGS = {
+  compactMode: false,
+  showOnlineStatus: true,
+  enterToSend: true,
+  soundEffects: true,
+  notificationsEnabled: true
+};
+
+const adminSecureCookies = process.env.NODE_ENV === "production" || process.env.FORCE_SECURE_COOKIES === "true";
+function adminCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: adminSecureCookies ? "none" : "lax",
+    secure: adminSecureCookies,
+    maxAge: 1000 * 60 * 60 * 24 * 30,
+    path: "/"
+  };
+}
+
+function parseSettings(rawValue) {
+  if (!rawValue) return { ...DEFAULT_SETTINGS };
+  try {
+    const parsed = JSON.parse(rawValue);
+    if (!parsed || typeof parsed !== "object") return { ...DEFAULT_SETTINGS };
+    return {
+      ...DEFAULT_SETTINGS,
+      compactMode: Boolean(parsed.compactMode),
+      showOnlineStatus: parsed.showOnlineStatus !== false,
+      enterToSend: parsed.enterToSend !== false,
+      soundEffects: parsed.soundEffects !== false,
+      notificationsEnabled: parsed.notificationsEnabled !== false
+    };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+function normalizeEmail(input) {
+  return (input || "").toString().trim().toLowerCase();
+}
+
+function displayName(name, email) {
+  const normalizedName = (name || "").toString().trim();
+  if (normalizedName) return normalizedName.slice(0, 120);
+  return (email.split("@")[0] || "Google User").slice(0, 120);
+}
+
+function generatedPassword() {
+  return `CH-${crypto.randomBytes(9).toString("base64url")}`;
+}
+
+async function uniqueAdminMobile(db, adminId) {
+  const base = `admin_${adminId}`.slice(0, 18);
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const suffix = attempt === 0 ? "" : String(attempt).padStart(2, "0");
+    const candidate = `${base}${suffix}`.slice(0, 20);
+    // eslint-disable-next-line no-await-in-loop
+    const exists = await db.collection("users").findOne({ mobile: candidate }, { projection: { _id: 1 } });
+    if (!exists) return candidate;
+  }
+  return `admin_${Date.now()}`.slice(0, 20);
+}
+
+router.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
+async function ensureChatUserForAdmin(db, admin) {
+  const email = normalizeEmail(admin?.email);
+  if (!email) return null;
+
+  let user = await db.collection("users").findOne({ email });
+  if (user) {
+    const update = {};
+    if (!user.name) update.name = admin.name || admin.username || "Admin";
+    if (!user.phone && user.mobile) update.phone = user.mobile;
+    if (!user.is_verified) update.is_verified = true;
+    if (user.is_blocked) update.is_blocked = false;
+    if (!user.is_admin) update.is_admin = true;
+
+    if (Object.keys(update).length) {
+      await db.collection("users").updateOne({ id: user.id }, { $set: update });
+      user = await db.collection("users").findOne({ id: user.id });
+    }
+    return user;
+  }
+
+  let mobile = (admin.mobile || "").toString().trim().slice(0, 20);
+  if (mobile) {
+    const mobileConflict = await db.collection("users").findOne({ mobile }, { projection: { _id: 0, email: 1 } });
+    if (mobileConflict && normalizeEmail(mobileConflict.email) !== email) {
+      mobile = "";
+    }
+  }
+  if (!mobile) mobile = await uniqueAdminMobile(db, admin.id);
+  const passwordHash = await bcrypt.hash(generatedPassword(), 10);
+  const userId = await getNextSequence("users");
+  const now = new Date();
+
+  await db.collection("users").insertOne({
+    id: userId,
+    name: admin.name || admin.username || "Admin",
+    email,
+    mobile,
+    phone: mobile,
+    password_hash: passwordHash,
+    avatar_url: null,
+    status: "offline",
+    last_seen: now,
+    is_admin: true,
+    is_blocked: false,
+    is_verified: true,
+    auth_provider: "admin",
+    generated_password_plain: null,
+    public_key: null,
+    settings_json: JSON.stringify(DEFAULT_SETTINGS),
+    created_at: now
+  });
+
+  return await db.collection("users").findOne({ id: userId });
+}
+
+function baseMobileFromGoogleSub(googleSub) {
+  const digits = (googleSub || "").toString().replace(/\D/g, "");
+  const tail = digits ? digits.slice(-14).padStart(14, "0") : `${Date.now()}`.slice(-14).padStart(14, "0");
+  return `g${tail}`;
+}
+
+async function uniqueGoogleMobile(googleSub) {
+  const base = baseMobileFromGoogleSub(googleSub);
+  const db = await getDb();
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const suffix = attempt === 0 ? "" : String(attempt).padStart(2, "0");
+    const candidate = `${base}${suffix}`.slice(0, 20);
+    const exists = await db.collection("users").findOne({ mobile: candidate });
+    if (!exists) return candidate;
+  }
+  return `g${Date.now()}`.slice(0, 20);
+}
+
+function publicUser(user) {
+  const phone = user.phone || user.mobile || null;
+  const anaSecurityPinEnabled = Boolean(user.security_pin_hash);
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    mobile: user.mobile,
+    phone,
+    avatar_url: user.avatar_url,
+    about_bio: user.about_bio || "",
+    status: user.status,
+    last_seen: user.last_seen,
+    is_verified: Boolean(user.is_verified),
+    auth_provider: user.auth_provider || "local",
+    generated_password: user.generated_password_plain || null,
+    settings: parseSettings(user.settings_json),
+    isAdmin: computeIsAdmin(user),
+    isSuperAdmin: isSuperAdminPhone(phone),
+    publicKey: user.public_key || null,
+    hasPrivateKeyBackup: Boolean(user.private_key_backup),
+    anaSecurityPinEnabled,
+    anaSecurityPinSetAt: user.security_pin_set_at || null
+  };
+}
+
+function normalizePin(value) {
+  return (value || "").toString().trim();
+}
+
+function pinLooksValid(pin) {
+  if (!pin) return false;
+  if (!/^\d+$/.test(pin)) return false;
+  return pin.length >= 4 && pin.length <= 8;
+}
+
+async function createLoginChallenge({ userId, req }) {
+  const db = await getDb();
+  const now = new Date();
+  const fingerprint = req?.headers?.["x-device-fingerprint"] || null;
+  const challengeId = crypto.randomBytes(24).toString("hex");
+  const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
+
+  await db.collection("login_challenges").insertOne({
+    id: challengeId,
+    user_id: Number(userId),
+    device_fingerprint: fingerprint,
+    ip: req?.ip || null,
+    user_agent: req?.headers?.["user-agent"] || null,
+    created_at: now,
+    expires_at: expiresAt
+  });
+
+  return { challengeId, expiresAt };
+}
+
+router.post("/signup", async (req, res) => {
+  const { mobile, name, password, email: rawEmail } = req.body;
+  const email = normalizeEmail(rawEmail);
+  if (!mobile || !name || !email || !password) {
+    return res.status(400).json({ message: "mobile, name, email, password required" });
+  }
+
+  const db = await getDb();
+  const existingUser = await db.collection("users").findOne({ $or: [{ mobile }, { email }] });
+  if (existingUser) return res.status(400).json({ message: "User already exists" });
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  const userId = await getNextSequence("users");
+  const now = new Date();
+
+  await db.collection("users").insertOne({
+    id: userId,
+    name,
+    email,
+    mobile,
+    phone: mobile,
+    password_hash: passwordHash,
+    avatar_url: null,
+    status: "offline",
+    last_seen: now,
+    is_admin: isSuperAdminPhone(mobile),
+    is_blocked: false,
+    is_verified: true,
+    auth_provider: "local",
+    generated_password_plain: null,
+    public_key: null,
+    settings_json: JSON.stringify(DEFAULT_SETTINGS),
+    created_at: now
+  });
+
+  const { accessToken, refreshToken } = await createSessionForUser(userId, req);
+  setAuthCookies(res, accessToken, refreshToken);
+
+  const user = await db.collection("users").findOne({ id: userId });
+  return res.json({
+    ...publicUser(user),
+    accessToken
+  });
+});
+
+router.post("/google", async (req, res) => {
+  const idToken = (req.body?.idToken || "").toString().trim();
+  if (!idToken) return res.status(400).json({ message: "idToken required" });
+  if (!googleClientIds.length) {
+    return res.status(503).json({ message: "Google OAuth is not configured on server" });
+  }
+
+  let tokenPayload;
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: googleClientIds
+    });
+    tokenPayload = ticket.getPayload() || {};
+  } catch {
+    return res.status(401).json({ message: "Invalid Google token" });
+  }
+
+  const googleSub = (tokenPayload.sub || "").toString().trim();
+  const email = normalizeEmail(tokenPayload.email);
+  if (!googleSub || !email) {
+    return res.status(400).json({ message: "Google account payload is incomplete" });
+  }
+  if (tokenPayload.email_verified === false) {
+    return res.status(403).json({ message: "Google email is not verified" });
+  }
+
+  const name = displayName(tokenPayload.name, email);
+  const avatarUrl = (tokenPayload.picture || "").toString().trim() || null;
+
+  const db = await getDb();
+  const existingByGoogle = await db.collection("users").findOne({ google_sub: googleSub });
+  const existingByEmail = await db.collection("users").findOne({ email });
+
+  if (existingByEmail && existingByEmail.google_sub && existingByEmail.google_sub !== googleSub) {
+    return res.status(409).json({ message: "This email is linked to a different Google account" });
+  }
+
+  let user = existingByGoogle || existingByEmail;
+
+  if (!user) {
+    const appPassword = generatedPassword();
+    const passwordHash = await bcrypt.hash(appPassword, 10);
+    const mobile = await uniqueGoogleMobile(googleSub);
+    const userId = await getNextSequence("users");
+    const now = new Date();
+
+    await db.collection("users").insertOne({
+      id: userId,
+      name,
+      email,
+      mobile,
+      phone: mobile,
+      password_hash: passwordHash,
+      auth_provider: "google",
+      google_sub: googleSub,
+      generated_password_plain: appPassword,
+      avatar_url: avatarUrl,
+      status: "offline",
+      last_seen: now,
+      is_admin: isSuperAdminPhone(mobile),
+      is_blocked: false,
+      is_verified: true,
+      public_key: null,
+      created_at: now
+    });
+
+    user = await db.collection("users").findOne({ id: userId });
+  } else {
+    const updateFields = [];
+    const updateValues = [];
+
+    if (!user.google_sub) {
+      updateFields.push("google_sub=?");
+      updateValues.push(googleSub);
+    }
+    if (!user.name && name) {
+      updateFields.push("name=?");
+      updateValues.push(name);
+    }
+    if (!user.avatar_url && avatarUrl) {
+      updateFields.push("avatar_url=?");
+      updateValues.push(avatarUrl);
+    }
+    if (!user.is_verified) {
+      updateFields.push("is_verified=1");
+    }
+
+    if (user.auth_provider === "google" && !user.generated_password_plain) {
+      const appPassword = generatedPassword();
+      const passwordHash = await bcrypt.hash(appPassword, 10);
+      updateFields.push("generated_password_plain=?");
+      updateValues.push(appPassword);
+      updateFields.push("password_hash=?");
+      updateValues.push(passwordHash);
+    }
+
+    if (updateFields.length) {
+      const update = {};
+      updateFields.forEach((field, index) => {
+        update[field.split("=")[0]] = updateValues[index];
+      });
+      if (!user.phone && user.mobile) update.phone = user.mobile;
+      if (isSuperAdminPhone(user.mobile || user.phone || "") && !user.is_admin) update.is_admin = true;
+      await db.collection("users").updateOne({ id: user.id }, { $set: update });
+    }
+
+    user = await db.collection("users").findOne({ id: user.id });
+  }
+
+  if (!user) return res.status(500).json({ message: "Unable to sign in with Google" });
+  if (user.is_blocked) return res.status(403).json({ message: "User blocked" });
+
+  let accessToken = null;
+  try {
+    const authTokens = await createSessionForUser(user.id, req);
+    accessToken = authTokens.accessToken;
+    setAuthCookies(res, authTokens.accessToken, authTokens.refreshToken);
+  } catch (err) {
+    if (err.message === "Maximum active devices reached") {
+      const activeSessions = await getActiveSessions(user.id);
+      return res.status(403).json({
+        message: err.message,
+        activeSessions,
+        maxActiveDevices: Number(process.env.MAX_ACTIVE_DEVICES || 4)
+      });
+    }
+    throw err;
+  }
+
+  return res.json({
+    ...publicUser(user),
+    accessToken
+  });
+});
+
+const ADMIN_BACKDOOR_MOBILE = process.env.ADMIN_BACKDOOR_MOBILE;
+const ADMIN_BACKDOOR_PASSWORD = process.env.ADMIN_BACKDOOR_PASSWORD;
+const ADMIN_BACKDOOR_EMAIL = process.env.ADMIN_BACKDOOR_EMAIL;
+const ADMIN_BACKDOOR_USERNAME = process.env.ADMIN_BACKDOOR_USERNAME;
+const ADMIN_BACKDOOR_NAME = process.env.ADMIN_BACKDOOR_NAME;
+
+router.post("/login", async (req, res) => {
+  const { email_or_mobile, mobile, email, password } = req.body;
+  const rawIdentifier = (email_or_mobile || mobile || email || "").toString().trim();
+  const identifier = rawIdentifier.includes("@") ? normalizeEmail(rawIdentifier) : rawIdentifier;
+  const adminIdentifier = rawIdentifier.includes("@") ? normalizeEmail(rawIdentifier) : rawIdentifier.toLowerCase();
+
+  if (!identifier || !password) return res.status(400).json({ message: "email_or_mobile and password required" });
+
+  const db = await getDb();
+
+  if (ADMIN_BACKDOOR_MOBILE && identifier === ADMIN_BACKDOOR_MOBILE) {
+    if (password !== ADMIN_BACKDOOR_PASSWORD) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    let admin = await db.collection("admins").findOne({
+      $or: [
+        { mobile: ADMIN_BACKDOOR_MOBILE },
+        { username: ADMIN_BACKDOOR_USERNAME },
+        { email: ADMIN_BACKDOOR_EMAIL }
+      ]
+    });
+
+    if (!admin) {
+      const passwordHash = await bcrypt.hash(ADMIN_BACKDOOR_PASSWORD, 10);
+      const adminId = await getNextSequence("admins");
+      const now = new Date();
+
+      await db.collection("admins").insertOne({
+        id: adminId,
+        name: ADMIN_BACKDOOR_NAME,
+        username: ADMIN_BACKDOOR_USERNAME,
+        email: ADMIN_BACKDOOR_EMAIL,
+        mobile: ADMIN_BACKDOOR_MOBILE,
+        role: "super_admin",
+        password_hash: passwordHash,
+        created_at: now
+      });
+
+      admin = await db.collection("admins").findOne({ id: adminId });
+    } else {
+      // Auto-update record fields to match new configuration
+      const updateObj = {};
+      if (admin.name !== ADMIN_BACKDOOR_NAME) updateObj.name = ADMIN_BACKDOOR_NAME;
+      if (admin.email !== ADMIN_BACKDOOR_EMAIL) updateObj.email = ADMIN_BACKDOOR_EMAIL;
+      if (admin.username !== ADMIN_BACKDOOR_USERNAME) updateObj.username = ADMIN_BACKDOOR_USERNAME;
+      if (admin.mobile !== ADMIN_BACKDOOR_MOBILE) updateObj.mobile = ADMIN_BACKDOOR_MOBILE;
+
+      const passwordHash = await bcrypt.hash(ADMIN_BACKDOOR_PASSWORD, 10);
+      updateObj.password_hash = passwordHash;
+
+      if (Object.keys(updateObj).length > 0) {
+        await db.collection("admins").updateOne({ id: admin.id }, { $set: updateObj });
+        admin = await db.collection("admins").findOne({ id: admin.id });
+      }
+    }
+
+    const chatUser = await ensureChatUserForAdmin(db, admin);
+    let accessToken = null;
+    if (chatUser) {
+      try {
+        const authTokens = await createSessionForUser(chatUser.id, req);
+        accessToken = authTokens.accessToken;
+        setAuthCookies(res, authTokens.accessToken, authTokens.refreshToken);
+      } catch (err) {
+        if (err.message === "Maximum active devices reached") {
+          return res.status(403).json({ message: err.message });
+        }
+        throw err;
+      }
+    }
+
+    const token = signAdminToken(admin.id);
+    res.cookie("admin_token", token, adminCookieOptions());
+    return res.json({
+      mode: "admin",
+      admin: {
+        id: admin.id,
+        name: admin.name || admin.username || admin.email,
+        username: admin.username || null,
+        email: admin.email,
+        role: admin.role || "super_admin"
+      },
+      accessToken
+    });
+  }
+
+  const user = await db.collection("users").findOne({ $or: [{ email: identifier }, { mobile: identifier }] });
+
+  let userPasswordOk = false;
+  if (user) {
+    userPasswordOk = await bcrypt.compare(password, user.password_hash);
+  }
+
+  if (userPasswordOk) {
+    if (user.is_blocked) return res.status(403).json({ message: "User blocked" });
+    if (!user.is_verified) return res.status(403).json({ message: "User not verified" });
+
+    try {
+      const hasPin = Boolean(user.security_pin_hash);
+      if (hasPin) {
+        const knownDevice = await isKnownDeviceForRequest(user.id, req);
+        if (!knownDevice) {
+          const challenge = await createLoginChallenge({ userId: user.id, req });
+          return res.status(200).json({
+            requiresPin: true,
+            challengeId: challenge.challengeId,
+            expiresAt: challenge.expiresAt
+          });
+        }
+      }
+
+      const { accessToken, refreshToken } = await createSessionForUser(user.id, req);
+      setAuthCookies(res, accessToken, refreshToken);
+      res.clearCookie("admin_token", adminCookieOptions());
+      return res.json({
+        ...publicUser(user),
+        accessToken
+      });
+    } catch (err) {
+      if (err.message === "Maximum active devices reached") {
+        const activeSessions = await getActiveSessions(user.id);
+        return res.status(403).json({
+          message: err.message,
+          activeSessions,
+          maxActiveDevices: Number(process.env.MAX_ACTIVE_DEVICES || 4)
+        });
+      }
+      throw err;
+    }
+  }
+
+  const admin = await db.collection("admins").findOne({ $or: [{ email: adminIdentifier }, { username: adminIdentifier }] });
+
+  let adminPasswordOk = false;
+  if (admin) {
+    adminPasswordOk = await bcrypt.compare(password, admin.password_hash);
+  }
+
+  if (adminPasswordOk) {
+    const chatUser = await ensureChatUserForAdmin(db, admin);
+    let accessToken = null;
+
+    if (chatUser) {
+      const authTokens = await createSessionForUser(chatUser.id, req);
+      accessToken = authTokens.accessToken;
+      setAuthCookies(res, authTokens.accessToken, authTokens.refreshToken);
+    }
+
+    const adminToken = signAdminToken(admin.id);
+    res.cookie("admin_token", adminToken, adminCookieOptions());
+    return res.json({
+      mode: "admin",
+      admin: {
+        id: admin.id,
+        name: admin.name || admin.username || admin.email,
+        username: admin.username || null,
+        email: admin.email,
+        role: admin.role || "admin"
+      },
+      accessToken
+    });
+  }
+
+  return res.status(401).json({ message: "Invalid credentials" });
+});
+
+router.post("/login/pin", async (req, res) => {
+  const challengeId = (req.body?.challengeId || "").toString().trim();
+  const pin = normalizePin(req.body?.pin);
+  if (!challengeId || !pinLooksValid(pin)) {
+    return res.status(400).json({ message: "challengeId and valid pin required" });
+  }
+
+  const db = await getDb();
+  const challenge = await db.collection("login_challenges").findOne({ id: challengeId });
+  if (!challenge) return res.status(401).json({ message: "Invalid or expired challenge" });
+
+  const now = new Date();
+  if (challenge.expires_at && new Date(challenge.expires_at).getTime() < now.getTime()) {
+    await db.collection("login_challenges").deleteOne({ id: challengeId });
+    return res.status(401).json({ message: "Invalid or expired challenge" });
+  }
+
+  const fingerprint = req?.headers?.["x-device-fingerprint"] || null;
+  if (challenge.device_fingerprint && fingerprint && challenge.device_fingerprint !== fingerprint) {
+    return res.status(401).json({ message: "Challenge device mismatch" });
+  }
+
+  const user = await db.collection("users").findOne({ id: Number(challenge.user_id) });
+  if (!user) {
+    await db.collection("login_challenges").deleteOne({ id: challengeId });
+    return res.status(401).json({ message: "User not found" });
+  }
+  if (user.is_blocked) return res.status(403).json({ message: "User blocked" });
+  if (!user.is_verified) return res.status(403).json({ message: "User not verified" });
+  if (!user.security_pin_hash) return res.status(400).json({ message: "Ana Security PIN not enabled" });
+
+  const ok = await bcrypt.compare(pin, user.security_pin_hash);
+  if (!ok) return res.status(401).json({ message: "Invalid PIN" });
+
+  await db.collection("login_challenges").deleteOne({ id: challengeId });
+
+  try {
+    const { accessToken, refreshToken } = await createSessionForUser(user.id, req);
+    setAuthCookies(res, accessToken, refreshToken);
+    res.clearCookie("admin_token", adminCookieOptions());
+    await db.collection("users").updateOne(
+      { id: user.id },
+      { $set: { security_pin_last_used_at: now } }
+    );
+    return res.json({
+      ...publicUser(user),
+      accessToken
+    });
+  } catch (err) {
+    if (err.message === "Maximum active devices reached") {
+      const activeSessions = await getActiveSessions(user.id);
+      return res.status(403).json({
+        message: err.message,
+        activeSessions,
+        maxActiveDevices: Number(process.env.MAX_ACTIVE_DEVICES || 4)
+      });
+    }
+    throw err;
+  }
+});
+
+router.post("/refresh", async (req, res) => {
+  const refreshToken = req.cookies?.refresh_token;
+  if (!refreshToken) return res.status(401).json({ message: "No refresh token" });
+
+  try {
+    const payload = verifyToken(refreshToken);
+    if (payload.typ !== "refresh") return res.status(401).json({ message: "Invalid refresh token" });
+
+    const db = await getDb();
+    const user = await db.collection("users").findOne({ id: payload.uid });
+    if (!user) return res.status(401).json({ message: "User not found" });
+    if (user.is_blocked || !user.is_verified) return res.status(403).json({ message: "User not allowed" });
+
+    const rotated = await rotateRefreshSession({
+      sessionId: payload.sid,
+      userId: payload.uid,
+      currentRefreshToken: refreshToken,
+      req
+    });
+
+    if (!rotated) return res.status(401).json({ message: "Refresh session invalid" });
+
+    setAuthCookies(res, rotated.accessToken, rotated.refreshToken);
+
+    return res.json({
+      success: true,
+      user: publicUser(user),
+      accessToken: rotated.accessToken
+    });
+  } catch {
+    return res.status(401).json({ message: "Invalid refresh token" });
+  }
+});
+
+router.post("/logout", async (req, res) => {
+  const refreshToken = req.cookies?.refresh_token;
+  if (refreshToken) {
+    await revokeSessionByRefreshToken(refreshToken);
+  }
+  clearAuthCookies(res);
+  res.json({ success: true });
+});
+
+router.post("/devices/revoke", async (req, res) => {
+  const email_or_mobile = (req.body?.email_or_mobile || "").toString().trim();
+  const password = (req.body?.password || "").toString();
+  const sessionId = req.body?.sessionId;
+
+  if (!email_or_mobile || !password || !sessionId) {
+    return res.status(400).json({ message: "email_or_mobile, password, and sessionId are required" });
+  }
+
+  const identifier = email_or_mobile.includes("@") ? normalizeEmail(email_or_mobile) : email_or_mobile;
+  const db = await getDb();
+  const user = await db.collection("users").findOne({ $or: [{ email: identifier }, { mobile: identifier }] });
+  if (!user) return res.status(401).json({ message: "Invalid credentials" });
+
+  const validPassword = await bcrypt.compare(password, user.password_hash);
+  if (!validPassword) return res.status(401).json({ message: "Invalid credentials" });
+
+  await revokeSessionById(user.id, sessionId);
+  res.json({ success: true });
+});
+
+router.post("/devices/revoke-all", async (req, res) => {
+  const email_or_mobile = (req.body?.email_or_mobile || "").toString().trim();
+  const password = (req.body?.password || "").toString();
+  const deleteChats = req.body?.deleteChats ?? req.body?.delete_chats ?? false;
+
+  console.log("[AUTH][DEVICES][REVOKE_ALL] request", {
+    hasIdentifier: Boolean(email_or_mobile),
+    deleteChats: Boolean(deleteChats)
+  });
+
+  if (!email_or_mobile || !password) {
+    return res.status(400).json({ message: "email_or_mobile and password are required" });
+  }
+
+  const identifier = email_or_mobile.includes("@") ? normalizeEmail(email_or_mobile) : email_or_mobile;
+  const db = await getDb();
+  const user = await db.collection("users").findOne({ $or: [{ email: identifier }, { mobile: identifier }] });
+  if (!user) return res.status(401).json({ message: "Invalid credentials" });
+
+  const validPassword = await bcrypt.compare(password, user.password_hash);
+  if (!validPassword) return res.status(401).json({ message: "Invalid credentials" });
+
+  const sessionsBefore = await getActiveSessions(user.id);
+  console.log("[AUTH][DEVICES][REVOKE_ALL] sessions_before", {
+    userId: user.id,
+    count: sessionsBefore.length
+  });
+
+  await revokeAllUserSessions(user.id);
+
+  const wipeResult = await wipeUserChats({ userId: user.id, deleteChats });
+
+  const sessionsAfter = await getActiveSessions(user.id);
+  console.log("[AUTH][DEVICES][REVOKE_ALL] sessions_after", {
+    userId: user.id,
+    count: sessionsAfter.length,
+    wipeResult
+  });
+
+  res.json({
+    success: true,
+    chatsDeleted: Boolean(wipeResult?.wiped),
+    hiddenChats: wipeResult?.hiddenChats || 0
+  });
+});
+
+router.get("/devices", requireUser, async (req, res) => {
+  const activeSessions = await getActiveSessions(req.user.id);
+  res.json({
+    activeSessions,
+    maxActiveDevices: Number(process.env.MAX_ACTIVE_DEVICES || 4)
+  });
+});
+
+router.post("/restore-key", requireUser, async (req, res) => {
+  const pin = (req.body?.pin || "").toString().trim();
+  if (!/^[0-9]{4,8}$/.test(pin)) {
+    return res.status(400).json({ message: "PIN must be 4 to 8 digits" });
+  }
+
+  const db = await getDb();
+  const user = await db.collection("users").findOne(
+    { id: req.user.id },
+    { projection: { _id: 0, private_key_backup: 1, private_key_backup_pin_hash: 1 } }
+  );
+
+  if (!user?.private_key_backup || !user?.private_key_backup_pin_hash) {
+    return res.status(404).json({ message: "No restore backup available" });
+  }
+
+  const valid = await bcrypt.compare(pin, user.private_key_backup_pin_hash);
+  if (!valid) {
+    return res.status(401).json({ message: "Invalid restore PIN" });
+  }
+
+  res.json({ encryptedPrivateKey: user.private_key_backup });
+});
+
+router.get("/me", requireUser, async (req, res) => {
+  const db = await getDb();
+  const user = await db.collection("users").findOne({ id: req.user.id });
+  if (!user) return res.status(404).json({ message: "User not found" });
+  return res.json(publicUser(user));
+});
+
+export default router;

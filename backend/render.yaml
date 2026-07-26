@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: anachat-backend
+    env: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      # Ensure WebSockets are supported on this Render web service so Socket.IO can upgrade properly.
+      # Add the following values in Render dashboard instead of storing secrets here:
+      # MONGODB_URI, JWT_SECRET, GOOGLE_CLIENT_ID, CLIENT_ORIGIN, REDIS_URL, SUPER_ADMIN
