@@ -10,6 +10,7 @@ let useMock = false;
 // Mock database storage in case Postgres is unavailable
 export const mockDb = {
   users: [],
+  admins: [],
   devices: [],
   contacts: [],
   groups: [],
@@ -129,14 +130,24 @@ export async function initDb() {
 
     await query(`
       CREATE TABLE IF NOT EXISTS sessions (
-        id SERIAL PRIMARY KEY,
+        id BIGINT PRIMARY KEY,
         user_id INT REFERENCES users(id) ON DELETE CASCADE,
-        token TEXT UNIQUE NOT NULL,
-        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        refresh_token_hash VARCHAR(255),
+        device_fingerprint VARCHAR(255),
+        ip VARCHAR(100),
+        user_agent TEXT,
         revoked_at TIMESTAMP WITH TIME ZONE,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        last_used_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    -- Add missing columns to existing sessions table (for zero-downtime upgrades)
+    await query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS refresh_token_hash VARCHAR(255);`).catch(() => {});
+    await query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS device_fingerprint VARCHAR(255);`).catch(() => {});
+    await query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ip VARCHAR(100);`).catch(() => {});
+    await query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS user_agent TEXT;`).catch(() => {});
+    await query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;`).catch(() => {});
 
     await query(`
       CREATE TABLE IF NOT EXISTS public_keys (
@@ -159,6 +170,22 @@ export async function initDb() {
         iv VARCHAR(100) NOT NULL,
         last_backup_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         last_backup_size INT DEFAULT 0
+      );
+    `);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS admins (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(200),
+        username VARCHAR(100) UNIQUE,
+        email VARCHAR(255) UNIQUE,
+        mobile VARCHAR(30) UNIQUE,
+        role VARCHAR(50) DEFAULT 'admin',
+        password_hash VARCHAR(255),
+        is_active BOOLEAN DEFAULT TRUE,
+        linked_user_id INT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -343,6 +370,77 @@ async function queryMock(text, params = []) {
       mockDb.backups.push(b);
     }
     return { rows: [b] };
+  }
+
+  // admins collection mock
+  if (norm.includes("from admins") || norm.startsWith("insert into admins") || norm.startsWith("update admins") || norm.startsWith("delete from admins") || norm.includes("select count(*) from admins")) {
+    // INSERT
+    if (norm.startsWith("insert into admins")) {
+      const id = (mockDb.admins?.length || 0) + 1;
+      const row = {
+        id,
+        name: params[0] || null,
+        username: params[1] || null,
+        email: params[2] || null,
+        mobile: params[3] || null,
+        role: params[4] || "admin",
+        password_hash: params[5] || null,
+        is_active: params[6] !== false,
+        linked_user_id: params[7] ? Number(params[7]) : null,
+        created_at: new Date(),
+        updated_at: new Date()
+      };
+      if (!mockDb.admins) mockDb.admins = [];
+      mockDb.admins.push(row);
+      return { rows: [row] };
+    }
+    // COUNT
+    if (norm.includes("count(*)")) {
+      const role = params[0];
+      if (!mockDb.admins) mockDb.admins = [];
+      const count = role ? mockDb.admins.filter(a => a.role === role).length : mockDb.admins.length;
+      return { rows: [{ count: String(count) }] };
+    }
+    // SELECT by id
+    if (norm.includes("where id =")) {
+      if (!mockDb.admins) mockDb.admins = [];
+      const row = mockDb.admins.find(a => a.id === Number(params[0]));
+      return { rows: row ? [row] : [] };
+    }
+    // SELECT by email/username/mobile (various $or patterns)
+    if (norm.includes("lower(email)") || norm.includes("lower(username)") || norm.includes("mobile")) {
+      if (!mockDb.admins) mockDb.admins = [];
+      const emailVal = (params[0] || "").toLowerCase();
+      const usernameVal = (params[1] || "").toLowerCase();
+      const mobileVal = params[2] || "";
+      const row = mockDb.admins.find(a =>
+        (emailVal && a.email && a.email.toLowerCase() === emailVal) ||
+        (usernameVal && a.username && a.username.toLowerCase() === usernameVal) ||
+        (mobileVal && a.mobile === mobileVal)
+      );
+      return { rows: row ? [row] : [] };
+    }
+    // SELECT all
+    if (norm.startsWith("select") && norm.includes("from admins")) {
+      if (!mockDb.admins) mockDb.admins = [];
+      return { rows: mockDb.admins };
+    }
+    // UPDATE
+    if (norm.startsWith("update admins")) {
+      if (!mockDb.admins) mockDb.admins = [];
+      const adminId = params[params.length - 1];
+      const row = mockDb.admins.find(a => a.id === Number(adminId));
+      if (row) row.updated_at = new Date();
+      return { rows: row ? [row] : [] };
+    }
+    // DELETE
+    if (norm.startsWith("delete from admins")) {
+      if (!mockDb.admins) mockDb.admins = [];
+      const adminId = Number(params[0]);
+      mockDb.admins = mockDb.admins.filter(a => a.id !== adminId);
+      return { rows: [] };
+    }
+    return { rows: [] };
   }
 
   // password_reset_tokens

