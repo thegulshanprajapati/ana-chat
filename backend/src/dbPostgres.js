@@ -142,7 +142,7 @@ export async function initDb() {
       );
     `);
 
-    -- Add missing columns to existing sessions table (for zero-downtime upgrades)
+    // Add missing columns to existing sessions table (for zero-downtime upgrades)
     await query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS refresh_token_hash VARCHAR(255);`).catch(() => {});
     await query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS device_fingerprint VARCHAR(255);`).catch(() => {});
     await query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ip VARCHAR(100);`).catch(() => {});
