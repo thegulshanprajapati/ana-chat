@@ -15,8 +15,8 @@ import {
   disconnect,
   reauthenticate,
   reconnect,
-  joinRoom,
-  leaveRoom
+  joinRoom as socketJoinRoom,
+  leaveRoom as socketLeaveRoom
 } from "../utils/socket";
 import { useAuth } from "./AuthContext";
 
@@ -175,11 +175,11 @@ export function SocketProvider({ children }) {
       off: (...args) => socket?.off?.(...args),
       joinRoom: (room) => {
         console.log("[SocketProvider] joinRoom", room);
-        joinRoom(room);
+        socketJoinRoom(room);
       },
       leaveRoom: (room) => {
         console.log("[SocketProvider] leaveRoom", room);
-        leaveRoom(room);
+        socketLeaveRoom(room);
       },
 
       // Utility methods
