@@ -545,6 +545,92 @@ export default function ChatPage() {
     }
   }, [notify]);
 
+  const selectChat = useCallback(async (chat) => {
+    if (!chat) return;
+    if (activeChat?.id !== chat.id) {
+      setMessages([]);
+      setTyping(false);
+      setTypingName("");
+    }
+    setActiveChat(chat);
+    await loadMessages(chat.id);
+    void getChatRecipients(chat.id).catch(() => {});
+    socket?.emit("join_room", chat.id);
+    socket?.emit("seen", { chatId: chat.id });
+    if (isMobile) setMobileChatOpen(true);
+  }, [activeChat?.id, getChatRecipients, isMobile, socket]);
+
+  const loadChats = useCallback(async (showSkeleton = false) => {
+    if (showSkeleton && chats.length === 0) setLoadingChats(true);
+    try {
+      // 1. Load chats from local IndexedDB first for optimistic/local-first speed
+      try {
+        const localChats = await getLocalChats();
+        if (localChats && localChats.length > 0) {
+          setChats(localChats);
+        }
+      } catch (err) {
+        console.error("Failed to load local chats:", err);
+      }
+
+      const [{ data }, { data: hiddenCountData }] = await Promise.all([
+        api.get("/chats"),
+        api.get("/chats/hidden/count")
+      ]);
+      const list = sortChats(Array.isArray(data) ? data : []);
+      const decryptedList = await Promise.all(list.map((chat) => decryptChatPreviewForMe(chat)));
+
+      // 2. Save fetched/decrypted chats to local IndexedDB
+      for (const chat of decryptedList) {
+        try {
+          await saveLocalChat(chat);
+        } catch (err) {
+          console.error("Failed to save chat to local DB:", err);
+        }
+      }
+
+      // 3. Retrieve final merged list from local IndexedDB
+      const finalChats = await getLocalChats();
+      setChats(finalChats.length > 0 ? finalChats : decryptedList);
+
+      const nextHiddenCount = Number(hiddenCountData?.count || 0);
+      setHiddenChatsCount(nextHiddenCount);
+      if (!nextHiddenCount) {
+        setHiddenChats([]);
+        setChatPinCache("");
+      }
+
+      if (!finalChats.length && !decryptedList.length) {
+        setActiveChat(null);
+        setMessages([]);
+        return;
+      }
+
+      const activeId = activeChatIdRef.current;
+      if (!activeId) {
+        return;
+      }
+
+      const stillActive = decryptedList.find((item) => item.id === activeId);
+      if (stillActive) {
+        setActiveChat((prev) => (prev?.id === stillActive.id ? { ...prev, ...stillActive } : stillActive));
+      } else {
+        setActiveChat(null);
+      }
+    } catch (err) {
+      if (err?.name === "CanceledError" || err?.message === "canceled" || err?.code === "ERR_CANCELED") {
+        return; // Ignore canceled duplicate requests
+      }
+      setChats([]);
+      setHiddenChats([]);
+      setChatPinCache("");
+      setHiddenChatsCount(0);
+      notify({ type: "error", message: "Unable to load chats." });
+    } finally {
+      setLoadingChats(false);
+    }
+  }, [decryptChatPreviewForMe, isMobile, notify, selectChat]);
+
   const refreshActiveChatMessages = useCallback(async () => {
     if (!activeChatIdRef.current) return;
     const ok = await loadMessages(activeChatIdRef.current);
@@ -665,92 +751,6 @@ export default function ChatPage() {
       throw err;
     }
   }, [notify]);
-
-  const selectChat = useCallback(async (chat) => {
-    if (!chat) return;
-    if (activeChat?.id !== chat.id) {
-      setMessages([]);
-      setTyping(false);
-      setTypingName("");
-    }
-    setActiveChat(chat);
-    await loadMessages(chat.id);
-    void getChatRecipients(chat.id).catch(() => {});
-    socket?.emit("join_room", chat.id);
-    socket?.emit("seen", { chatId: chat.id });
-    if (isMobile) setMobileChatOpen(true);
-  }, [activeChat?.id, getChatRecipients, isMobile, socket]);
-
-  const loadChats = useCallback(async (showSkeleton = false) => {
-    if (showSkeleton && chats.length === 0) setLoadingChats(true);
-    try {
-      // 1. Load chats from local IndexedDB first for optimistic/local-first speed
-      try {
-        const localChats = await getLocalChats();
-        if (localChats && localChats.length > 0) {
-          setChats(localChats);
-        }
-      } catch (err) {
-        console.error("Failed to load local chats:", err);
-      }
-
-      const [{ data }, { data: hiddenCountData }] = await Promise.all([
-        api.get("/chats"),
-        api.get("/chats/hidden/count")
-      ]);
-      const list = sortChats(Array.isArray(data) ? data : []);
-      const decryptedList = await Promise.all(list.map((chat) => decryptChatPreviewForMe(chat)));
-
-      // 2. Save fetched/decrypted chats to local IndexedDB
-      for (const chat of decryptedList) {
-        try {
-          await saveLocalChat(chat);
-        } catch (err) {
-          console.error("Failed to save chat to local DB:", err);
-        }
-      }
-
-      // 3. Retrieve final merged list from local IndexedDB
-      const finalChats = await getLocalChats();
-      setChats(finalChats.length > 0 ? finalChats : decryptedList);
-
-      const nextHiddenCount = Number(hiddenCountData?.count || 0);
-      setHiddenChatsCount(nextHiddenCount);
-      if (!nextHiddenCount) {
-        setHiddenChats([]);
-        setChatPinCache("");
-      }
-
-      if (!finalChats.length && !decryptedList.length) {
-        setActiveChat(null);
-        setMessages([]);
-        return;
-      }
-
-      const activeId = activeChatIdRef.current;
-      if (!activeId) {
-        return;
-      }
-
-      const stillActive = decryptedList.find((item) => item.id === activeId);
-      if (stillActive) {
-        setActiveChat((prev) => (prev?.id === stillActive.id ? { ...prev, ...stillActive } : stillActive));
-      } else {
-        setActiveChat(null);
-      }
-    } catch (err) {
-      if (err?.name === "CanceledError" || err?.message === "canceled" || err?.code === "ERR_CANCELED") {
-        return; // Ignore canceled duplicate requests
-      }
-      setChats([]);
-      setHiddenChats([]);
-      setChatPinCache("");
-      setHiddenChatsCount(0);
-      notify({ type: "error", message: "Unable to load chats." });
-    } finally {
-      setLoadingChats(false);
-    }
-  }, [decryptChatPreviewForMe, isMobile, notify, selectChat]);
 
   const createChat = useCallback(async (otherUserId) => {
     try {
