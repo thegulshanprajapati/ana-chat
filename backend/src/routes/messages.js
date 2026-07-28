@@ -12,7 +12,7 @@ import {
   getChatParticipantIds,
   getDirectBlockState
 } from "../utils/chatDb.js";
-import { parseE2EE } from "../models/Message.js";
+import { parseE2EE, e2eeForUser } from "../models/Message.js";
 import { v2 as cloudinary } from "cloudinary";
 import { fileURLToPath } from "node:url";
 
@@ -195,13 +195,18 @@ async function sendMessageHandler(req, res) {
       const userRoom = `user_${userId}`;
       const socketsInRoom = io.sockets.adapter.rooms.get(userRoom);
       
+      const specializedPayload = {
+        ...messagePayload,
+        e2ee: e2eeForUser(messagePayload.e2ee, userId)
+      };
+
       if (socketsInRoom && socketsInRoom.size > 0) {
         // Recipient is online: Deliver immediately
-        io.to(userRoom).emit("receive_message", messagePayload);
+        io.to(userRoom).emit("receive_message", specializedPayload);
       } else {
         // Recipient is offline: Save to temporary Redis offline queue (retained for 48h)
         const queueKey = `offline_queue:${userId}`;
-        await redisClient.lPush(queueKey, JSON.stringify(messagePayload));
+        await redisClient.lPush(queueKey, JSON.stringify(specializedPayload));
         // Set expiry on queue
         await redisClient.set(`${queueKey}:expiry`, "1", { EX: 48 * 3600 });
       }
@@ -212,7 +217,10 @@ async function sendMessageHandler(req, res) {
     });
   }
 
-  res.json(messagePayload);
+  res.json({
+    ...messagePayload,
+    e2ee: e2eeForUser(messagePayload.e2ee, req.user.id)
+  });
 }
 
 router.post("/", requireUser, mediaUpload, sendMessageHandler);

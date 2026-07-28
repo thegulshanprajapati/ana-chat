@@ -69,6 +69,43 @@ export interface MessagePayload {
   isDeleted?: boolean;
 }
 
+export interface E2ETextPayload {
+  iv: string;
+  ciphertext: string;
+}
+
+export interface E2EMediaPayload {
+  iv: string;
+  mime: string;
+  kind: "image" | "video" | "audio" | "file";
+  size: number;
+}
+
+export interface E2EEnvelope {
+  v: number;
+  alg: string;
+  keys?: Record<string, string>;
+  key?: string | null;
+  text?: E2ETextPayload | null;
+  media?: E2EMediaPayload | null;
+}
+
+export interface CanonicalMessageDTO {
+  id: string | number;
+  chatId: number;
+  senderId: number;
+  senderName?: string;
+  clientMessageId: string | null;
+  body: string | null;
+  imageUrl: string | null;
+  replyToMessageId: number | null;
+  e2ee: E2EEnvelope;
+  seen: boolean | number;
+  createdAt: string;
+  deletedForEveryone: boolean;
+  deliveryStatus?: "sending" | "sent" | "delivered" | "read" | "failed";
+}
+
 export interface OfflineMessageEnvelope {
   recipientId: string;
   senderId: string;

@@ -457,18 +457,26 @@ export default function ChatPage() {
     const pair = await getOrCreateRsaKeyPair(user.id);
 
     let body = typeof message.body === "string" ? message.body : null;
-    if ((!body || body.length === 0) && message.e2ee?.key && message.e2ee?.text) {
+    const key = message.e2ee?.key || message.e2ee?.keys?.[String(user.id)] || null;
+    if ((!body || body.length === 0) && key && message.e2ee?.text) {
       try {
-        body = await decryptTextFromMessage({ e2ee: message.e2ee, privateJwk: pair.privateJwk });
+        body = await decryptTextFromMessage({
+          e2ee: { ...message.e2ee, key },
+          privateJwk: pair.privateJwk
+        });
       } catch {
         body = null;
       }
     }
 
     let replyBody = typeof message.reply_to_body === "string" ? message.reply_to_body : null;
-    if ((!replyBody || replyBody.length === 0) && message.reply_to_e2ee?.key && message.reply_to_e2ee?.text) {
+    const replyKey = message.reply_to_e2ee?.key || message.reply_to_e2ee?.keys?.[String(user.id)] || null;
+    if ((!replyBody || replyBody.length === 0) && replyKey && message.reply_to_e2ee?.text) {
       try {
-        replyBody = await decryptTextFromMessage({ e2ee: message.reply_to_e2ee, privateJwk: pair.privateJwk });
+        replyBody = await decryptTextFromMessage({
+          e2ee: { ...message.reply_to_e2ee, key: replyKey },
+          privateJwk: pair.privateJwk
+        });
       } catch {
         replyBody = null;
       }
