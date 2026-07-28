@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import Cropper from "react-easy-crop";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, RefreshCw, Maximize, Check } from "lucide-react";
@@ -112,7 +113,7 @@ export const AvatarCropModal = ({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
         {/* Backdrop overlay */}
@@ -239,7 +240,8 @@ export const AvatarCropModal = ({
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 

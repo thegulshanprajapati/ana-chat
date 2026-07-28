@@ -747,14 +747,14 @@ export default function AuthPage({ onAuthed }) {
             <div className="flex flex-col h-full min-h-0 overflow-y-auto p-5 sm:p-8 xl:p-10 pb-10">
               <div className="flex-shrink-0">
                 <div className="mb-5 flex items-center gap-3">
-                  <div className="h-10 w-10 overflow-hidden rounded-2xl border border-rose-200/70 bg-gradient-to-br from-rose-500 to-pink-600 shadow-sm dark:border-rose-800/70 flex items-center justify-center">
+                  <div className="h-14 w-14 flex items-center justify-center">
                     {authLogoBroken ? (
-                      <MessageCircle className="h-5 w-5 text-white" />
+                      <MessageCircle className="h-7 w-7 text-rose-500" />
                     ) : (
                       <img
                         src="/logo.png"
                         alt="AnaChat"
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-contain"
                         onError={() => setAuthLogoBroken(true)}
                       />
                     )}

@@ -1520,14 +1520,20 @@ export default function ChatPage() {
 
   const orderedFilteredChats = useMemo(() => {
     const list = Array.isArray(filteredChats) ? filteredChats : [];
-    if (!pinnedChatIds.length) return list;
+    const lockerChat = list.find((c) => c.chat_type === "self");
+    const remainingList = list.filter((c) => c.chat_type !== "self");
+
     const pinnedSet = new Set(pinnedChatIds.map((id) => Number(id)).filter(Boolean));
     const pinned = [];
     const others = [];
-    list.forEach((chat) => {
+    remainingList.forEach((chat) => {
       if (pinnedSet.has(Number(chat.id))) pinned.push(chat);
       else others.push(chat);
     });
+
+    if (lockerChat) {
+      return [lockerChat, ...pinned, ...others];
+    }
     return [...pinned, ...others];
   }, [filteredChats, pinnedChatIds]);
 

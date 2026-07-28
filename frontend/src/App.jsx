@@ -32,10 +32,10 @@ function UserApp() {
 
           {/* Animated logo */}
           <div className="relative flex items-center justify-center">
-            <div className="absolute w-28 h-28 rounded-full bg-rose-400/15 animate-ping" style={{ animationDuration: "2.4s" }} />
-            <div className="absolute w-22 h-22 rounded-full bg-rose-300/20 animate-ping" style={{ animationDuration: "2.9s", animationDelay: "0.5s" }} />
-            <div className="relative w-[72px] h-[72px] rounded-[22px] overflow-hidden shadow-[0_16px_48px_rgba(225,29,72,0.38)] flex items-center justify-center bg-white">
-              <img src="/logo.png" alt="AnaChat" className="w-full h-full object-cover" />
+            <div className="absolute w-36 h-36 rounded-full bg-rose-400/15 animate-ping" style={{ animationDuration: "2.4s" }} />
+            <div className="absolute w-28 h-28 rounded-full bg-rose-300/20 animate-ping" style={{ animationDuration: "2.9s", animationDelay: "0.5s" }} />
+            <div className="relative w-[110px] h-[110px] flex items-center justify-center">
+              <img src="/logo.png" alt="AnaChat" className="w-full h-full object-contain" />
             </div>
           </div>
 
