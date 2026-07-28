@@ -3,10 +3,28 @@ const dbStatusEl = document.getElementById('db-status');
 const authStatusEl = document.getElementById('auth-status');
 const socketStatusEl = document.getElementById('socket-status');
 const detailsEl = document.getElementById('details');
+const detailsPanel = document.getElementById('details-panel');
+const successScreen = document.getElementById('success-screen');
+const statusContainer = document.getElementById('status-container');
+const mainCard = document.getElementById('main-card');
+
 const timeout = 8000;
 
-function formatError(message) {
-  return message ? message.replace(/\n/g, '<br>') : 'Unknown error';
+function updateStatusElement(el, success, label, desc) {
+  const indicator = el.querySelector('.indicator');
+  const labelEl = el.querySelector('.status-label');
+  const descEl = el.querySelector('.status-desc');
+
+  if (success) {
+    indicator.className = 'indicator active';
+    el.classList.remove('failed');
+  } else {
+    indicator.className = 'indicator error';
+    el.classList.add('failed');
+  }
+
+  labelEl.textContent = label;
+  descEl.textContent = desc;
 }
 
 async function checkApiHealth() {
@@ -14,23 +32,18 @@ async function checkApiHealth() {
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    const startTime = performance.now();
     const res = await fetch('/healthz', {
       signal: controller.signal,
       cache: 'no-store',
       headers: { 'Accept': 'application/json' }
     });
-    const duration = Math.round(performance.now() - startTime);
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-
-    statusEl.innerHTML = '<div class="indicator active"></div><div class="status-content"><div class="status-label">✓ Server Status: Active</div><div class="status-desc">Backend is running and responding</div></div>';
-    detailsEl.innerHTML = `<strong>API Response (${duration}ms):</strong><br><br>${JSON.stringify(data, null, 2)}<br><br><strong>Endpoint:</strong> /healthz<br><strong>Status:</strong> ${res.status} ${res.statusText}`;
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    updateStatusElement(statusEl, true, 'Server Status: Active', 'API Gateway is responding normally');
+    return { ok: true };
   } catch (error) {
-    statusEl.innerHTML = '<div class="indicator" style="background:#ef4444"></div><div class="status-content"><div class="status-label">✗ Server Status: Error</div><div class="status-desc">Backend API is not responding</div></div>';
-    const msg = error.name === 'AbortError' ? 'Request timeout (no response after 8s)' : error.message;
-    detailsEl.innerHTML = `<strong>API Error:</strong><br>${formatError(msg)}<br><br><strong>Troubleshooting:</strong><br>• Check if backend server is running<br>• Check network/firewall settings<br>• Review backend logs for errors`;
+    const msg = error.name === 'AbortError' ? 'Request timed out after 8s' : error.message;
+    updateStatusElement(statusEl, false, 'Server Status: Offline', msg);
+    return { ok: false, service: 'Server', error: msg };
   } finally {
     clearTimeout(timeoutId);
   }
@@ -41,23 +54,18 @@ async function checkDbStatus() {
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    const startTime = performance.now();
     const res = await fetch('/db-health', {
       signal: controller.signal,
       cache: 'no-store',
       headers: { 'Accept': 'application/json' }
     });
-    const duration = Math.round(performance.now() - startTime);
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-
-    dbStatusEl.innerHTML = '<div class="indicator active"></div><div class="status-content"><div class="status-label">✓ Database Status: Connected</div><div class="status-desc">Database is reachable and healthy</div></div>';
-    detailsEl.innerHTML += `<br><br><strong>DB Ping (${duration}ms):</strong><br>${JSON.stringify(data, null, 2)}`;
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    updateStatusElement(dbStatusEl, true, 'Database Status: Connected', 'MongoDB connection is healthy');
+    return { ok: true };
   } catch (error) {
-    dbStatusEl.innerHTML = '<div class="indicator" style="background:#ef4444"></div><div class="status-content"><div class="status-label">✗ Database Status: Error</div><div class="status-desc">Database connection failed</div></div>';
-    const msg = error.name === 'AbortError' ? 'Request timeout (no response after 8s)' : error.message;
-    detailsEl.innerHTML += `<br><br><strong>DB Error:</strong><br>${formatError(msg)}`;
+    const msg = error.name === 'AbortError' ? 'Request timed out after 8s' : error.message;
+    updateStatusElement(dbStatusEl, false, 'Database Status: Error', msg);
+    return { ok: false, service: 'Database', error: msg };
   } finally {
     clearTimeout(timeoutId);
   }
@@ -68,21 +76,18 @@ async function checkAuthStatus() {
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    const startTime = performance.now();
     const res = await fetch('/api/auth/health', {
       signal: controller.signal,
       cache: 'no-store',
       headers: { 'Accept': 'application/json' }
     });
-    const duration = Math.round(performance.now() - startTime);
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    authStatusEl.innerHTML = '<div class="indicator active"></div><div class="status-content"><div class="status-label">✓ Auth Service: Available</div><div class="status-desc">Authentication endpoint is functional</div></div>';
-    detailsEl.innerHTML += `<br><br><strong>Auth Endpoint (${duration}ms):</strong> ${res.status} ${res.statusText}`;
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    updateStatusElement(authStatusEl, true, 'Auth Service: Available', 'Authentication infrastructure is functional');
+    return { ok: true };
   } catch (error) {
-    authStatusEl.innerHTML = '<div class="indicator" style="background:#ef4444"></div><div class="status-content"><div class="status-label">✗ Auth Service: Error</div><div class="status-desc">Authentication endpoint is not reachable</div></div>';
-    const msg = error.name === 'AbortError' ? 'Request timeout (no response after 8s)' : error.message;
-    detailsEl.innerHTML += `<br><br><strong>Auth Error:</strong><br>${formatError(msg)}`;
+    const msg = error.name === 'AbortError' ? 'Request timed out after 8s' : error.message;
+    updateStatusElement(authStatusEl, false, 'Auth Service: Error', msg);
+    return { ok: false, service: 'Auth Service', error: msg };
   } finally {
     clearTimeout(timeoutId);
   }
@@ -93,41 +98,61 @@ async function checkSocketStatus() {
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    const startTime = performance.now();
     const res = await fetch('/socket-status', {
       signal: controller.signal,
       cache: 'no-store',
       headers: { 'Accept': 'application/json' }
     });
-    const duration = Math.round(performance.now() - startTime);
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
     const data = await res.json();
-
     if (data.status === 'connected') {
-      socketStatusEl.innerHTML = '<div class="indicator active"></div><div class="status-content"><div class="status-label">✓ Socket Status: Connected</div><div class="status-desc">WebSocket server is active (' + data.activeConnections + ' connections)</div></div>';
-    } else {
-      socketStatusEl.innerHTML = '<div class="indicator" style="background:#ef4444"></div><div class="status-content"><div class="status-label">✗ Socket Status: Disconnected</div><div class="status-desc">WebSocket server is not responding</div></div>';
+      updateStatusElement(socketStatusEl, true, 'Socket Status: Connected', `Active connections: ${data.activeConnections}`);
+      return { ok: true };
     }
-
-    detailsEl.innerHTML += `<br><br><strong>Socket Check (${duration}ms):</strong> ${data.status}`;
+    throw new Error('Socket.IO engine reported unhealthy');
   } catch (error) {
-    socketStatusEl.innerHTML = '<div class="indicator" style="background:#ef4444"></div><div class="status-content"><div class="status-label">✗ Socket Status: Error</div><div class="status-desc">Cannot verify WebSocket connections</div></div>';
-    const msg = error.name === 'AbortError' ? 'Request timeout (no response after 8s)' : error.message;
-    detailsEl.innerHTML += `<br><br><strong>Socket Error:</strong><br>${formatError(msg)}`;
+    const msg = error.name === 'AbortError' ? 'Request timed out after 8s' : error.message;
+    updateStatusElement(socketStatusEl, false, 'Socket Status: Error', msg);
+    return { ok: false, service: 'WebSockets', error: msg };
   } finally {
     clearTimeout(timeoutId);
   }
 }
 
-function resetDetails() {
-  detailsEl.innerHTML = 'Initializing...';
-}
-
 async function runChecks() {
-  resetDetails();
-  await Promise.all([checkApiHealth(), checkDbStatus(), checkAuthStatus(), checkSocketStatus()]);
+  const results = await Promise.all([
+    checkApiHealth(),
+    checkDbStatus(),
+    checkAuthStatus(),
+    checkSocketStatus()
+  ]);
+
+  const failures = results.filter(r => !r.ok);
+
+  if (failures.length === 0) {
+    // Show only the gorgeous round green tick!
+    statusContainer.style.display = 'none';
+    detailsPanel.style.display = 'none';
+    successScreen.style.display = 'flex';
+    mainCard.style.borderColor = 'rgba(34, 197, 94, 0.4)';
+    mainCard.style.boxShadow = '0 30px 100px rgba(0, 0, 0, 0.8), 0 0 60px rgba(34, 197, 94, 0.15)';
+  } else {
+    // Show detailed status items & diagnostic logs
+    successScreen.style.display = 'none';
+    statusContainer.style.display = 'flex';
+    detailsPanel.style.display = 'block';
+    mainCard.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+    mainCard.style.boxShadow = '0 30px 100px rgba(0, 0, 0, 0.8), 0 0 60px rgba(239, 68, 68, 0.05)';
+
+    // Build user-friendly diagnostic output
+    let errorLogs = '';
+    failures.forEach((fail, idx) => {
+      errorLogs += `[Error ${idx + 1}] Service: ${fail.service}\nDetails: ${fail.error}\n\n`;
+    });
+    errorLogs += `Troubleshooting:\n• Verify that MongoDB and Redis instances are running\n• Check server ports and firewalls\n• Inspect the console logs of your app process`;
+    detailsEl.textContent = errorLogs;
+  }
 }
 
 runChecks();
-setInterval(runChecks, 30000);
+setInterval(runChecks, 15000);
