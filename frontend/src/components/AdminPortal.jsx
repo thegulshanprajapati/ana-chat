@@ -3,6 +3,7 @@ import {
   Activity,
   ArrowUpRight,
   Bell,
+  ChevronDown,
   ClipboardList,
   LogOut,
   Mail,
@@ -23,10 +24,12 @@ import EmailTemplatesPanel from "./panels/EmailTemplatesPanel";
 const tabs = [
   { id: "dashboard", label: "Dashboard", icon: Shield },
   { id: "users", label: "Users", icon: Users },
-  { id: "notify", label: "Notify User", icon: Bell },
+  { id: "email", label: "Email Center", icon: Mail },
+  { id: "templates", label: "Email Templates", icon: Mail },
+  { id: "notify", label: "Notifications", icon: Bell },
   { id: "broadcast", label: "Broadcast", icon: Megaphone },
-  { id: "email", label: "Email Templates", icon: Mail },
-  { id: "admins", label: "Admins", icon: User }
+  { id: "admins", label: "Admin", icon: User },
+  { id: "emailSettings", label: "Settings", icon: Shield }
 ];
 
 const pageBgClass = "min-h-[100dvh] bg-gradient-to-br from-slate-950 via-amber-950/25 to-slate-950 text-slate-100 font-sans";
@@ -1262,11 +1265,21 @@ export default function AdminPortal() {
     );
   }
 
+  function renderEmailSettings() {
+    return (
+      <section className={`${panelClass} p-4 md:p-6 min-h-[600px]`}>
+        <EmailTemplatesPanel adminToken={admin?.token} initialSelectedKey="__settings" />
+      </section>
+    );
+  }
+
   function renderCurrentSection() {
     if (tab === "users") return renderUsers();
+    if (tab === "templates") return renderEmailTemplates();
     if (tab === "notify") return renderNotify();
     if (tab === "broadcast") return renderBroadcast();
     if (tab === "admins") return renderAdmins();
+    if (tab === "emailSettings") return renderEmailSettings();
     if (tab === "email") return renderEmailTemplates();
     return renderDashboard();
   }
@@ -1367,15 +1380,32 @@ export default function AdminPortal() {
 }
 
 function Sidebar({ admin, tab, onTabChange, onLogout, onClose, mobile = false }) {
+  const communicationOpen = ["templates", "notify", "broadcast"].includes(tab);
+  const adminOpen = tab === "admins";
+  const navItemClass = (active, indent = false) => `flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-[15px] font-semibold transition ${
+    active
+      ? "bg-slate-800/90 text-slate-50"
+      : "text-slate-300 hover:bg-slate-900/70 hover:text-slate-50"
+  } ${indent ? "py-2.5 pl-12 text-[13px] font-medium text-slate-400" : ""}`;
+
+  const NavButton = ({ id, label, icon: Icon, indent = false }) => (
+    <button
+      type="button"
+      onClick={() => onTabChange(id)}
+      className={navItemClass(tab === id, indent)}
+    >
+      {Icon && <Icon size={indent ? 15 : 18} className={tab === id ? "text-cyan-300" : "text-slate-400"} />}
+      <span className="min-w-0 truncate">{label}</span>
+    </button>
+  );
+
   return (
-    <div className={`${mobile ? panelClass + " h-full max-h-[100dvh] w-full max-w-[300px] p-4" : "h-full border-r border-slate-800/40 bg-slate-950/20 backdrop-blur-2xl p-5"} flex flex-col`}>
+    <div className={`${mobile ? "h-full max-h-[100dvh] w-full max-w-[300px] rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-2xl" : "h-full border-r border-slate-900 bg-[#0b1222] p-4"} flex flex-col`}>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">AnaChat Console</p>
-          <p className="mt-1.5 text-2xl font-semibold text-slate-100">Admin</p>
-          <p className="mt-1 text-[13px] text-slate-200">{admin.name || admin.username || admin.email}</p>
-          <p className="mt-0.5 text-xs text-slate-500">{admin.email}</p>
-          <p className="mt-0.5 text-xs text-amber-300">{admin.role === "super_admin" ? "Super Admin" : "Admin"}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">AnaChat</p>
+          <p className="mt-1.5 text-xl font-semibold text-slate-100">Admin Panel</p>
+          <p className="mt-1 truncate text-[13px] text-slate-400">{admin.name || admin.username || admin.email}</p>
         </div>
         {mobile && (
           <button onClick={onClose} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700 bg-slate-900/80 text-slate-200">
@@ -1384,25 +1414,50 @@ function Sidebar({ admin, tab, onTabChange, onLogout, onClose, mobile = false })
         )}
       </div>
 
-      <nav className="mt-6 space-y-1.5">
-        {tabs.map((item) => {
-          const Icon = item.icon;
-          const active = tab === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onTabChange(item.id)}
-              className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left text-[15px] font-medium transition ${
-                active
-                  ? "border-amber-500/55 bg-amber-500/18 text-amber-100"
-                  : "border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-800/60"
-              }`}
-            >
-              <Icon size={16} />
-              {item.label}
-            </button>
-          );
-        })}
+      <nav className="mt-7 space-y-2">
+        <NavButton id="dashboard" label="Dashboard" icon={Shield} />
+        <NavButton id="users" label="Users" icon={Users} />
+        <NavButton id="email" label="Email Center" icon={Mail} />
+
+        <div>
+          <button
+            type="button"
+            onClick={() => onTabChange(communicationOpen ? "templates" : "templates")}
+            className={navItemClass(communicationOpen)}
+          >
+            <Mail size={18} className={communicationOpen ? "text-cyan-300" : "text-slate-400"} />
+            <span className="min-w-0 flex-1 truncate">Communication</span>
+            <ChevronDown size={15} className={`transition ${communicationOpen ? "rotate-180 text-slate-200" : "text-slate-500"}`} />
+          </button>
+          {communicationOpen && (
+            <div className="ml-4 mt-2 space-y-1 border-l border-slate-800">
+              <NavButton id="templates" label="Email Templates" indent />
+              <NavButton id="notify" label="Notifications" indent />
+              <NavButton id="broadcast" label="Broadcast" indent />
+            </div>
+          )}
+        </div>
+
+        <NavButton id="broadcast" label="Broadcast" icon={Megaphone} />
+
+        <div>
+          <button
+            type="button"
+            onClick={() => onTabChange(adminOpen ? "admins" : "admins")}
+            className={navItemClass(adminOpen)}
+          >
+            <User size={18} className={adminOpen ? "text-cyan-300" : "text-slate-400"} />
+            <span className="min-w-0 flex-1 truncate">Admin</span>
+            <ChevronDown size={15} className={`transition ${adminOpen ? "rotate-180 text-slate-200" : "text-slate-500"}`} />
+          </button>
+          {adminOpen && (
+            <div className="ml-4 mt-2 space-y-1 border-l border-slate-800">
+              <NavButton id="admins" label="Manage Admins" indent />
+            </div>
+          )}
+        </div>
+
+        <NavButton id="emailSettings" label="Settings" icon={Shield} />
       </nav>
       <div className="mt-auto space-y-2">
         <a href="/" className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2.5 text-[13px] font-semibold text-slate-200 transition hover:bg-slate-800/80">

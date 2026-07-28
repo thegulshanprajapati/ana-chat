@@ -248,7 +248,7 @@ function EmailSettingsTab({ adminToken }) {
   );
 }
 
-export default function EmailTemplatesPanel({ adminToken }) {
+export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = null }) {
   const [templates, setTemplates] = useState([]);
   const [selectedKey, setSelectedKey] = useState(null);
   const [template, setTemplate] = useState(null);
@@ -272,11 +272,12 @@ export default function EmailTemplatesPanel({ adminToken }) {
       .then(r => r.json())
       .then(d => {
         setTemplates(d.templates || []);
-        if (d.templates?.length) setSelectedKey(d.templates[0].template_key);
+        if (initialSelectedKey) setSelectedKey(initialSelectedKey);
+        else if (d.templates?.length) setSelectedKey(d.templates[0].template_key);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [adminToken]);
+  }, [adminToken, initialSelectedKey]);
 
   // Load selected template
   useEffect(() => {

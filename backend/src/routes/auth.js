@@ -211,6 +211,23 @@ async function createLoginChallenge({ userId, req }) {
   return { challengeId, expiresAt };
 }
 
+async function sendWelcomeEmailSafely(user) {
+  if (!user?.email) return;
+  try {
+    const [{ sendEmail }, { composeEmail }] = await Promise.all([
+      import("../services/mailer.js"),
+      import("../services/emailTemplate.js")
+    ]);
+    const { subject, html, text, replyTo } = await composeEmail("welcome", {
+      user_name: user.name || user.email,
+      user_email: user.email
+    });
+    await sendEmail({ to: user.email, subject, html, text, replyTo });
+  } catch (err) {
+    console.warn("[Auth/WelcomeEmail] Could not send welcome email:", err.message);
+  }
+}
+
 router.post("/signup", async (req, res) => {
   const { mobile, name, password, email: rawEmail } = req.body;
   const email = normalizeEmail(rawEmail);
@@ -250,6 +267,7 @@ router.post("/signup", async (req, res) => {
   setAuthCookies(res, accessToken, refreshToken);
 
   const user = await db.collection("users").findOne({ id: userId });
+  void sendWelcomeEmailSafely(user);
   return res.json({
     ...publicUser(user),
     accessToken
@@ -324,6 +342,7 @@ router.post("/google", async (req, res) => {
     });
 
     user = await db.collection("users").findOne({ id: userId });
+    void sendWelcomeEmailSafely(user);
   } else {
     const updateFields = [];
     const updateValues = [];
