@@ -14,7 +14,17 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, "index.html"));
+  const devUrl = "http://localhost:5173";
+  if (process.env.NODE_ENV === "development" || !app.isPackaged) {
+    mainWindow.loadURL(devUrl).catch(() => {
+      mainWindow?.loadFile(path.join(__dirname, "index.html"));
+    });
+  } else {
+    mainWindow.loadFile(path.join(__dirname, "../../../frontend/dist/index.html")).catch(() => {
+      mainWindow?.loadFile(path.join(__dirname, "index.html"));
+    });
+  }
+  
   mainWindow.on("closed", () => {
     mainWindow = null;
   });

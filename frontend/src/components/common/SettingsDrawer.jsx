@@ -3,6 +3,7 @@ import { Lock, Settings2, Sparkles, X, Keyboard } from "lucide-react";
 import ThemeColorModal from "./ThemeColorModal";
 import ThemeDoodleModal from "./ThemeDoodleModal";
 import KeyboardShortcutsModal from "./KeyboardShortcutsModal";
+import WhatsAppModal from "./WhatsAppModal";
 import { api } from "../../api/client";
 
 const DEFAULT_SETTINGS = {
@@ -41,6 +42,7 @@ export default function SettingsDrawer({
   const [themeColorOpen, setThemeColorOpen] = useState(false);
   const [doodleOpen, setDoodleOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [whatsappOpen, setWhatsappOpen] = useState(false);
   const [pinBusy, setPinBusy] = useState(false);
   const [pinError, setPinError] = useState("");
   const [pinSuccess, setPinSuccess] = useState("");
@@ -71,6 +73,10 @@ export default function SettingsDrawer({
 
   useEffect(() => {
     if (!open) setShortcutsOpen(false);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) setWhatsappOpen(false);
   }, [open]);
 
   function updateSetting(key, value) {
@@ -267,6 +273,28 @@ export default function SettingsDrawer({
                   </span>
                 </span>
                 <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">View</span>
+              </button>
+            </section>
+
+            <section className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-900/70">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Integrations</p>
+              <button
+                type="button"
+                onClick={() => setWhatsappOpen(true)}
+                className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+              >
+                <span className="flex min-w-0 items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.717-1.456L0 24zm6.59-4.846c1.6.95 3.197 1.451 4.825 1.452 5.523 0 10.017-4.493 10.02-10.016.002-2.675-1.038-5.19-2.932-7.086-1.895-1.895-4.41-2.935-7.085-2.936-5.524 0-10.018 4.494-10.02 10.017-.001 1.745.474 3.447 1.378 4.962l-.993 3.627 3.72-.977zm11.382-7.85c-.3-.15-1.772-.875-2.047-.975-.276-.1-.476-.15-.676.15-.2.3-.775.975-.95 1.175-.175.2-.35.225-.65.075-.3-.15-1.267-.467-2.414-1.49-.893-.797-1.496-1.782-1.67-2.083-.176-.3-.019-.462.131-.611.135-.134.3-.35.45-.525.15-.175.2-.3.3-.5.1-.2.05-.375-.025-.525-.075-.15-.676-1.63-.926-2.235-.244-.589-.493-.509-.676-.518-.175-.008-.375-.01-.575-.01-.2 0-.525.075-.8.375-.275.3-1.05 1.025-1.05 2.5s1.075 2.9 1.225 3.1c.15.2 2.115 3.23 5.124 4.53 1.214.525 2.16.84 2.9.1.75-.725.75-1.725 0-2.375z" />
+                    </svg>
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">WhatsApp Synchronization</span>
+                    <span className="block truncate text-xs text-slate-500 dark:text-slate-400">Sync conversations across devices in real-time.</span>
+                  </span>
+                </span>
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Link</span>
               </button>
             </section>
 
@@ -501,6 +529,11 @@ export default function SettingsDrawer({
       <KeyboardShortcutsModal
         open={shortcutsOpen}
         onClose={() => setShortcutsOpen(false)}
+      />
+
+      <WhatsAppModal
+        open={whatsappOpen}
+        onClose={() => setWhatsappOpen(false)}
       />
     </div>
   );

@@ -1,7 +1,12 @@
 import pg from "pg";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URI || "";
 let pool = null;
@@ -151,7 +156,7 @@ export async function initDb() {
       `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;`
     ];
     for (const altQuery of alterQueries) {
-      await query(altQuery).catch(() => {});
+      await query(altQuery).catch(() => { });
     }
 
     await query(`
@@ -275,7 +280,7 @@ export async function initDb() {
 // In-Memory query engine mock to make the code resilient
 async function queryMock(text, params = []) {
   const norm = text.replace(/\s+/g, " ").trim().toLowerCase();
-  
+
   if (norm.startsWith("insert into users")) {
     const id = ++mockDb.counters.users;
     const newUser = {
@@ -625,7 +630,7 @@ async function seedDefaultEmailTemplates() {
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (template_key) DO NOTHING`,
       [tpl.key, tpl.name, tpl.subject, tpl.html, tpl.plain_text]
-    ).catch(() => {});
+    ).catch(() => { });
     // Also seed mock
     if (!mockDb.email_templates.find(r => r.template_key === tpl.key)) {
       mockDb.email_templates.push({

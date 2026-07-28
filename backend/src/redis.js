@@ -1,7 +1,12 @@
 import { createClient } from "redis";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const redisUrl = process.env.REDIS_URL || "";
 let redisClient = null;
@@ -19,7 +24,7 @@ class MockRedisClient {
     return this;
   }
 
-  async disconnect() {}
+  async disconnect() { }
 
   async hSet(key, field, value) {
     if (!this.store.has(key)) {

@@ -52,10 +52,10 @@ async function checkDbStatus() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
-    dbStatusEl.innerHTML = '<div class="indicator active"></div><div class="status-content"><div class="status-label">✓ Database Status: Connected</div><div class="status-desc">MongoDB is reachable and healthy</div></div>';
+    dbStatusEl.innerHTML = '<div class="indicator active"></div><div class="status-content"><div class="status-label">✓ Database Status: Connected</div><div class="status-desc">Database is reachable and healthy</div></div>';
     detailsEl.innerHTML += `<br><br><strong>DB Ping (${duration}ms):</strong><br>${JSON.stringify(data, null, 2)}`;
   } catch (error) {
-    dbStatusEl.innerHTML = '<div class="indicator" style="background:#ef4444"></div><div class="status-content"><div class="status-label">✗ Database Status: Error</div><div class="status-desc">MongoDB connection failed</div></div>';
+    dbStatusEl.innerHTML = '<div class="indicator" style="background:#ef4444"></div><div class="status-content"><div class="status-label">✗ Database Status: Error</div><div class="status-desc">Database connection failed</div></div>';
     const msg = error.name === 'AbortError' ? 'Request timeout (no response after 8s)' : error.message;
     detailsEl.innerHTML += `<br><br><strong>DB Error:</strong><br>${formatError(msg)}`;
   } finally {
@@ -94,13 +94,13 @@ async function checkSocketStatus() {
 
   try {
     const startTime = performance.now();
-    const res = await fetch('/socket-status', { 
+    const res = await fetch('/socket-status', {
       signal: controller.signal,
       cache: 'no-store',
       headers: { 'Accept': 'application/json' }
     });
     const duration = Math.round(performance.now() - startTime);
-    
+
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 

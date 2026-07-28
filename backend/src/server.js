@@ -15,6 +15,7 @@ import usersRoutes from "./routes/users.js";
 import chatsRoutes from "./routes/chats.js";
 import messagesRoutes from "./routes/messages.js";
 import webhookRoutes from "./routes/webhooks.js";
+import whatsappRoutes from "./routes/whatsapp.js";
 import { requireUser } from "./middleware/auth.js";
 import errorHandler from "./middleware/errorHandler.js";
 import { connectDb } from "./db.js";
@@ -156,8 +157,8 @@ app.get("/health", async (req, res) => {
 app.get("/db-health", async (_req, res) => {
   try {
     const db = await connectDb();
-    const pingResult = await db.admin().ping();
-    return res.json({ status: "ok", db: pingResult });
+    await db.collection("users").findOne({});
+    return res.json({ status: "ok", message: "Database layer initialized and responsive" });
   } catch (error) {
     return res.status(500).json({ status: "error", message: error.message });
   }
@@ -199,6 +200,7 @@ app.use(`${apiPrefix}/users`, usersRoutes);
 app.use(`${apiPrefix}/chats`, chatsRoutes);
 app.use(`${apiPrefix}/messages`, messagesRoutes);
 app.use(`${apiPrefix}/webhooks`, webhookRoutes);
+app.use(`${apiPrefix}/whatsapp`, whatsappRoutes);
 app.get(`${apiPrefix}/me`, requireUser, (req, res) => {
   res.json(req.user);
 });
