@@ -10,11 +10,11 @@ import {
   initializeSocket,
   getSocket,
   subscribe,
-  isConnected,
+  isConnected as socketIsConnected,
   getReconnectionStatus,
-  disconnect,
-  reauthenticate,
-  reconnect,
+  disconnect as socketDisconnect,
+  reauthenticate as socketReauthenticate,
+  reconnect as socketReconnect,
   joinRoom as socketJoinRoom,
   leaveRoom as socketLeaveRoom
 } from "../utils/socket";
@@ -79,7 +79,7 @@ export function SocketProvider({ children }) {
   // ===== CRITICAL FIX 25: Initialize socket only when authenticated =====
   useEffect(() => {
     if (!user) {
-      disconnect();
+      socketDisconnect();
       initializationRef.current = false;
       setConnectionState(CONNECTION_STATES.DISCONNECTED);
       if (unsubscribeRef.current) {
@@ -142,9 +142,9 @@ export function SocketProvider({ children }) {
 
   // ===== CRITICAL FIX 26: Handle token refresh =====
   useEffect(() => {
-    if (lastTokenRef.current !== token && token && isConnected()) {
+    if (lastTokenRef.current !== token && token && socketIsConnected()) {
       console.log("[SocketProvider] Token changed, re-authenticating");
-      reauthenticate();
+      socketReauthenticate();
     }
   }, [token]);
 
@@ -164,7 +164,7 @@ export function SocketProvider({ children }) {
 
     return {
       // Connection state
-      isConnected: isConnected(),
+      isConnected: socketIsConnected(),
       connectionState,
       reconnectionStatus,
 
@@ -184,15 +184,15 @@ export function SocketProvider({ children }) {
 
       // Utility methods
       disconnect: () => {
-        disconnect();
+        socketDisconnect();
         setConnectionState(CONNECTION_STATES.DISCONNECTED);
       },
       reconnect: () => {
-        reconnect();
+        socketReconnect();
         setConnectionState(CONNECTION_STATES.RECONNECTING);
       },
       reauthenticate: () => {
-        reauthenticate();
+        socketReauthenticate();
       },
 
       // Raw socket for advanced usage
