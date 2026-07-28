@@ -11,6 +11,10 @@ export default defineConfig({
   optimizeDeps: {
     include: ['socket.io-client', 'debug', 'date-fns', 'emoji-picker-react']
   },
+  build: {
+    // Enable source maps so we can trace minified errors back to source
+    sourcemap: true,
+  },
   server: {
     host: true,
     port: 5173,
