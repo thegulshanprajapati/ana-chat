@@ -290,7 +290,7 @@ export default function SettingsDrawer({
                     </svg>
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">WhatsApp Synchronization</span>
+                    <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">Ana Synchronization</span>
                     <span className="block truncate text-xs text-slate-500 dark:text-slate-400">Sync conversations across devices in real-time.</span>
                   </span>
                 </span>

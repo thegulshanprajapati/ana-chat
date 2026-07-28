@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, Loader2 } from "lucide-react";
+import { ArrowDown, Loader2, Lock, X } from "lucide-react";
 import MessageGroup from "./MessageGroup";
 import DaySeparator from "./DaySeparator";
 import TypingIndicator from "./TypingIndicator";
@@ -9,10 +9,73 @@ import SparkleConfetti from "./SparkleConfetti";
 import MediaViewerModal from "./MediaViewerModal";
 
 function EncryptionNotice() {
+  const [showModal, setShowModal] = useState(false);
+
   return (
-    <div className="mx-auto w-fit rounded-full border border-emerald-300/70 bg-emerald-50/90 px-3 py-1 text-[11px] font-medium text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-500/10 dark:text-emerald-200">
-      Messages and calls are end-to-end encrypted.
-    </div>
+    <>
+      <div className="mx-auto w-fit rounded-full border border-emerald-300/70 bg-emerald-50/90 px-4 py-1.5 text-[11px] font-medium text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-500/10 dark:text-emerald-200 flex items-center gap-1.5 shadow-sm">
+        <Lock size={12} className="text-emerald-600 dark:text-emerald-400" />
+        <span>Messages and calls are end-to-end encrypted.</span>
+        <button
+          type="button"
+          onClick={() => setShowModal(true)}
+          className="text-violet-600 dark:text-violet-300 hover:underline font-bold focus:outline-none"
+        >
+          Know more
+        </button>
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          {/* Backdrop with blur */}
+          <div
+            onClick={() => setShowModal(false)}
+            className="absolute inset-0 bg-slate-950/40 dark:bg-slate-950/70 backdrop-blur-sm transition-opacity"
+          />
+
+          {/* Card container */}
+          <div className="relative z-10 w-full max-w-sm overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 p-6 shadow-2xl backdrop-blur-xl text-slate-800 dark:text-slate-100 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                <Lock size={15} className="text-emerald-500" />
+                End-to-End Encryption
+              </h4>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="rounded-full p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-900 dark:text-slate-400 transition-colors"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              AnaChat secures your private messages with strong end-to-end encryption. Your conversations, calls, voice notes, and media files are encrypted before they leave your device and can only be decrypted by you and the recipient.
+            </p>
+
+            <div className="rounded-2xl bg-slate-50 dark:bg-slate-900/50 p-3.5 border border-slate-100 dark:border-slate-800 space-y-2">
+              <p className="text-[11px] font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                🔒 Cryptographic Proof
+              </p>
+              <ul className="text-[10px] text-slate-500 dark:text-slate-400 list-disc list-inside space-y-1">
+                <li>Uses RSA-OAEP for secure AES key exchange.</li>
+                <li>Uses AES-GCM for stream block encryption.</li>
+                <li>Private keys never leave your device.</li>
+              </ul>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowModal(false)}
+              className="w-full py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/10 active:scale-[0.98] transition-all"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

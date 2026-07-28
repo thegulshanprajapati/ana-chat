@@ -1,18 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, Copy, Eye, EyeOff, X, User, Mail, Phone, Info, Lock } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Copy, Eye, EyeOff, X, User, Mail, Phone, Info, Lock } from "lucide-react";
 import { api } from "../../api/client";
-import Avatar from "./Avatar";
+import AvatarUploader from "../profile/AvatarUploader";
 
 export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
   const [about, setAbout] = useState("");
-  const [avatar, setAvatar] = useState(null);
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [showGeneratedPassword, setShowGeneratedPassword] = useState(false);
-  const fileRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
@@ -20,19 +18,9 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
     setEmail(me?.email || "");
     setMobile(me?.mobile || "");
     setAbout((me?.about_bio || "").slice(0, 500));
-    setAvatar(null);
     setPassword("");
     setShowGeneratedPassword(false);
-    if (fileRef.current) fileRef.current.value = "";
   }, [open, me]);
-
-  const preview = useMemo(() => (avatar ? URL.createObjectURL(avatar) : me?.avatar_url || ""), [avatar, me?.avatar_url]);
-
-  useEffect(() => {
-    return () => {
-      if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
-    };
-  }, [preview]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -43,7 +31,6 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
       form.append("email", email.trim());
       form.append("mobile", mobile.trim());
       form.append("about", about.trim());
-      if (avatar) form.append("avatar", avatar);
       if (password.trim()) form.append("password", password.trim());
 
       const { data } = await api.patch("/users/me", form, {
@@ -109,28 +96,14 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
             
             {/* Avatar / Profile Picture Section */}
             <div className="bg-white/80 dark:bg-slate-900/30 backdrop-blur-md border border-slate-200/40 dark:border-white/5 rounded-2xl p-6 flex flex-col items-center shadow-sm">
-              <div 
-                className="relative group cursor-pointer rounded-full p-1 border-2 border-dashed border-slate-200 dark:border-white/10 hover:border-violet-550 dark:hover:border-violet-500 transition-all duration-300" 
-                onClick={() => fileRef.current?.click()}
-              >
-                <div className="rounded-full overflow-hidden w-[130px] h-[130px]">
-                  <Avatar name={name} src={preview} size={130} />
-                </div>
-                <div className="absolute inset-1 rounded-full flex flex-col items-center justify-center bg-slate-950/70 opacity-0 group-hover:opacity-100 transition-all duration-300 text-center p-2">
-                  <Camera size={22} className="text-white mb-1" />
-                  <span className="text-[9px] uppercase font-extrabold tracking-wider text-white">Change Photo</span>
-                </div>
-              </div>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => setAvatar(e.target.files?.[0] || null)}
+              <AvatarUploader
+                currentAvatarUrl={me?.avatar_url}
+                userName={name}
+                onUploadSuccess={(newUrl) => {
+                  onSaved?.({ ...me, avatar_url: newUrl });
+                }}
+                notify={notify}
               />
-              <p className="mt-3 text-[11px] font-medium text-slate-400 dark:text-[var(--panel-muted)]">
-                Click photo to upload custom avatar
-              </p>
             </div>
 
             {/* Inputs Card */}
@@ -222,7 +195,7 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
                 </label>
                 <div className="flex items-center gap-2">
                   <input
-                    className="flex-1 rounded-xl bg-slate-100/50 dark:bg-slate-950/40 border border-slate-200 dark:border-white/10 text-[var(--panel-text)] px-3.5 py-2.5 text-sm outline-none font-mono"
+                    className="flex-1 min-w-0 rounded-xl bg-slate-100/50 dark:bg-slate-950/40 border border-slate-200 dark:border-white/10 text-[var(--panel-text)] px-3.5 py-2.5 text-sm outline-none font-mono"
                     value={me?.generated_password || "Not available for this account"}
                     type={showGeneratedPassword || !me?.generated_password ? "text" : "password"}
                     readOnly

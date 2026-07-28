@@ -868,6 +868,7 @@ export default function Composer({
             <ComposerIconButton
               label="Text styling"
               disabled={disabled}
+              className="hidden sm:inline-flex"
               onClick={() => {
                 if (disabled) return;
                 setShowFormat((v) => !v);
@@ -996,6 +997,7 @@ export default function Composer({
             <ComposerIconButton
               label="Camera"
               disabled={disabled}
+              className="hidden sm:inline-flex"
               onClick={() => {
                 if (disabled) return;
                 setCameraOpen(true);
@@ -1034,6 +1036,7 @@ export default function Composer({
           <EmojiPicker
             width="100%"
             lazyLoadEmojis
+            emojiStyle="native"
             theme={theme === "dark" ? "dark" : "light"}
             onEmojiClick={(emoji) => setText((prev) => prev + emoji.emoji)}
           />

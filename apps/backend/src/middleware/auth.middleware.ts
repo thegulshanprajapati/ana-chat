@@ -6,7 +6,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     const token = req.cookies?.refreshToken || req.headers.authorization?.split(" ")[1];
     if (!token) return res.status(401).json({ error: "Authentication required." });
 
-    const payload = await verifyToken(token);
+    const payload = await verifyToken(token) as any;
     req.user = payload;
     next();
   } catch (error) {

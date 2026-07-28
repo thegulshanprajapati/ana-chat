@@ -607,3 +607,12 @@ input[type="range"].audio-seekbar::-moz-range-progress {
   border-radius: 9999px;
 }
 
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+

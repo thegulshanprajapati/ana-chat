@@ -107,7 +107,7 @@ export default function WhatsAppModal({ open, onClose }) {
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
           <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
             <QrCode size={16} className="text-emerald-500" />
-            WhatsApp Synchronization
+            Ana Synchronization
           </h3>
           <button
             type="button"
@@ -133,7 +133,7 @@ export default function WhatsAppModal({ open, onClose }) {
                   <CheckCircle size={42} className="mx-auto text-emerald-500 mb-3" />
                   <h4 className="text-base font-semibold text-emerald-800 dark:text-emerald-400">Connected</h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Your WhatsApp session is active and synchronized. Conversations will stay synced in real-time.
+                    Your Ana session is active and synchronized. Conversations will stay synced in real-time.
                   </p>
                 </div>
               )}
@@ -143,7 +143,7 @@ export default function WhatsAppModal({ open, onClose }) {
                   <Loader2 size={42} className="mx-auto text-blue-500 mb-3 animate-spin" />
                   <h4 className="text-base font-semibold text-blue-800 dark:text-blue-400">Connecting</h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Connecting to WhatsApp servers. Please wait...
+                    Connecting to Ana servers. Please wait...
                   </p>
                 </div>
               )}
@@ -167,7 +167,7 @@ export default function WhatsAppModal({ open, onClose }) {
                   <AlertCircle size={42} className="mx-auto text-slate-400 mb-3" />
                   <h4 className="text-base font-semibold text-slate-700 dark:text-slate-300">Disconnected</h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    WhatsApp synchronization is not active. Link a device to begin sync.
+                    Ana synchronization is not active. Link a device to begin sync.
                   </p>
                 </div>
               )}
@@ -196,7 +196,7 @@ export default function WhatsAppModal({ open, onClose }) {
                     onClick={handleConnect}
                     className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 text-sm font-semibold transition"
                   >
-                    Link WhatsApp Device
+                    Link Ana Device
                   </button>
                 )}
               </div>

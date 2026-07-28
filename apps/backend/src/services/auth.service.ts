@@ -15,7 +15,7 @@ const authService = {
   },
 
   signJwt(payload: object, expiresIn = config.jwtExpiresIn) {
-    return jwt.sign(payload, config.jwtSecret, { expiresIn });
+    return jwt.sign(payload, config.jwtSecret, { expiresIn: expiresIn as any });
   },
 
   async verifyToken(token: string) {
@@ -113,18 +113,18 @@ const authService = {
   },
 
   async getSessions(req: Request, res: Response) {
-    const sessions = await SessionModel.find({ userId: req.user.userId, revokedAt: null });
+    const sessions = await SessionModel.find({ userId: req.user!.userId, revokedAt: null });
     return res.json({ sessions });
   },
 
   async getDevices(req: Request, res: Response) {
-    const user = await UserModel.findById(req.user.userId);
+    const user = await UserModel.findById(req.user!.userId);
     return res.json({ devices: user?.devices || [] });
   },
 
   async updateSettings(req: Request, res: Response) {
     const settings = req.body;
-    const user = await UserModel.findByIdAndUpdate(req.user.userId, { settings, updatedAt: new Date() }, { new: true });
+    const user = await UserModel.findByIdAndUpdate(req.user!.userId, { settings, updatedAt: new Date() }, { new: true });
     return res.json({ settings: user?.settings });
   },
 

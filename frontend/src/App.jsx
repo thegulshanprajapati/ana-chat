@@ -34,12 +34,8 @@ function UserApp() {
           <div className="relative flex items-center justify-center">
             <div className="absolute w-28 h-28 rounded-full bg-rose-400/15 animate-ping" style={{ animationDuration: "2.4s" }} />
             <div className="absolute w-22 h-22 rounded-full bg-rose-300/20 animate-ping" style={{ animationDuration: "2.9s", animationDelay: "0.5s" }} />
-            <div className="relative w-[72px] h-[72px] rounded-[22px] bg-gradient-to-br from-rose-500 to-pink-600 shadow-[0_16px_48px_rgba(225,29,72,0.38)] flex items-center justify-center">
-              <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-                <path d="M7 9a4 4 0 0 1 4-4h14a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4h-6.5L12 31v-6H11a4 4 0 0 1-4-4V9z" fill="white" fillOpacity="0.95"/>
-                <rect x="11.5" y="13" width="13" height="2" rx="1" fill="rgba(225,29,72,0.55)"/>
-                <rect x="11.5" y="17.5" width="9" height="2" rx="1" fill="rgba(225,29,72,0.35)"/>
-              </svg>
+            <div className="relative w-[72px] h-[72px] rounded-[22px] overflow-hidden shadow-[0_16px_48px_rgba(225,29,72,0.38)] flex items-center justify-center bg-white">
+              <img src="/logo.png" alt="AnaChat" className="w-full h-full object-cover" />
             </div>
           </div>
 

@@ -769,7 +769,7 @@ export default function SidebarPanel({
 
         {activeTab === "chats" && (
           <div className={`${compactMode ? "px-3 pt-1.5" : "px-4 pt-2"}`}>
-            <div className={`flex max-h-24 flex-wrap items-center gap-1.5 overflow-y-auto ${compactMode ? "pb-1.5" : "pb-2"}`}>
+            <div className={`flex flex-nowrap items-center gap-1.5 overflow-x-auto no-scrollbar ${compactMode ? "pb-1.5" : "pb-2"}`}>
               {BUILTIN_FILTERS.map((item) => {
                 const Icon = item.icon;
                 const active = resolvedActiveFilter === item.id;
@@ -1262,7 +1262,7 @@ export default function SidebarPanel({
           <button
             type="button"
             onClick={() => setQuickActionsOpen(false)}
-            className="absolute inset-0 z-[18] bg-slate-950/25"
+            className="absolute inset-0 z-[18] bg-slate-950/35 backdrop-blur-[6px] transition-all duration-300"
             aria-label="Close quick actions"
           />
         )}

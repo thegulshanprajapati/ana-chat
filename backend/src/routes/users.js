@@ -303,6 +303,44 @@ router.patch("/me", requireUser, avatarUpload, async (req, res) => {
   res.json(profilePayload(updated));
 });
 
+router.post("/profile/avatar", requireUser, avatarUpload, async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: "No file uploaded" });
+  }
+
+  const userId = req.user.id;
+  let avatarUrl = `/uploads/${req.file.filename}`;
+
+  if (process.env.CLOUDINARY_URL || (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)) {
+    try {
+      const uploadResult = await cloudinary.uploader.upload(req.file.path, {
+        folder: "anachat_avatars",
+        transformation: [{ width: 512, height: 512, crop: "fill" }]
+      });
+      avatarUrl = uploadResult.secure_url;
+      fs.unlink(req.file.path, () => {});
+    } catch (err) {
+      console.error("Cloudinary upload failed:", err);
+      avatarUrl = `/uploads/${req.file.filename}`;
+    }
+  }
+
+  const db = await getDb();
+  await db.collection("users").updateOne({ id: userId }, {
+    $set: {
+      avatar_url: avatarUrl,
+      updated_at: new Date()
+    }
+  });
+
+  res.json({
+    success: true,
+    avatarUrl: avatarUrl,
+    thumbnail: avatarUrl,
+    updatedAt: new Date().toISOString()
+  });
+});
+
 // E2EE: client uploads public key (private key never leaves the browser).
 router.put("/me/public-key", requireUser, async (req, res) => {
   const publicKey = req.body?.publicKey;

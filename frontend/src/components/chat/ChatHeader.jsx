@@ -24,8 +24,28 @@ import {
 import Avatar from "../common/Avatar";
 import { formatDayLabel, formatTime } from "../../utils/time";
 
-function lastSeenText(partner) {
+function lastSeenText(partner, nowMs = Date.now()) {
   if (!partner?.last_seen) return "offline";
+  const lastSeenTime = new Date(partner.last_seen).getTime();
+  const diffMs = nowMs - lastSeenTime;
+  const diffSecs = Math.floor(diffMs / 1000);
+
+  if (diffSecs < 0) return "online"; // clock skew safety
+  if (diffSecs < 60) {
+    if (diffSecs <= 5) return "last seen just now";
+    return `last seen ${diffSecs} seconds ago`;
+  }
+
+  const diffMins = Math.floor(diffSecs / 60);
+  if (diffMins < 60) {
+    return `last seen ${diffMins} minute${diffMins > 1 ? "s" : ""} ago`;
+  }
+
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) {
+    return `last seen ${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+  }
+
   const day = formatDayLabel(partner.last_seen);
   const time = formatTime(partner.last_seen);
   if (!day || !time) return "offline";
@@ -97,7 +117,7 @@ export default function ChatHeader({
   }, [menuOpen]);
 
   useEffect(() => {
-    const timer = setInterval(() => setNowMs(Date.now()), 15000);
+    const timer = setInterval(() => setNowMs(Date.now()), 5000);
     return () => clearInterval(timer);
   }, []);
 
@@ -123,7 +143,7 @@ export default function ChatHeader({
   const typingSubtitle = isTyping ? (isGroup ? `${safeTypingName} typing...` : "typing...") : "";
   const subtitleText = typingSubtitle || (isGroup
     ? (memberCount ? `${memberCount} members` : "Group chat")
-    : (aboutText || (showOnlineStatus ? (online ? "online" : lastSeenText(partner)) : "")));
+    : (aboutText || (showOnlineStatus ? (online ? "online" : lastSeenText(partner, nowMs)) : "")));
   const contactText = isGroup
     ? (memberCount ? `${memberCount} members` : "Group chat")
     : (chat?.other_user_mobile || chat?.other_user_email || "No contact info");
@@ -229,7 +249,7 @@ export default function ChatHeader({
                     </p>
                   )}
                   {showOnlineStatus && (
-                    <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{online ? "Online now" : lastSeenText(partner)}</p>
+                    <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{online ? "Online now" : lastSeenText(partner, nowMs)}</p>
                   )}
                   {!isGroup && blockedByMe && (
                     <p className="mt-1 rounded-md border border-amber-300/70 bg-amber-50 px-1.5 py-1 text-[11px] text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">

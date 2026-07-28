@@ -197,6 +197,12 @@ app.use(`${apiPrefix}/auth`, authLimiter);
 app.use(`${apiPrefix}/auth`, authRoutes);
 app.use(`${apiPrefix}/admin`, adminRoutes);
 app.use(`${apiPrefix}/users`, usersRoutes);
+app.use(`${apiPrefix}/profile`, (req, _res, next) => {
+  if (req.url === "/avatar" || req.url === "/avatar/") {
+    req.url = "/profile/avatar";
+  }
+  next();
+}, usersRoutes);
 app.use(`${apiPrefix}/chats`, chatsRoutes);
 app.use(`${apiPrefix}/messages`, messagesRoutes);
 app.use(`${apiPrefix}/webhooks`, webhookRoutes);

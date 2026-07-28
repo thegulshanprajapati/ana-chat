@@ -1232,6 +1232,7 @@ function MessageBubble({
                         width="100%"
                         height={320}
                         lazyLoadEmojis
+                        emojiStyle="native"
                         theme={theme === "dark" ? "dark" : "light"}
                         onEmojiClick={(emoji) => handleReactionSelect(emoji.emoji)}
                       />
