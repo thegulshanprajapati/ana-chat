@@ -252,7 +252,7 @@ async function getUserChats(userId, options = {}) {
   }, { projection: { _id: 0, message_id: 1 } }).toArray();
   const hiddenMsgIds = hiddenMessageStateRows.map((row) => Number(row.message_id)).filter(Boolean);
 
-  const matchStage = { chat_id: { $in: chatIds } };
+  const matchStage = { chat_id: { $in: chatIds }, deleted_for_everyone: { $ne: true } };
   if (hiddenMsgIds.length) {
     matchStage.id = { $nin: hiddenMsgIds };
   }
@@ -267,6 +267,7 @@ async function getUserChats(userId, options = {}) {
           body: { $first: "$body" },
           image_url: { $first: "$image_url" },
           e2ee: { $first: "$e2ee" },
+          deleted_for_everyone: { $first: "$deleted_for_everyone" },
           created_at: { $first: "$created_at" }
         }
       }
@@ -351,7 +352,8 @@ async function getUserChats(userId, options = {}) {
       last_message_body: last?.body ?? null,
       last_message_image: last?.image_url ?? null,
       last_message_created_at: last?.created_at ?? null,
-      last_message_e2ee: last?.e2ee ? e2eeForUser(last.e2ee, me) : null
+      last_message_e2ee: last?.e2ee ? e2eeForUser(last.e2ee, me) : null,
+      last_message_deleted_for_everyone: last?.deleted_for_everyone ? 1 : 0
     };
 
     if (chatType === "group") {
@@ -803,6 +805,8 @@ router.post("/:chatId/clear", requireUser, async (req, res) => {
       { upsert: true }
     )
   ));
+
+  emitChatUpdated(req, [req.user.id], chatId);
 
   res.json({ success: true });
 });

@@ -12,6 +12,7 @@ import { api, API_BASE_URL } from "../../api/client";
 import { mediaSrc, isVideoMedia } from "../../utils/chat";
 import CustomConfirmDialog from "../common/CustomConfirmDialog";
 import { useToast } from "../../context/ToastContext";
+import { clearLocalMessagesForChat } from "../../utils/localDb";
 
 const REPORT_REASONS = [
   { id: "spam", label: "Spam" },
@@ -200,6 +201,7 @@ export default function PartnerProfileSheet({
     setConfirmClearOpen(false);
     try {
       await api.post(`/chats/${chatId}/clear`);
+      await clearLocalMessagesForChat(chatId).catch(() => {});
       window.dispatchEvent(new Event("ana_chats_updated"));
       window.dispatchEvent(new CustomEvent("ana_active_chat_cleared", { detail: { chatId } }));
       success("Chat cleared successfully.");

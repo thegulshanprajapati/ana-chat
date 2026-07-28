@@ -22,6 +22,7 @@ import { useAuth } from "../../context/AuthContext";
 import { api } from "../../api/client";
 import CustomConfirmDialog from "../common/CustomConfirmDialog";
 import { useToast } from "../../context/ToastContext";
+import { clearLocalMessagesForChat } from "../../utils/localDb";
 
 function escapeHtml(value) {
   return (value || "")
@@ -264,6 +265,7 @@ export default function ChatListItem({
     setConfirmClearOpen(false);
     try {
       await api.post(`/chats/${chat.id}/clear`);
+      await clearLocalMessagesForChat(chat.id).catch(() => {});
       window.dispatchEvent(new Event("ana_chats_updated"));
       window.dispatchEvent(new CustomEvent("ana_active_chat_cleared", { detail: { chatId: chat.id } }));
       success("Chat cleared successfully.");
@@ -447,8 +449,10 @@ export default function ChatListItem({
     ? "You blocked this user"
     : (blockedMe
       ? "This user blocked you"
-      : (chat.last_message_body
-        || (chat.last_message_image ? "[media]" : (chat.last_message_at || chat.last_message_created_at ? "Message deleted" : "Start conversation")))));
+      : (chat.last_message_deleted_for_everyone
+        ? "Message deleted"
+        : (chat.last_message_body
+          || (chat.last_message_image ? "[media]" : (chat.last_message_e2ee ? "🔒 Encrypted message" : "Start conversation"))))));
   const titleClass = active
     ? "text-slate-900 dark:text-slate-50"
     : (customDark ? "text-white" : "text-slate-900 dark:text-slate-100");

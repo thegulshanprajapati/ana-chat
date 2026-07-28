@@ -58,9 +58,37 @@ function getUploadedFile(req) {
   return req.files?.media?.[0] || req.files?.image?.[0] || req.files?.video?.[0] || null;
 }
 
-// GET /messages/:chatId returns empty array as server doesn't store chat history permanently
 router.get("/:chatId", requireUser, async (req, res) => {
-  res.json([]);
+  const chatId = Number(req.params.chatId);
+  if (!chatId) return res.status(400).json({ message: "chatId required" });
+
+  try {
+    const db = await getDb();
+    const chat = await getChatMembership(db, chatId, req.user.id);
+    if (!chat) return res.status(403).json({ message: "Not chat participant" });
+
+    const hiddenRows = await db.collection("message_user_state").find(
+      { user_id: Number(req.user.id), chat_id: chatId, hidden_at: { $ne: null } },
+      { projection: { _id: 0, message_id: 1 } }
+    ).toArray();
+    const hiddenIds = hiddenRows.map((row) => Number(row.message_id)).filter(Boolean);
+    const filter = { chat_id: chatId };
+    if (hiddenIds.length) filter.id = { $nin: hiddenIds };
+
+    const rows = await db.collection("messages")
+      .find(filter, { projection: { _id: 0 } })
+      .sort({ created_at: 1, id: 1 })
+      .limit(500)
+      .toArray();
+
+    res.json(rows.map((message) => ({
+      ...message,
+      e2ee: message.e2ee ? e2eeForUser(message.e2ee, req.user.id) : null
+    })));
+  } catch (err) {
+    console.error("Failed to load messages:", err);
+    res.status(500).json({ message: "Failed to load messages" });
+  }
 });
 
 // Backup APIs
@@ -186,6 +214,20 @@ async function sendMessageHandler(req, res) {
     deleted_for_everyone: false
   };
 
+  await db.collection("messages").updateOne(
+    clientMessageId
+      ? { client_message_id: clientMessageId, sender_id: Number(req.user.id) }
+      : { id: messageId },
+    {
+      $setOnInsert: messagePayload
+    },
+    { upsert: true }
+  );
+  await db.collection("chats").updateOne(
+    { id: chatId },
+    { $set: { last_message_at: messagePayload.created_at, updated_at: new Date() } }
+  );
+
   // Relay via Socket.IO
   const io = req.app.get("io");
   const participantIds = await getChatParticipantIds(db, chat);
@@ -246,24 +288,74 @@ router.patch("/:chatId/seen", requireUser, async (req, res) => {
 
 router.patch("/:messageId/edit", requireUser, async (req, res) => {
   const messageId = Number(req.params.messageId);
+  const chatId = Number(req.body.chatId);
+  const e2ee = parseE2EE(req.body?.e2ee);
+  if (chatId) {
+    try {
+      const db = await getDb();
+      const chat = await getChatMembership(db, chatId, req.user.id);
+      if (!chat) return res.status(403).json({ message: "Not chat participant" });
+      await db.collection("messages").updateOne(
+        { id: messageId, chat_id: chatId, sender_id: Number(req.user.id) },
+        { $set: { e2ee, edited_at: new Date().toISOString() } }
+      );
+    } catch (err) {
+      console.error("Edit persist failed:", err);
+    }
+  }
   const io = req.app.get("io");
   if (io) {
     io.emit("message_updated", {
       id: messageId,
-      chat_id: Number(req.body.chatId),
-      e2ee: parseE2EE(req.body?.e2ee)
+      chat_id: chatId,
+      e2ee
     });
   }
-  res.json({ success: true });
+  res.json({ success: true, message: { id: messageId, chat_id: chatId, e2ee } });
 });
 
 router.post("/:messageId/delete-for-everyone", requireUser, async (req, res) => {
   const messageId = Number(req.params.messageId);
+  const chatId = Number(req.body.chatId);
+  try {
+    const db = await getDb();
+    const message = await db.collection("messages").findOne(
+      { id: messageId, chat_id: chatId },
+      { projection: { _id: 0, sender_id: 1 } }
+    );
+    if (!message) return res.status(404).json({ message: "Message not found" });
+    if (Number(message.sender_id) !== Number(req.user.id)) {
+      return res.status(403).json({ message: "Only sender can delete this message for everyone" });
+    }
+    await db.collection("messages").updateOne(
+      { id: messageId, chat_id: chatId },
+      {
+        $set: {
+          body: null,
+          image_url: null,
+          e2ee: null,
+          deleted_for_everyone: true,
+          deleted_for_everyone_at: new Date().toISOString()
+        }
+      }
+    );
+    const chat = await getChatMembership(db, chatId, req.user.id);
+    const participantIds = chat ? await getChatParticipantIds(db, chat) : [];
+    const io = req.app.get("io");
+    if (io) {
+      participantIds.forEach((uid) => {
+        io.to(`user_${uid}`).emit("chat_updated", { chatId });
+      });
+    }
+  } catch (err) {
+    console.error("Delete-for-everyone persist failed:", err);
+    return res.status(500).json({ message: "Failed to delete message" });
+  }
   const io = req.app.get("io");
   if (io) {
     io.emit("message_deleted_everyone", {
       messageId,
-      chatId: Number(req.body.chatId),
+      chatId,
       deletedByUserId: req.user.id
     });
   }
@@ -271,6 +363,27 @@ router.post("/:messageId/delete-for-everyone", requireUser, async (req, res) => 
 });
 
 router.post("/:messageId/delete-for-me", requireUser, async (req, res) => {
+  const messageId = Number(req.params.messageId);
+  const chatId = Number(req.body?.chatId);
+  if (messageId && chatId) {
+    try {
+      const db = await getDb();
+      const chat = await getChatMembership(db, chatId, req.user.id);
+      if (!chat) return res.status(403).json({ message: "Not chat participant" });
+      const now = new Date();
+      await db.collection("message_user_state").updateOne(
+        { user_id: Number(req.user.id), message_id: messageId },
+        {
+          $set: { hidden_at: now, chat_id: chatId, updated_at: now },
+          $setOnInsert: { user_id: Number(req.user.id), message_id: messageId, is_starred: false, created_at: now }
+        },
+        { upsert: true }
+      );
+    } catch (err) {
+      console.error("Delete-for-me persist failed:", err);
+      return res.status(500).json({ message: "Failed to delete message for you" });
+    }
+  }
   res.json({ success: true });
 });
 
@@ -405,6 +518,12 @@ router.post("/:messageId/forward", requireUser, async (req, res) => {
       deleted_for_everyone: false
     };
 
+    await db.collection("messages").insertOne(forwardPayload);
+    await db.collection("chats").updateOne(
+      { id: Number(targetChatId) },
+      { $set: { last_message_at: forwardPayload.created_at, updated_at: new Date() } }
+    );
+
     const io = req.app.get("io");
     if (io) {
       const participantIds = await getChatParticipantIds(db, chat);
@@ -429,4 +548,3 @@ router.post("/:messageId/forward", requireUser, async (req, res) => {
 });
 
 export default router;
-

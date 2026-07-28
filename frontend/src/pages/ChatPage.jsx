@@ -20,7 +20,9 @@ import {
   deleteLocalMessage,
   clearLocalDb,
   exportLocalDbAsJson,
-  importLocalDbFromJson
+  importLocalDbFromJson,
+  deleteLocalChat,
+  clearLocalMessagesForChat
 } from "../utils/localDb";
 import SidebarPanel from "../components/sidebar/SidebarPanel";
 import ChatPane from "../components/chat/ChatPane";
@@ -539,8 +541,22 @@ export default function ChatPage() {
     }, 150);
     try {
       const localMsgs = await getLocalMessages(chatId);
+      let serverMsgs = [];
+      try {
+        const { data } = await api.get(`/messages/${chatId}`);
+        const rawServerMsgs = Array.isArray(data) ? data : [];
+        serverMsgs = await Promise.all(rawServerMsgs.map((item) => decryptMessageForMe(item)));
+        await Promise.all(serverMsgs.map((item) => saveLocalMessage(item).catch(() => {})));
+      } catch (err) {
+        console.warn("Failed to sync server messages:", err);
+      }
+      const messageMap = new Map();
+      [...localMsgs, ...serverMsgs].forEach((item) => {
+        if (item?.id) messageMap.set(String(item.id), item);
+      });
+      const mergedMsgs = [...messageMap.values()].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
       clearTimeout(timer);
-      setMessages(localMsgs);
+      setMessages(mergedMsgs);
       setUnreadByChat((prev) => ({ ...prev, [chatId]: 0 }));
       setLoadingMessages(false);
       return true;
@@ -551,7 +567,7 @@ export default function ChatPage() {
       notify({ type: "error", message: "Unable to load messages locally." });
       return false;
     }
-  }, [notify]);
+  }, [decryptMessageForMe, notify]);
 
   const selectChat = useCallback(async (chat) => {
     if (!chat) return;
@@ -987,9 +1003,12 @@ export default function ChatPage() {
       onConfirm: async () => {
         try {
           await api.delete(`/chats/${id}`);
+          await clearLocalMessagesForChat(id).catch(() => {});
+          await deleteLocalChat(id).catch(() => {});
           notify({ type: "success", message: "Chat deleted successfully." });
           if (Number(activeChat?.id) === id) {
             setActiveChat(null);
+            setMessages([]);
           }
           await loadChats();
         } catch (err) {
@@ -1314,7 +1333,8 @@ export default function ChatPage() {
   const removeLocalMessage = useCallback(async (message) => {
     if (!message?.id) return;
     try {
-      await api.post(`/messages/${message.id}/delete-for-me`);
+      await api.post(`/messages/${message.id}/delete-for-me`, { chatId: message.chat_id });
+      await deleteLocalMessage(message.id).catch(() => {});
       setMessages((prev) => prev.filter((item) => item.id !== message.id));
       notify({ type: "success", message: "Message deleted for you." });
     } catch (err) {
@@ -1336,9 +1356,10 @@ export default function ChatPage() {
       const recipients = await getChatRecipients(chatId);
       const { e2ee } = await encryptOutgoingMessage({ plaintext: text, file: null, recipients });
 
-      const { data } = await api.patch(`/messages/${message.id}/edit`, { e2ee });
-      const decrypted = await decryptMessageForMe(data);
+      const { data } = await api.patch(`/messages/${message.id}/edit`, { chatId, e2ee });
+      const decrypted = await decryptMessageForMe({ ...message, ...(data?.message || {}), e2ee });
       applyMessagePatch(message.id, decrypted);
+      await saveLocalMessage(decrypted).catch(() => {});
     } catch (err) {
       notify({
         type: "error",
@@ -1350,13 +1371,16 @@ export default function ChatPage() {
   const deleteForEveryone = useCallback(async (message) => {
     if (!message?.id) return;
     try {
-      await api.post(`/messages/${message.id}/delete-for-everyone`);
-      applyMessagePatch(message.id, {
+      const patch = {
         body: null,
         image_url: null,
         e2ee: null,
         deleted_for_everyone: true
-      });
+      };
+      await api.post(`/messages/${message.id}/delete-for-everyone`, { chatId: message.chat_id });
+      applyMessagePatch(message.id, patch);
+      await saveLocalMessage({ ...message, ...patch }).catch(() => {});
+      await loadChats();
       notify({ type: "success", message: "Message deleted for everyone." });
     } catch (err) {
       notify({
@@ -1565,6 +1589,9 @@ export default function ChatPage() {
     };
     const handleChatCleared = (e) => {
       const clearedChatId = Number(e.detail?.chatId);
+      if (clearedChatId) {
+        void clearLocalMessagesForChat(clearedChatId).catch(() => {});
+      }
       if (clearedChatId && activeChatIdRef.current === clearedChatId) {
         setMessages([]);
       }

@@ -168,3 +168,35 @@ export async function importLocalDbFromJson(jsonString) {
     tx.onerror = () => reject(tx.error);
   });
 }
+
+export async function deleteLocalChat(chatId) {
+  const db = await openLocalDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("chats", "readwrite");
+    const store = tx.objectStore("chats");
+    const req = store.delete(Number(chatId));
+    req.onsuccess = () => resolve(true);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function clearLocalMessagesForChat(chatId) {
+  const db = await openLocalDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("messages", "readwrite");
+    const store = tx.objectStore("messages");
+    const index = store.index("chat_id");
+    const req = index.openCursor(IDBKeyRange.only(Number(chatId)));
+    req.onsuccess = (event) => {
+      const cursor = event.target.result;
+      if (cursor) {
+        cursor.delete();
+        cursor.continue();
+      } else {
+        resolve(true);
+      }
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
