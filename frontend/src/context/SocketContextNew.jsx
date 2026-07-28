@@ -6,42 +6,19 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  initializeSocket,
-  getSocket,
-  subscribe,
-  isConnected as socketIsConnected,
-  getReconnectionStatus,
-  disconnect as socketDisconnect,
-  reauthenticate as socketReauthenticate,
-  reconnect as socketReconnect,
-  joinRoom as socketJoinRoom,
-  leaveRoom as socketLeaveRoom
-} from "../utils/socket";
 import { useAuth } from "./AuthContext";
 
-/**
- * ===== CRITICAL FIX 22: Socket Context with Singleton =====
- * 
- * This provider uses the global socket singleton created in utils/socket.js
- * It does NOT create or manage sockets directly - it only wraps access
- * to the singleton with React state for component re-renders.
- * 
- * Key principles:
- * - Socket is created ONCE at app startup
- * - Socket persists across page navigations and re-renders
- * - Provider only tracks connection state for React re-renders
- * - Reconnection logic is handled by socket.js, not here
- */
+// Lazy import all socket utilities inside functions to avoid TDZ/scope-shadowing
+// when Vite/Rollup minifies the bundle. This is the only safe pattern.
+async function getSocketUtils() {
+  return await import("../utils/socket");
+}
 
 const SocketContext = createContext(null);
 
 export function useSocket() {
-  const context = useContext(SocketContext);
-  if (!context) {
-    throw new Error("useSocket must be used within SocketProvider");
-  }
-  return context;
+  // Return null instead of throwing — consumers must handle null safely
+  return useContext(SocketContext);
 }
 
 const CONNECTION_STATES = {
@@ -50,41 +27,50 @@ const CONNECTION_STATES = {
   CONNECTED: "connected",
   DISCONNECTED: "disconnected",
   ERROR: "error",
-  RECONNECTING: "reconnecting"
+  RECONNECTING: "reconnecting",
 };
 
 export function SocketProvider({ children }) {
   const { user, token } = useAuth();
 
-  // ===== CRITICAL FIX 23: Connection state (for React re-renders only) =====
   const [connectionState, setConnectionState] = useState(
     CONNECTION_STATES.UNINITIALIZED
   );
   const [reconnectionStatus, setReconnectionStatus] = useState({
     attempts: 0,
     maxAttempts: 25,
-    hasReachedMax: false
+    hasReachedMax: false,
   });
 
-  // ===== CRITICAL FIX 24: Track if we've initialized =====
   const initializationRef = useRef(false);
   const unsubscribeRef = useRef(null);
   const lastTokenRef = useRef(token);
+  const socketUtilsRef = useRef(null);
+
+  // Pre-load socket utils once
+  useEffect(() => {
+    getSocketUtils().then((utils) => {
+      socketUtilsRef.current = utils;
+    });
+  }, []);
 
   // Update token ref when it changes
   useEffect(() => {
     lastTokenRef.current = token;
   }, [token]);
 
-  // ===== CRITICAL FIX 25: Initialize socket only when authenticated =====
+  // Initialize socket when user logs in, cleanup on logout
   useEffect(() => {
     if (!user) {
-      socketDisconnect();
+      // Cleanup on logout
       initializationRef.current = false;
       setConnectionState(CONNECTION_STATES.DISCONNECTED);
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
         unsubscribeRef.current = null;
+      }
+      if (socketUtilsRef.current) {
+        socketUtilsRef.current.disconnect();
       }
       return;
     }
@@ -100,9 +86,12 @@ export function SocketProvider({ children }) {
         console.log("[SocketProvider] Initializing socket for user:", user.id);
         setConnectionState(CONNECTION_STATES.CONNECTING);
 
-        await initializeSocket();
+        const utils = await getSocketUtils();
+        socketUtilsRef.current = utils;
 
-        const unsubscribe = subscribe((state) => {
+        await utils.initializeSocket();
+
+        const unsubscribe = utils.subscribe((state) => {
           console.log("[SocketProvider] Socket state changed:", state);
 
           if (state === "connected") {
@@ -115,11 +104,11 @@ export function SocketProvider({ children }) {
             setConnectionState(CONNECTION_STATES.RECONNECTING);
           }
 
-          const status = getReconnectionStatus();
+          const status = utils.getReconnectionStatus();
           setReconnectionStatus({
             attempts: status.reconnectAttempts,
             maxAttempts: status.maxAttempts,
-            hasReachedMax: status.hasReachedMaxAttempts
+            hasReachedMax: status.hasReachedMaxAttempts,
           });
         });
 
@@ -140,15 +129,17 @@ export function SocketProvider({ children }) {
     };
   }, [user]);
 
-  // ===== CRITICAL FIX 26: Handle token refresh =====
+  // Re-authenticate on token change
   useEffect(() => {
-    if (lastTokenRef.current !== token && token && socketIsConnected()) {
+    if (!socketUtilsRef.current) return;
+    const utils = socketUtilsRef.current;
+    if (lastTokenRef.current !== token && token && utils.isConnected()) {
       console.log("[SocketProvider] Token changed, re-authenticating");
-      socketReauthenticate();
+      utils.reauthenticate();
     }
   }, [token]);
 
-  // ===== CRITICAL FIX 27: Cleanup on unmount =====
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (unsubscribeRef.current) {
@@ -158,45 +149,43 @@ export function SocketProvider({ children }) {
     };
   }, []);
 
-  // ===== CRITICAL FIX 28: Provide stable socket API =====
+  // Build the stable API object
   const socketAPI = useMemo(() => {
-    const socket = getSocket();
+    const utils = socketUtilsRef.current;
+    const rawSocket = utils ? utils.getSocket() : null;
 
     return {
-      // Connection state
-      isConnected: socketIsConnected(),
+      isConnected: utils ? utils.isConnected() : false,
       connectionState,
       reconnectionStatus,
 
-      // Socket methods (from singleton)
-      emit: (...args) => socket?.emit?.(...args),
-      on: (...args) => socket?.on?.(...args),
-      once: (...args) => socket?.once?.(...args),
-      off: (...args) => socket?.off?.(...args),
+      emit: (...args) => rawSocket?.emit?.(...args),
+      on: (...args) => rawSocket?.on?.(...args),
+      once: (...args) => rawSocket?.once?.(...args),
+      off: (...args) => rawSocket?.off?.(...args),
+
       joinRoom: (room) => {
         console.log("[SocketProvider] joinRoom", room);
-        socketJoinRoom(room);
+        utils?.joinRoom?.(room);
       },
       leaveRoom: (room) => {
         console.log("[SocketProvider] leaveRoom", room);
-        socketLeaveRoom(room);
+        utils?.leaveRoom?.(room);
       },
 
-      // Utility methods
       disconnect: () => {
-        socketDisconnect();
+        utils?.disconnect?.();
         setConnectionState(CONNECTION_STATES.DISCONNECTED);
       },
       reconnect: () => {
-        socketReconnect();
+        utils?.reconnect?.();
         setConnectionState(CONNECTION_STATES.RECONNECTING);
       },
       reauthenticate: () => {
-        socketReauthenticate();
+        utils?.reauthenticate?.();
       },
 
-      // Raw socket for advanced usage
-      raw: socket
+      raw: rawSocket,
     };
   }, [connectionState, reconnectionStatus]);
 

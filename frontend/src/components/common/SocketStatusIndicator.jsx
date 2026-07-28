@@ -7,11 +7,11 @@ const CONNECTION_STATES = {
   CONNECTING: 'connecting',
   CONNECTED: 'connected',
   RECONNECTING: 'reconnecting',
-  ERROR: 'error'
+  ERROR: 'error',
 };
 
 export function SocketStatusIndicator() {
-  const socket = useSocket();
+  const socket = useSocket(); // may be null — handled safely below
   const isOnline = useOnlineStatus();
 
   const status = useMemo(() => {
@@ -57,14 +57,16 @@ export function SocketStatusIndicator() {
 }
 
 export function ConnectionBanner() {
-  const socket = useSocket();
+  const socket = useSocket(); // null-safe — no throw
   const isOnline = useOnlineStatus();
 
   const showBanner = useMemo(() => {
     if (!isOnline) return true;
     if (!socket) return false;
-    return socket.connectionState === CONNECTION_STATES.ERROR ||
-           socket.connectionState === CONNECTION_STATES.DISCONNECTED;
+    return (
+      socket.connectionState === CONNECTION_STATES.ERROR ||
+      socket.connectionState === CONNECTION_STATES.DISCONNECTED
+    );
   }, [socket, isOnline]);
 
   if (!showBanner) return null;
