@@ -100,7 +100,7 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
                 currentAvatarUrl={me?.avatar_url}
                 userName={name}
                 onUploadSuccess={(newUrl) => {
-                  onSaved?.({ ...me, avatar_url: newUrl });
+                  onSaved?.({ ...me, avatar_url: newUrl }, true);
                 }}
                 notify={notify}
               />

@@ -114,8 +114,8 @@ export const AvatarUploader = ({
       form.append("avatar", croppedBlob, "avatar.webp");
 
       try {
-        // Send post request to /api/profile/avatar
-        const response = await fetch("/api/profile/avatar", {
+        // Send post request to /api/users/profile/avatar
+        const response = await fetch("/api/users/profile/avatar", {
           method: "POST",
           headers: {
             // Let the browser set the boundary headers automatically

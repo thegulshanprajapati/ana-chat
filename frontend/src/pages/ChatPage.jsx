@@ -1384,7 +1384,10 @@ export default function ChatPage() {
   const reactToMessage = useCallback(async (message, reaction) => {
     if (!message?.id) return;
     try {
-      const { data } = await api.post(`/messages/${message.id}/react`, { reaction });
+      const { data } = await api.post(`/messages/${message.id}/react`, {
+        reaction,
+        chatId: message.chat_id || message.chatId
+      });
       applyMessagePatch(message.id, {
         my_reaction: data.my_reaction || null,
         reactions: data.reactions || {}
@@ -1530,6 +1533,13 @@ export default function ChatPage() {
     const list = Array.isArray(filteredChats) ? filteredChats : [];
     const lockerChat = list.find((c) => c.chat_type === "self");
     const remainingList = list.filter((c) => c.chat_type !== "self");
+
+    // Sort remainingList by latest message time
+    remainingList.sort((a, b) => {
+      const left = new Date(b.last_message_at || b.last_message_created_at || 0).getTime();
+      const right = new Date(a.last_message_at || a.last_message_created_at || 0).getTime();
+      return left - right;
+    });
 
     const pinnedSet = new Set(pinnedChatIds.map((id) => Number(id)).filter(Boolean));
     const pinned = [];
@@ -2725,10 +2735,12 @@ export default function ChatPage() {
         open={profileOpen}
         me={user}
         onClose={() => setProfileOpen(false)}
-        onSaved={async () => {
+        onSaved={async (updatedUser, keepOpen) => {
           await reload();
           await loadChats();
-          setProfileOpen(false);
+          if (!keepOpen) {
+            setProfileOpen(false);
+          }
         }}
         notify={notify}
       />

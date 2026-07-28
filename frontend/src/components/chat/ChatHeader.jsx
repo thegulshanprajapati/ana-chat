@@ -143,15 +143,15 @@ export default function ChatHeader({
   const typingSubtitle = isTyping ? (isGroup ? `${safeTypingName} typing...` : "typing...") : "";
   const subtitleText = typingSubtitle || (isGroup
     ? (memberCount ? `${memberCount} members` : "Group chat")
-    : (aboutText || (showOnlineStatus ? (online ? "online" : lastSeenText(partner, nowMs)) : "")));
+    : (chat.chat_type === "self"
+      ? "Only visible to you"
+      : (showOnlineStatus ? (online ? "online" : lastSeenText(partner, nowMs)) : "")));
   const contactText = isGroup
     ? (memberCount ? `${memberCount} members` : "Group chat")
     : (chat?.other_user_mobile || chat?.other_user_email || "No contact info");
   const subtitleClass = isTyping
     ? "text-violet-600 dark:text-violet-300"
-    : (!isGroup && aboutText
-      ? "text-slate-500 dark:text-slate-400"
-      : (online ? "text-emerald-500" : "text-slate-500 dark:text-slate-400"));
+    : (online ? "text-emerald-500" : "text-slate-500 dark:text-slate-400");
 
   async function copyContact() {
     try {

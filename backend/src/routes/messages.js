@@ -274,4 +274,72 @@ router.post("/:messageId/delete-for-me", requireUser, async (req, res) => {
   res.json({ success: true });
 });
 
+router.post("/:messageId/react", requireUser, async (req, res) => {
+  const messageId = req.params.messageId;
+  const { reaction, chatId } = req.body;
+  const userId = req.user.id;
+
+  if (!chatId) {
+    return res.status(400).json({ message: "chatId is required" });
+  }
+
+  try {
+    const db = await getDb();
+    const chat = await getChatMembership(db, Number(chatId), userId);
+    if (!chat) {
+      return res.status(403).json({ message: "Not chat participant" });
+    }
+
+    if (!reaction) {
+      await query(
+        "DELETE FROM message_reactions WHERE message_id = $1 AND user_id = $2",
+        [messageId, Number(userId)]
+      );
+    } else {
+      await query(
+        `INSERT INTO message_reactions (message_id, user_id, reaction)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (message_id, user_id)
+         DO UPDATE SET reaction = EXCLUDED.reaction`,
+        [messageId, Number(userId), reaction]
+      );
+    }
+
+    // Get all reactions for this message to build reactions summary object
+    const rxRes = await query(
+      "SELECT user_id, reaction FROM message_reactions WHERE message_id = $1",
+      [messageId]
+    );
+
+    const reactions = {};
+    rxRes.rows.forEach(row => {
+      reactions[row.reaction] = (reactions[row.reaction] || 0) + 1;
+    });
+
+    const my_reaction = reaction || null;
+
+    // Relay via Socket.IO to other participants
+    const io = req.app.get("io");
+    if (io) {
+      const participantIds = await getChatParticipantIds(db, chat);
+      participantIds.forEach(uid => {
+        io.to(`user_${uid}`).emit("message_reaction", {
+          messageId,
+          chatId: Number(chatId),
+          reactions
+        });
+      });
+    }
+
+    res.json({
+      success: true,
+      my_reaction,
+      reactions
+    });
+  } catch (err) {
+    console.error("Reaction failed:", err);
+    res.status(500).json({ message: "Failed to process reaction: " + err.message });
+  }
+});
+
 export default router;

@@ -333,6 +333,22 @@ router.post("/profile/avatar", requireUser, avatarUpload, async (req, res) => {
     }
   });
 
+  const updated = await db.collection("users").findOne({ id: userId });
+  const io = req.app.get("io");
+  if (io && updated) {
+    io.emit("user_profile_updated", {
+      id: updated.id,
+      name: updated.name,
+      email: updated.email,
+      mobile: updated.mobile,
+      avatar_url: updated.avatar_url,
+      about_bio: updated.about_bio || "",
+      status: updated.status,
+      last_seen: updated.last_seen,
+      is_verified: Boolean(updated.is_verified)
+    });
+  }
+
   res.json({
     success: true,
     avatarUrl: avatarUrl,

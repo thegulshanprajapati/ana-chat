@@ -263,6 +263,15 @@ export async function initDb() {
       );
     `);
 
+    await query(`
+      CREATE TABLE IF NOT EXISTS message_reactions (
+        message_id VARCHAR(100) NOT NULL,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        reaction VARCHAR(50) NOT NULL,
+        PRIMARY KEY (message_id, user_id)
+      );
+    `);
+
     // Seed default email templates if none exist
     const existing = await query("SELECT COUNT(*) FROM email_templates");
     if (Number(existing.rows[0].count) === 0) {
