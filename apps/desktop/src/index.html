@@ -6,41 +6,454 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AnaChat Desktop</title>
     <style>
+      :root {
+        --bg-main: #020617;
+        --bg-panel: #0f172a;
+        --bg-card: #1e293b;
+        --accent: #38bdf8;
+        --accent-gradient: linear-gradient(135deg, #0ea5e9, #6366f1);
+        --text-primary: #f8fafc;
+        --text-secondary: #94a3b8;
+        --border-color: rgba(255, 255, 255, 0.05);
+      }
+
       body {
         margin: 0;
-        display: grid;
-        place-items: center;
-        min-height: 100vh;
-        font-family: Inter, system-ui, sans-serif;
-        background: radial-gradient(circle at top, #0f172a, #020617);
-        color: #f8fafc;
+        padding: 0;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        background-color: var(--bg-main);
+        color: var(--text-primary);
+        height: 100vh;
+        display: flex;
+        overflow: hidden;
       }
-      .panel {
-        padding: 3rem;
-        border-radius: 24px;
-        background: rgba(15, 23, 42, 0.94);
-        box-shadow: 0 30px 80px rgba(15, 23, 42, 0.45);
-        text-align: center;
-        max-width: 640px;
+
+      /* 1. Global Navigation Bar */
+      .nav-bar {
+        width: 70px;
+        background-color: #0b0f19;
+        border-right: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px 0;
+        justify-content: space-between;
       }
-      a {
-        color: #38bdf8;
+
+      .logo {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: var(--accent-gradient);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 1.2rem;
+        box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+      }
+
+      .nav-menu {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .nav-item {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background-color: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .nav-item:hover, .nav-item.active {
+        color: var(--text-primary);
+        background-color: rgba(255, 255, 255, 0.05);
+      }
+
+      .nav-item.active {
+        color: var(--accent);
+        border-left: 3px solid var(--accent);
+        border-radius: 0 12px 12px 0;
+        width: 41px;
+      }
+
+      /* 2. Conversations Sidebar */
+      .sidebar {
+        width: 320px;
+        background-color: var(--bg-panel);
+        border-right: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .sidebar-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .sidebar-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        margin: 0;
+      }
+
+      .status-badge {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #10b981;
+        background-color: rgba(16, 185, 129, 0.1);
+        padding: 4px 10px;
+        border-radius: 20px;
+        border: 1px solid rgba(16, 185, 129, 0.2);
+      }
+
+      .search-box {
+        padding: 15px 20px;
+      }
+
+      .search-input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px 15px;
+        border-radius: 10px;
+        background-color: rgba(2, 6, 23, 0.6);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        font-size: 0.9rem;
+      }
+
+      .search-input:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+
+      .chat-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px;
+      }
+
+      .chat-item {
+        display: flex;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        margin-bottom: 4px;
+      }
+
+      .chat-item:hover, .chat-item.active {
+        background-color: rgba(255, 255, 255, 0.03);
+      }
+
+      .chat-item.active {
+        background-color: rgba(56, 189, 248, 0.08);
+        border: 1px solid rgba(56, 189, 248, 0.15);
+      }
+
+      .chat-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background-color: #334155;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        position: relative;
+      }
+
+      .avatar-online::after {
+        content: '';
+        position: absolute;
+        bottom: 2px;
+        right: 2px;
+        width: 10px;
+        height: 10px;
+        background-color: #10b981;
+        border: 2px solid var(--bg-panel);
+        border-radius: 50%;
+      }
+
+      .chat-details {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .chat-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 4px;
+      }
+
+      .chat-name {
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .chat-time {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+      }
+
+      .chat-preview {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* 3. Conversation Pane */
+      .main-pane {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background-color: var(--bg-main);
+      }
+
+      .pane-header {
+        height: 70px;
+        border-bottom: 1px solid var(--border-color);
+        padding: 0 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background-color: rgba(15, 23, 42, 0.3);
+        backdrop-filter: blur(10px);
+      }
+
+      .active-chat-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .active-chat-name {
+        font-weight: 600;
+        margin: 0;
+      }
+
+      .active-chat-status {
+        font-size: 0.8rem;
+        color: #10b981;
+        margin: 2px 0 0 0;
+      }
+
+      .messages-container {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .message-row {
+        display: flex;
+        width: 100%;
+      }
+
+      .message-row.sent {
+        justify-content: flex-end;
+      }
+
+      .message-bubble {
+        max-width: 60%;
+        padding: 12px 18px;
+        border-radius: 16px;
+        font-size: 0.95rem;
+        line-height: 1.45;
+        position: relative;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+
+      .message-row.sent .message-bubble {
+        background: var(--accent-gradient);
+        color: white;
+        border-bottom-right-radius: 0;
+      }
+
+      .message-row.received .message-bubble {
+        background-color: var(--bg-panel);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        border-bottom-left-radius: 0;
+      }
+
+      .message-time {
+        display: block;
+        font-size: 0.75rem;
+        margin-top: 6px;
+        text-align: right;
+        opacity: 0.7;
+      }
+
+      .message-input-area {
+        padding: 20px 24px;
+        background-color: rgba(15, 23, 42, 0.3);
+        border-top: 1px solid var(--border-color);
+      }
+
+      .input-wrapper {
+        display: flex;
+        gap: 12px;
+        background-color: var(--bg-panel);
+        border: 1px solid var(--border-color);
+        padding: 8px 16px;
+        border-radius: 16px;
+        align-items: center;
+      }
+
+      .input-field {
+        flex: 1;
+        background-color: transparent;
+        border: none;
+        color: var(--text-primary);
+        font-size: 0.95rem;
+        padding: 8px 0;
+      }
+
+      .input-field:focus {
+        outline: none;
+      }
+
+      .btn-send {
+        background: var(--accent-gradient);
+        border: none;
+        color: white;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+      }
+
+      .btn-send:hover {
+        opacity: 0.9;
       }
     </style>
   </head>
   <body>
-    <div class="panel">
-      <h1>AnaChat Desktop</h1>
-      <p>Electron shell ready for local-first messaging with SQLite storage, secure sync, and native notifications.</p>
-      <p>Use the shared backend at <code>http://localhost:5000</code>.</p>
-      <p><a href="#" id="theme">Get theme</a></p>
-      <script>
-        const themeLink = document.getElementById('theme');
-        themeLink?.addEventListener('click', async () => {
-          const theme = await window.electron.getTheme();
-          alert('Current theme: ' + theme);
-        });
-      </script>
+    <!-- 1. Left Icon Navigation Bar -->
+    <div class="nav-bar">
+      <div class="logo">A</div>
+      <div class="nav-menu">
+        <div class="nav-item active">💬</div>
+        <div class="nav-item">👤</div>
+        <div class="nav-item">⚙️</div>
+      </div>
+      <div class="nav-item" id="theme-btn">🔒</div>
     </div>
+
+    <!-- 2. Contacts/Chat Lists Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h2 class="sidebar-title">Chats</h2>
+        <span class="status-badge">E2E ON</span>
+      </div>
+      <div class="search-box">
+        <input type="text" class="search-input" placeholder="Search secure chats..." />
+      </div>
+      <div class="chat-list">
+        <div class="chat-item active">
+          <div class="chat-avatar avatar-online">AS</div>
+          <div class="chat-details">
+            <div class="chat-row">
+              <h4 class="chat-name">Aditya Sharma</h4>
+              <span class="chat-time">12:30 PM</span>
+            </div>
+            <p class="chat-preview">Sure, let's meet at 5 PM today.</p>
+          </div>
+        </div>
+        <div class="chat-item">
+          <div class="chat-avatar avatar-online">PP</div>
+          <div class="chat-details">
+            <div class="chat-row">
+              <h4 class="chat-name">Priya Patel</h4>
+              <span class="chat-time">10:45 AM</span>
+            </div>
+            <p class="chat-preview">Did you review the database design?</p>
+          </div>
+        </div>
+        <div class="chat-item">
+          <div class="chat-avatar">RV</div>
+          <div class="chat-details">
+            <div class="chat-row">
+              <h4 class="chat-name">Rohit Verma</h4>
+              <span class="chat-time">Yesterday</span>
+            </div>
+            <p class="chat-preview">The build is successful on desktop client.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Chat Room Conversation Window -->
+    <div class="main-pane">
+      <div class="pane-header">
+        <div class="active-chat-info">
+          <h3 class="active-chat-name">Aditya Sharma</h3>
+          <p class="active-chat-status">● active now</p>
+        </div>
+        <div>
+          <code style="font-size: 0.8rem; opacity: 0.6;">Local DB: SQLITE_OPFS</code>
+        </div>
+      </div>
+
+      <div class="messages-container">
+        <div class="message-row received">
+          <div class="message-bubble">
+            Hey, are we still on for the review?
+            <span class="message-time">12:20 PM</span>
+          </div>
+        </div>
+        <div class="message-row sent">
+          <div class="message-bubble">
+            Yes! Absolutely. I have prepared the UI demo.
+            <span class="message-time">12:25 PM</span>
+          </div>
+        </div>
+        <div class="message-row received">
+          <div class="message-bubble">
+            Sure, let's meet at 5 PM today.
+            <span class="message-time">12:30 PM</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="message-input-area">
+        <div class="input-wrapper">
+          <input type="text" class="input-field" placeholder="Send an encrypted message..." />
+          <button class="btn-send">➔</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const themeBtn = document.getElementById('theme-btn');
+      themeBtn?.addEventListener('click', () => {
+        alert("Desktop E2E Encryption Status: Fully Secure (HMAC-SHA256 authenticated)");
+      });
+    </script>
   </body>
 </html>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Flag, ShieldAlert, UserCheck, UserMinus, X } from "lucide-react";
-import Avatar from "../common/Avatar";
+import Avatar, { avatarUrl } from "../common/Avatar";
+import PhotoViewer from "../common/PhotoViewer";
 import { formatDayLabel, formatTime } from "../../utils/time";
 
 const REPORT_REASONS = [
@@ -68,10 +69,12 @@ export default function PartnerProfileSheet({
   const [reason, setReason] = useState("spam");
   const [details, setDetails] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [profilePhotoOpen, setProfilePhotoOpen] = useState(false);
 
   const username = useMemo(() => deriveUsername(partner), [partner]);
   const statusLine = useMemo(() => lastActiveText(partner, nowMs, isGroup, memberCount), [isGroup, memberCount, nowMs, partner]);
   const online = useMemo(() => statusLine === "Online now", [statusLine]);
+  const profilePhotoSrc = useMemo(() => avatarUrl(partner?.avatar_url), [partner?.avatar_url]);
 
   useEffect(() => {
     const timer = setInterval(() => setNowMs(Date.now()), 15000);
@@ -108,7 +111,15 @@ export default function PartnerProfileSheet({
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900">
             <div className="flex items-center gap-3">
-              <Avatar name={partner?.name} src={partner?.avatar_url} size={64} />
+              <button
+                type="button"
+                onClick={() => profilePhotoSrc && setProfilePhotoOpen(true)}
+                disabled={!profilePhotoSrc}
+                className={`rounded-full ${profilePhotoSrc ? "cursor-zoom-in" : "cursor-default"}`}
+                aria-label={profilePhotoSrc ? "Open full profile photo" : "Profile photo unavailable"}
+              >
+                <Avatar name={partner?.name} src={partner?.avatar_url} size={64} />
+              </button>
               <div className="min-w-0">
                 <p className="truncate text-lg font-semibold text-slate-900 dark:text-slate-100">{partner?.name || "Unknown"}</p>
                 <p className="truncate text-sm text-violet-700 dark:text-violet-300">{username}</p>
@@ -236,6 +247,13 @@ export default function PartnerProfileSheet({
             </div>
           )}
         </div>
+        <PhotoViewer
+          src={profilePhotoSrc}
+          alt={`${partner?.name || "User"} profile photo`}
+          open={profilePhotoOpen && Boolean(profilePhotoSrc)}
+          onClose={() => setProfilePhotoOpen(false)}
+          square
+        />
       </aside>
     </div>
   );

@@ -13,6 +13,8 @@
     "@tailwindcss/typography": "^0.5.20",
     "@vercel/og": "^1.0.0",
     "framer-motion": "^11.0.0",
+    "motion-dom": "^11.18.1",
+    "motion-utils": "^11.18.1",
     "next": "15.2.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",

@@ -13,7 +13,7 @@ import {
     Send,
     Palette,
     Variable,
-    Automation,
+    Cpu,
     TestTube,
     ChevronRight
 } from 'lucide-react';
@@ -101,7 +101,7 @@ export default function EmailCenterLayout({ children }: { children: React.ReactN
         {
             id: 'automation',
             label: 'Automation',
-            icon: <Automation size={20} />,
+            icon: <Cpu size={20} />,
             href: '/email-center/automation',
             description: 'Email workflows'
         }
@@ -136,7 +136,7 @@ export default function EmailCenterLayout({ children }: { children: React.ReactN
                     {navItems.map((item) => (
                         <Link
                             key={item.id}
-                            href={item.href}
+                            href={item.href as any}
                             className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group relative ${isActive(item.href)
                                     ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-300 border-l-4 border-cyan-500'
                                     : 'text-slate-400 hover:text-white hover:bg-slate-800/50'

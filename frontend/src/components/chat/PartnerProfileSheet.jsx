@@ -5,7 +5,8 @@ import {
   Trash, Ban, ThumbsDown, Pencil, ChevronDown, Check,
   FileText, ExternalLink, Play
 } from "lucide-react";
-import Avatar from "../common/Avatar";
+import Avatar, { avatarUrl } from "../common/Avatar";
+import PhotoViewer from "../common/PhotoViewer";
 import { formatDayLabel, formatTime } from "../../utils/time";
 import { api, API_BASE_URL } from "../../api/client";
 import { mediaSrc, isVideoMedia } from "../../utils/chat";
@@ -85,6 +86,7 @@ export default function PartnerProfileSheet({
   const [reason, setReason] = useState("spam");
   const [details, setDetails] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [profilePhotoOpen, setProfilePhotoOpen] = useState(false);
 
   // Real localStorage states
   const [isFavourite, setIsFavourite] = useState(false);
@@ -97,6 +99,7 @@ export default function PartnerProfileSheet({
   const username = useMemo(() => deriveUsername(partner), [partner]);
   const statusLine = useMemo(() => lastActiveText(partner, nowMs, isGroup, memberCount), [isGroup, memberCount, nowMs, partner]);
   const online = useMemo(() => statusLine === "Online now", [statusLine]);
+  const profilePhotoSrc = useMemo(() => avatarUrl(partner?.avatar_url), [partner?.avatar_url]);
 
   // Read state from local storage and sync on events
   useEffect(() => {
@@ -388,7 +391,15 @@ export default function PartnerProfileSheet({
           }`}>
             {/* Large Avatar */}
             <div className="relative mb-5">
-              <Avatar name={partner?.name} src={partner?.avatar_url} size={150} />
+              <button
+                type="button"
+                onClick={() => profilePhotoSrc && setProfilePhotoOpen(true)}
+                disabled={!profilePhotoSrc}
+                className={`rounded-full ${profilePhotoSrc ? "cursor-zoom-in" : "cursor-default"}`}
+                aria-label={profilePhotoSrc ? "Open full profile photo" : "Profile photo unavailable"}
+              >
+                <Avatar name={partner?.name} src={partner?.avatar_url} size={150} />
+              </button>
               {online && (
                 <div className={`absolute bottom-2 right-2 w-4 h-4 rounded-full bg-emerald-500 border-4 ${
                   isDark ? "border-[var(--panel-bg)]" : "border-[#ffffff]"
@@ -811,6 +822,13 @@ export default function PartnerProfileSheet({
             cancelText="Cancel"
             onConfirm={performClearChat}
             onCancel={() => setConfirmClearOpen(false)}
+          />
+          <PhotoViewer
+            src={profilePhotoSrc}
+            alt={`${partner?.name || "User"} profile photo`}
+            open={profilePhotoOpen && Boolean(profilePhotoSrc)}
+            onClose={() => setProfilePhotoOpen(false)}
+            square
           />
         </div>
       </aside>

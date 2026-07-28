@@ -14,6 +14,7 @@ export default function PhotoViewer({
   onPrev,
   onNext,
   info = null,
+  square = false,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -22,11 +23,11 @@ export default function PhotoViewer({
   return (
     <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70 backdrop-blur-md">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative max-w-[92vw] max-h-[92vh] flex flex-col items-center justify-center animate-scaleIn">
+      <div className={`relative max-w-[92vw] max-h-[92vh] flex flex-col items-center justify-center animate-scaleIn ${square ? "aspect-square w-[min(90vw,80vh)]" : ""}`}>
         <img
           src={src}
           alt={alt}
-          className="rounded-2xl shadow-2xl max-h-[80vh] max-w-[90vw] object-contain border border-white/20"
+          className={`rounded-2xl shadow-2xl object-contain border border-white/20 ${square ? "h-full w-full bg-black" : "max-h-[80vh] max-w-[90vw]"}`}
           style={{ transition: "box-shadow 0.2s" }}
         />
         <button

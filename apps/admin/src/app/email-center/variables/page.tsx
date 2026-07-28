@@ -203,7 +203,7 @@ export default function VariablesPage() {
                     <div className="space-y-3 text-sm text-slate-400">
                         <p>Use double curly braces to insert variables in your templates:</p>
                         <div className="bg-slate-900/50 rounded border border-slate-700/30 p-4 font-mono">
-                            <p className="text-cyan-400">Hello {'{{'} user.name {'}}'}}!</p>
+                            <p className="text-cyan-400">{"Hello {{ user.name }}!"}</p>
                             <p className="text-slate-500 mt-2">→ Hello John Doe!</p>
                         </div>
                         <p className="mt-4">

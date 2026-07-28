@@ -1,6 +1,6 @@
 import { API_BASE_URL } from "../../api/client";
 
-function avatarUrl(path) {
+export function avatarUrl(path) {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
   

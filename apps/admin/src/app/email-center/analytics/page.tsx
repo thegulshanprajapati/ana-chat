@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Header from '@/components/Header';
-import { TrendingUp, TrendingDown, BarChart3, PieChart, Line, ArrowUpRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, PieChart, LineChart, ArrowUpRight } from 'lucide-react';
 
 export default function AnalyticsPage() {
     const [timeRange, setTimeRange] = useState('7days');
@@ -85,7 +85,7 @@ export default function AnalyticsPage() {
                     {/* Daily Emails Chart */}
                     <div className="card">
                         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                            <Line size={20} />
+                            <LineChart size={20} />
                             Daily Email Sent
                         </h3>
                         <div className="h-64 bg-gradient-to-b from-slate-800/50 to-slate-900/50 rounded-lg border border-slate-700/30 flex items-center justify-center">

@@ -97,7 +97,7 @@ export default function TestEmailPage() {
                                 {Object.entries(variables).map(([key, value]) => (
                                     <div key={key}>
                                         <label className="block text-sm font-medium text-slate-300 mb-2 capitalize">
-                                            {{ key }}}
+                                            {key}
                                         </label>
                                         <input
                                             type="text"

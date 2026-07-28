@@ -44,6 +44,7 @@ export default function Sidebar() {
             ]
         },
         { id: 'settings', icon: Settings, label: 'Settings', href: '/settings' }
+    ];
 
     return (
         <>
@@ -92,7 +93,7 @@ export default function Sidebar() {
                                     </button>
                                 ) : (
                                     <Link
-                                        href={item.href}
+                                        href={item.href as any}
                                         className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300 hover:text-white transition-all duration-200 hover:bg-slate-800/50 group"
                                     >
                                         <item.icon size={20} className="group-hover:text-cyan-400 transition-colors" />
@@ -106,7 +107,7 @@ export default function Sidebar() {
                                         {item.submenu.map((subitem, idx) => (
                                             <Link
                                                 key={idx}
-                                                href={subitem.href}
+                                                href={subitem.href as any}
                                                 className="block px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-cyan-300 transition-all duration-200 hover:bg-slate-800/30"
                                             >
                                                 {subitem.label}
