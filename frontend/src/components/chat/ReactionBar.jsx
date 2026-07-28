@@ -7,7 +7,12 @@ function EmojiIcon({ value }) {
       className="inline-flex items-center justify-center text-[18px] leading-none"
       aria-hidden
       dangerouslySetInnerHTML={{
-        __html: twemoji.parse(value, { folder: "svg", ext: ".svg", className: "twemoji-icon" })
+        __html: twemoji.parse(value, {
+          base: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/",
+          folder: "svg",
+          ext: ".svg",
+          className: "twemoji-icon"
+        })
       }}
     />
   );

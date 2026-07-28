@@ -26,6 +26,7 @@ import {
 import Avatar from "../common/Avatar";
 import { formatDayLabel, formatTime } from "../../utils/time";
 import { api, API_BASE_URL } from "../../api/client";
+import { useToast } from "../../context/ToastContext";
 
 const STATUS_STORAGE_PREFIX = "anach_status_v1";
 const STATUS_FEED_STORAGE_PREFIX = "anach_status_feed_v1";
@@ -221,6 +222,7 @@ export default function StatusPanel({
   onBack 
 }) {
   const meId = me?.id || "guest";
+  const { error: showToastError } = useToast();
   const fileInputRef = useRef(null);
 
   // Collage Creator States
@@ -413,7 +415,7 @@ export default function StatusPanel({
       window.dispatchEvent(new Event("anach_status_updated"));
       onSelectStatusFeed?.(null);
     } catch (err) {
-      alert("Error posting status: " + (err.response?.data?.message || err.message));
+      showToastError("Error posting status: " + (err.response?.data?.message || err.message));
     }
   };
 

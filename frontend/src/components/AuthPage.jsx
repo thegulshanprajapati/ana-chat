@@ -658,7 +658,7 @@ export default function AuthPage({ onAuthed }) {
           className="grid w-full lg:max-h-[90dvh] grid-cols-1 overflow-hidden rounded-[28px] border border-rose-100/60 dark:border-slate-800/50 bg-white/80 dark:bg-slate-950/60 backdrop-blur-xl shadow-[0_30px_90px_rgba(225,29,72,0.10)]"
           variants={itemVariants}
         >
-          <div className="grid grid-cols-1 lg:grid-cols-2 lg:h-[700px] lg:max-h-[85vh] min-h-0">
+          <div className="grid grid-cols-1 lg:grid-cols-2 lg:h-[640px] lg:max-h-[90vh] min-h-0">
             {/* ── Desktop left hero panel ── */}
             <div
               className="relative hidden lg:flex flex-col justify-between p-8 xl:p-10 border-r border-rose-100/40 dark:border-slate-800/40 bg-gradient-to-br from-rose-600 via-rose-500 to-pink-500 overflow-y-auto"
@@ -744,12 +744,12 @@ export default function AuthPage({ onAuthed }) {
             </div>
 
             {/* ── Right / Form panel ── */}
-            <div className="flex flex-col h-full min-h-0 overflow-y-auto p-5 sm:p-8 xl:p-10 pb-10">
+            <div className="flex flex-col h-full min-h-0 overflow-y-auto p-4 sm:p-6 xl:p-8 pb-4">
               <div className="flex-shrink-0">
-                <div className="mb-5 flex items-center gap-3">
-                  <div className="h-14 w-14 flex items-center justify-center">
+                <div className="mb-3 flex items-center gap-2.5">
+                  <div className="h-9 w-9 flex items-center justify-center">
                     {authLogoBroken ? (
-                      <MessageCircle className="h-7 w-7 text-rose-500" />
+                      <MessageCircle className="h-5 w-5 text-rose-500" />
                     ) : (
                       <img
                         src="/logo.png"
@@ -760,20 +760,20 @@ export default function AuthPage({ onAuthed }) {
                     )}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-rose-600 dark:text-rose-400">Welcome to</p>
-                    <p className="mt-0.5 truncate text-xs font-bold text-slate-900 dark:text-white">AnaChat</p>
+                    <p className="text-[8px] font-bold uppercase tracking-[0.25em] text-rose-600 dark:text-rose-400">Welcome to</p>
+                    <p className="truncate text-[11px] font-bold text-slate-900 dark:text-white">AnaChat</p>
                   </div>
                 </div>
-                <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+                <h2 className="text-[17px] font-bold tracking-tight text-slate-900 dark:text-white">
                   {mode === "login" ? "Sign in to continue" : "Create your account"}
                 </h2>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                   {mode === "login" ? "Pick up where you left off." : "Start chatting with a fresh, secure profile."}
                 </p>
               </div>
 
-              <div className="mt-4 flex-shrink-0">
-                <div className="relative grid grid-cols-2 rounded-2xl bg-rose-50/80 dark:bg-slate-800/80 p-1.5 border border-rose-100/60 dark:border-slate-700/60">
+              <div className="mt-2.5 flex-shrink-0">
+                <div className="relative grid grid-cols-2 rounded-xl bg-rose-50/80 dark:bg-slate-800/80 p-1 border border-rose-100/60 dark:border-slate-700/60">
                   {[{ value: "login", label: "Login" }, { value: "signup", label: "Sign up" }].map((item) => {
                     const selected = item.value === mode;
                     return (
@@ -781,7 +781,7 @@ export default function AuthPage({ onAuthed }) {
                         key={item.value}
                         type="button"
                         onClick={() => switchMode(item.value)}
-                        className="relative z-10 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors duration-300 outline-none"
+                        className="relative z-10 rounded-lg px-4 py-2 text-[13px] font-bold transition-colors duration-300 outline-none"
                       >
                         <span className={selected ? "text-slate-900 dark:text-white" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"}>
                           {item.label}
@@ -789,7 +789,7 @@ export default function AuthPage({ onAuthed }) {
                         {selected && (
                           <Motion.div
                             layoutId="activeTabIndicator"
-                            className="absolute inset-0 -z-10 rounded-xl bg-white dark:bg-slate-900 shadow-sm border border-rose-100/40 dark:border-slate-800"
+                            className="absolute inset-0 -z-10 rounded-lg bg-white dark:bg-slate-900 shadow-sm border border-rose-100/40 dark:border-slate-800"
                             transition={{ type: "spring", stiffness: 380, damping: 28 }}
                           />
                         )}
@@ -1027,12 +1027,12 @@ export default function AuthPage({ onAuthed }) {
                 </Motion.div>
               ) : null}
 
-              <div className="mt-6">
+              <div className="mt-3">
                 {mode === "login" ? (
                   <Motion.form
                     key="login"
                     onSubmit={handleLogin}
-                    className="space-y-5"
+                    className="space-y-3"
                     variants={itemVariants}
                     initial="hidden"
                     animate="visible"
@@ -1049,7 +1049,7 @@ export default function AuthPage({ onAuthed }) {
                           required
                           placeholder="name@email.com or 9876543210"
                           className={[
-                            "w-full rounded-2xl border px-4 py-3.5 pr-10 text-sm outline-none transition",
+                            "w-full rounded-xl border px-3.5 py-2.5 pr-9 text-sm outline-none transition",
                             "bg-white/80 dark:bg-slate-950/40",
                             "text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500",
                             fieldErrors.email_or_mobile
@@ -1057,7 +1057,7 @@ export default function AuthPage({ onAuthed }) {
                               : "border-slate-200/70 dark:border-slate-800/70 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70"
                           ].join(" ")}
                         />
-                        <Mail className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Mail className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                       </div>
                     </Field>
 
@@ -1075,7 +1075,7 @@ export default function AuthPage({ onAuthed }) {
                           type={showPassword ? "text" : "password"}
                           placeholder="Your password"
                           className={[
-                            "w-full rounded-2xl border px-4 py-3.5 pr-11 text-sm outline-none transition",
+                            "w-full rounded-xl border px-3.5 py-2.5 pr-10 text-sm outline-none transition",
                             "bg-white/80 dark:bg-slate-950/40",
                             "text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500",
                             fieldErrors.password
@@ -1086,28 +1086,28 @@ export default function AuthPage({ onAuthed }) {
                         <button
                           type="button"
                           onClick={() => setShowPassword((s) => !s)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition"
                           aria-label={showPassword ? "Hide password" : "Show password"}
                         >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                         </button>
                       </div>
                     </Field>
 
                     <div className="flex items-center justify-between gap-4">
-                      <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                      <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                         <input
                           type="checkbox"
                           checked={rememberMe}
                           onChange={(e) => setRememberMe(e.target.checked)}
-                          className="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                          className="h-3.5 w-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500"
                         />
                         Remember me
                       </label>
                       <button
                         type="button"
                         onClick={() => setShowForgotPassword(true)}
-                        className="text-sm font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300"
+                        className="text-xs font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300"
                       >
                         Forgot?
                       </button>
@@ -1115,7 +1115,7 @@ export default function AuthPage({ onAuthed }) {
 
                     <button
                       disabled={loading}
-                      className="group w-full rounded-2xl bg-gradient-to-r from-rose-600 to-pink-500 hover:from-rose-500 hover:to-pink-400 disabled:opacity-60 text-white font-semibold px-4 py-3.5 transition shadow-[0_8px_30px_rgba(225,29,72,0.30)] flex items-center justify-center gap-2.5 text-sm"
+                      className="group w-full rounded-xl bg-gradient-to-r from-rose-600 to-pink-500 hover:from-rose-500 hover:to-pink-400 disabled:opacity-60 text-white font-semibold px-4 py-2.5 transition shadow-[0_6px_20px_rgba(225,29,72,0.28)] flex items-center justify-center gap-2 text-sm"
                     >
                       {loading ? (
                         <span className="flex items-center gap-2">
@@ -1134,26 +1134,26 @@ export default function AuthPage({ onAuthed }) {
                       )}
                     </button>
 
-                    <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-center text-[11px] text-slate-400 dark:text-slate-500">
                       No signup fees · Cute stickers · Start chatting instantly
                     </p>
                   </Motion.form>
                 ) : (
-                  <Motion.div key="signup" className="space-y-4" variants={itemVariants} initial="hidden" animate="visible">
+                  <Motion.div key="signup" className="space-y-3" variants={itemVariants} initial="hidden" animate="visible">
                     {/* Visual Progress Steps */}
-                    <div className="flex items-center justify-center gap-3 mb-2">
-                      <div className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold transition ${signupStep === 1 ? "bg-rose-500 text-white shadow-sm" : "bg-emerald-500 text-white"}`}>
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <div className={`flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold transition ${signupStep === 1 ? "bg-rose-500 text-white shadow-sm" : "bg-emerald-500 text-white"}`}>
                         1
                       </div>
-                      <div className="h-0.5 w-8 bg-slate-200 dark:bg-slate-800" />
-                      <div className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold transition ${signupStep === 2 ? "bg-rose-500 text-white shadow-sm" : "bg-slate-200 dark:bg-slate-800 text-slate-500"}`}>
+                      <div className="h-0.5 w-6 bg-slate-200 dark:bg-slate-800" />
+                      <div className={`flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-bold transition ${signupStep === 2 ? "bg-rose-500 text-white shadow-sm" : "bg-slate-200 dark:bg-slate-800 text-slate-500"}`}>
                         2
                       </div>
                     </div>
 
-                    <form onSubmit={handleSignupForm} className="space-y-4">
+                    <form onSubmit={handleSignupForm} className="space-y-3">
                       {/* Step 1: Personal Details */}
-                      <div className={signupStep === 1 ? "space-y-4" : "hidden"}>
+                      <div className={signupStep === 1 ? "space-y-3" : "hidden"}>
                         <Field label="Full name">
                           <div className="relative">
                             <input
@@ -1161,13 +1161,13 @@ export default function AuthPage({ onAuthed }) {
                               required={signupStep === 1}
                               autoComplete="name"
                               placeholder="Your name"
-                              className="w-full rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
+                              className="w-full rounded-xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
                             />
-                            <User className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <User className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                           </div>
                         </Field>
 
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="grid grid-cols-2 gap-3">
                           <Field label="Email">
                             <div className="relative">
                               <input
@@ -1176,9 +1176,9 @@ export default function AuthPage({ onAuthed }) {
                                 type="email"
                                 autoComplete="email"
                                 placeholder="name@email.com"
-                                className="w-full rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
+                                className="w-full rounded-xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
                               />
-                              <Mail className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                              <Mail className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                             </div>
                           </Field>
 
@@ -1189,9 +1189,9 @@ export default function AuthPage({ onAuthed }) {
                                 required={signupStep === 1}
                                 autoComplete="tel"
                                 placeholder="9876543210"
-                                className="w-full rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
+                                className="w-full rounded-xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
                               />
-                              <Phone className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                              <Phone className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                             </div>
                           </Field>
                         </div>
@@ -1199,7 +1199,7 @@ export default function AuthPage({ onAuthed }) {
                         <button
                           type="button"
                           onClick={handleNextSignupStep}
-                          className="group w-full rounded-2xl bg-gradient-to-r from-rose-600 to-pink-500 hover:from-rose-500 hover:to-pink-400 text-white font-semibold px-4 py-3 transition shadow-[0_8px_24px_rgba(225,29,72,0.25)] flex items-center justify-center gap-2 text-sm"
+                          className="group w-full rounded-xl bg-gradient-to-r from-rose-600 to-pink-500 hover:from-rose-500 hover:to-pink-400 text-white font-semibold px-4 py-2.5 transition shadow-[0_6px_20px_rgba(225,29,72,0.25)] flex items-center justify-center gap-2 text-sm"
                         >
                           Next Step
                           <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
@@ -1207,7 +1207,7 @@ export default function AuthPage({ onAuthed }) {
                       </div>
 
                       {/* Step 2: Credentials */}
-                      <div className={signupStep === 2 ? "space-y-4" : "hidden"}>
+                      <div className={signupStep === 2 ? "space-y-3" : "hidden"}>
                         <Field label="Password" hint="Min 6 characters">
                           <div className="relative">
                             <input
@@ -1216,15 +1216,15 @@ export default function AuthPage({ onAuthed }) {
                               type={showSignupPassword ? "text" : "password"}
                               autoComplete="new-password"
                               placeholder="Create a password"
-                              className="w-full rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
+                              className="w-full rounded-xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
                             />
                             <button
                               type="button"
                               onClick={() => setShowSignupPassword((s) => !s)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-xl p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition"
+                              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition"
                               aria-label={showSignupPassword ? "Hide password" : "Show password"}
                             >
-                              {showSignupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              {showSignupPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                             </button>
                           </div>
                         </Field>
@@ -1237,31 +1237,31 @@ export default function AuthPage({ onAuthed }) {
                               type={showSignupConfirmPassword ? "text" : "password"}
                               autoComplete="new-password"
                               placeholder="Confirm your password"
-                              className="w-full rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
+                              className="w-full rounded-xl border border-slate-200/70 dark:border-slate-800/70 bg-white/80 dark:bg-slate-950/40 px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-200/70 transition"
                             />
                             <button
                               type="button"
                               onClick={() => setShowSignupConfirmPassword((s) => !s)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-xl p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition"
+                              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition"
                               aria-label={showSignupConfirmPassword ? "Hide confirm password" : "Show confirm password"}
                             >
-                              {showSignupConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              {showSignupConfirmPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                             </button>
                           </div>
                         </Field>
 
-                        <div className="flex gap-3">
+                        <div className="flex gap-2.5">
                           <button
                             type="button"
                             onClick={() => setSignupStep(1)}
-                            className="flex-1 rounded-2xl border border-slate-200/70 dark:border-slate-800/70 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900 transition"
+                            className="flex-1 rounded-xl border border-slate-200/70 dark:border-slate-800/70 bg-white dark:bg-slate-950 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900 transition"
                           >
                             Back
                           </button>
                           <button
                              type="submit"
                              disabled={loading}
-                             className="flex-[2] rounded-2xl bg-gradient-to-r from-rose-600 to-pink-500 hover:from-rose-500 hover:to-pink-400 disabled:opacity-60 text-white font-semibold px-4 py-3 transition shadow-[0_8px_24px_rgba(225,29,72,0.25)] flex items-center justify-center gap-2 text-sm"
+                             className="flex-[2] rounded-xl bg-gradient-to-r from-rose-600 to-pink-500 hover:from-rose-500 hover:to-pink-400 disabled:opacity-60 text-white font-semibold px-4 py-2.5 transition shadow-[0_6px_20px_rgba(225,29,72,0.25)] flex items-center justify-center gap-2 text-sm"
                            >
                              {loading ? (
                                <span className="flex items-center gap-2">
@@ -1283,8 +1283,8 @@ export default function AuthPage({ onAuthed }) {
                       </div>
 
                       {showGoogleSection && signupStep === 1 ? (
-                        <div className="pt-2">
-                          <div className="relative my-4 flex items-center">
+                        <div className="pt-1">
+                          <div className="relative my-2 flex items-center">
                             <div className="h-px flex-1 bg-slate-200/70 dark:bg-slate-800/70" />
                             <span className="px-3 text-xs font-semibold text-slate-500 dark:text-slate-400">or</span>
                             <div className="h-px flex-1 bg-slate-200/70 dark:bg-slate-800/70" />
@@ -1315,7 +1315,7 @@ export default function AuthPage({ onAuthed }) {
                 )}
               </div>
 
-              <div className="mt-6 pb-4 text-center text-sm text-slate-600 dark:text-slate-300">
+              <div className="mt-3 pb-1 text-center text-xs text-slate-600 dark:text-slate-300">
                 <button
                   type="button"
                   onClick={() => switchMode(mode === "login" ? "signup" : "login")}

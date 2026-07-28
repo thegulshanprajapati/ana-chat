@@ -119,6 +119,7 @@ function linkifyHtml(value) {
 
 function emojiHtml(value) {
   return twemoji.parse(value || "", {
+    base: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/",
     folder: "svg",
     ext: ".svg",
     className: "twemoji-icon"

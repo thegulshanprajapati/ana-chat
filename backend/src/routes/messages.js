@@ -203,6 +203,16 @@ async function sendMessageHandler(req, res) {
       if (socketsInRoom && socketsInRoom.size > 0) {
         // Recipient is online: Deliver immediately
         io.to(userRoom).emit("receive_message", specializedPayload);
+
+        // Notify sender of delivery
+        if (Number(userId) !== Number(req.user.id)) {
+          io.to(`user_${req.user.id}`).emit("message_status_update", {
+            messageId: messagePayload.id,
+            chatId: chatId,
+            status: "delivered",
+            timestamp: new Date().toISOString()
+          });
+        }
       } else {
         // Recipient is offline: Save to temporary Redis offline queue (retained for 48h)
         const queueKey = `offline_queue:${userId}`;

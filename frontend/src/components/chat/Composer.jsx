@@ -46,6 +46,7 @@ function escapeHtml(value) {
 
 function emojiHtml(value) {
   return twemoji.parse(escapeHtml(value || ""), {
+    base: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/",
     folder: "svg",
     ext: ".svg",
     className: "twemoji-icon twemoji-icon--composer"
@@ -77,6 +78,7 @@ function richComposerHtml(value) {
   );
 
   return twemoji.parse(text, {
+    base: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/",
     folder: "svg",
     ext: ".svg",
     className: "twemoji-icon twemoji-icon--composer"

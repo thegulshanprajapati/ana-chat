@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../api/client";
+import CustomConfirmDialog from "../common/CustomConfirmDialog";
+import { useToast } from "../../context/ToastContext";
 
 function escapeHtml(value) {
   return (value || "")
@@ -32,6 +34,7 @@ function escapeHtml(value) {
 
 function emojiHtml(value) {
   return twemoji.parse(escapeHtml(value || ""), {
+    base: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/",
     folder: "svg",
     ext: ".svg",
     className: "twemoji-icon twemoji-icon--list"
@@ -75,6 +78,10 @@ export default function ChatListItem({
   customDark = false,
   nowMs = 0
 }) {
+  const { success, error: showToastError } = useToast();
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [confirmExitOpen, setConfirmExitOpen] = useState(false);
+
   const hasUnread = unreadCount > 0;
   const isGroup = chat.chat_type === "group";
   const isSelf = chat.chat_type === "self";
@@ -249,7 +256,30 @@ export default function ChatListItem({
       }
       window.dispatchEvent(new Event("ana_chats_updated"));
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to toggle block status.");
+      showToastError(err.response?.data?.message || "Failed to toggle block status.");
+    }
+  };
+
+  const performClearChat = async () => {
+    setConfirmClearOpen(false);
+    try {
+      await api.post(`/chats/${chat.id}/clear`);
+      window.dispatchEvent(new Event("ana_chats_updated"));
+      window.dispatchEvent(new CustomEvent("ana_active_chat_cleared", { detail: { chatId: chat.id } }));
+      success("Chat cleared successfully.");
+    } catch (err) {
+      showToastError(err.response?.data?.message || "Failed to clear chat.");
+    }
+  };
+
+  const performExitGroup = async () => {
+    setConfirmExitOpen(false);
+    try {
+      await api.post(`/chats/${chat.id}/exit`);
+      window.dispatchEvent(new Event("ana_chats_updated"));
+      success("Exited group successfully.");
+    } catch (err) {
+      showToastError(err.response?.data?.message || "Failed to exit group.");
     }
   };
 
@@ -308,18 +338,7 @@ export default function ChatListItem({
       key: "clear",
       icon: <Eraser size={14} />,
       label: "Clear chat",
-      onClick: async () => {
-        const confirm = window.confirm("Are you sure you want to clear all messages in this chat?");
-        if (confirm) {
-          try {
-            await api.post(`/chats/${chat.id}/clear`);
-            window.dispatchEvent(new Event("ana_chats_updated"));
-            window.dispatchEvent(new CustomEvent("ana_active_chat_cleared", { detail: { chatId: chat.id } }));
-          } catch (err) {
-            alert(err.response?.data?.message || "Failed to clear chat.");
-          }
-        }
-      },
+      onClick: () => setConfirmClearOpen(true),
       danger: false
     });
 
@@ -329,17 +348,7 @@ export default function ChatListItem({
         key: "exit",
         icon: <LogOut size={14} />,
         label: "Exit group",
-        onClick: async () => {
-          const confirm = window.confirm("Are you sure you want to exit this group?");
-          if (confirm) {
-            try {
-              await api.post(`/chats/${chat.id}/exit`);
-              window.dispatchEvent(new Event("ana_chats_updated"));
-            } catch (err) {
-              alert(err.response?.data?.message || "Failed to exit group.");
-            }
-          }
-        },
+        onClick: () => setConfirmExitOpen(true),
         danger: true
       });
     } else {
@@ -662,6 +671,24 @@ export default function ChatListItem({
         </div>,
         document.body
       )}
+      <CustomConfirmDialog
+        isOpen={confirmClearOpen}
+        title="Clear Chat"
+        message="Are you sure you want to clear all messages in this chat?"
+        confirmText="Clear"
+        cancelText="Cancel"
+        onConfirm={performClearChat}
+        onCancel={() => setConfirmClearOpen(false)}
+      />
+      <CustomConfirmDialog
+        isOpen={confirmExitOpen}
+        title="Exit Group"
+        message="Are you sure you want to exit this group?"
+        confirmText="Exit"
+        cancelText="Cancel"
+        onConfirm={performExitGroup}
+        onCancel={() => setConfirmExitOpen(false)}
+      />
     </>
   );
 }

@@ -182,6 +182,9 @@ export async function createSocketServer(server: HttpServer) {
 
       const now = new Date();
       try {
+        // Broadcast seen directly to other room participants
+        socket.to(`chat_${chatId}`).emit("seen", { chatId });
+
         const unreadMessages = await db.collection("messages").find({
           chat_id: Number(chatId),
           sender_id: { $ne: Number(userId) },

@@ -9,6 +9,8 @@ import Avatar from "../common/Avatar";
 import { formatDayLabel, formatTime } from "../../utils/time";
 import { api, API_BASE_URL } from "../../api/client";
 import { mediaSrc, isVideoMedia } from "../../utils/chat";
+import CustomConfirmDialog from "../common/CustomConfirmDialog";
+import { useToast } from "../../context/ToastContext";
 
 const REPORT_REASONS = [
   { id: "spam", label: "Spam" },
@@ -77,6 +79,8 @@ export default function PartnerProfileSheet({
   onDeleteChat,
   theme = "dark"
 }) {
+  const { success, error: showToastError } = useToast();
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reason, setReason] = useState("spam");
   const [details, setDetails] = useState("");
@@ -184,17 +188,20 @@ export default function PartnerProfileSheet({
   };
 
   // Clear Chat function
-  const handleClearChat = async () => {
+  const handleClearChat = () => {
     if (!chatId) return;
-    const confirm = window.confirm("Are you sure you want to clear all messages in this chat?");
-    if (confirm) {
-      try {
-        await api.post(`/chats/${chatId}/clear`);
-        window.dispatchEvent(new Event("ana_chats_updated"));
-        window.dispatchEvent(new CustomEvent("ana_active_chat_cleared", { detail: { chatId } }));
-      } catch (err) {
-        alert(err.response?.data?.message || "Failed to clear chat.");
-      }
+    setConfirmClearOpen(true);
+  };
+
+  const performClearChat = async () => {
+    setConfirmClearOpen(false);
+    try {
+      await api.post(`/chats/${chatId}/clear`);
+      window.dispatchEvent(new Event("ana_chats_updated"));
+      window.dispatchEvent(new CustomEvent("ana_active_chat_cleared", { detail: { chatId } }));
+      success("Chat cleared successfully.");
+    } catch (err) {
+      showToastError(err.response?.data?.message || "Failed to clear chat.");
     }
   };
 
@@ -214,14 +221,21 @@ export default function PartnerProfileSheet({
         try {
           await api.patch(`/users/${partner.id}/rename`, { name: tempName.trim() });
           window.dispatchEvent(new Event("ana_chats_updated"));
+          success("Contact renamed successfully.");
         } catch (err) {
-          alert(err.response?.data?.message || "Failed to rename contact.");
+          showToastError(err.response?.data?.message || "Failed to rename contact.");
         }
       }
       setIsEditingName(false);
     } else {
       setIsEditingName(true);
     }
+  };
+
+  const handleCopyUsername = () => {
+    if (!username) return;
+    navigator.clipboard.writeText(username);
+    success("Username copied to clipboard!");
   };
 
   useEffect(() => {
@@ -388,13 +402,17 @@ export default function PartnerProfileSheet({
               {partner?.name || "Unknown"}
             </h2>
             {/* Phone/Sub */}
-            <p className={`mt-1.5 text-[14px] text-center ${
+            <p className={`mt-1.5 text-[14px] text-center select-text selection:bg-accent/30 selection:text-accent-hover ${
               isDark ? "text-[var(--panel-muted)]" : "text-slate-500"
             }`}>
               {phoneDisplay}
             </p>
             {/* Username */}
-            <p className="mt-1 text-xs text-accent">
+            <p
+              onClick={handleCopyUsername}
+              className="mt-1 text-xs text-accent cursor-pointer hover:underline active:scale-95 transition-transform"
+              title="Click to copy username"
+            >
               {username}
             </p>
 
@@ -785,6 +803,15 @@ export default function PartnerProfileSheet({
             </div>
           </div>
 
+          <CustomConfirmDialog
+            isOpen={confirmClearOpen}
+            title="Clear Chat"
+            message="Are you sure you want to clear all messages in this chat?"
+            confirmText="Clear"
+            cancelText="Cancel"
+            onConfirm={performClearChat}
+            onCancel={() => setConfirmClearOpen(false)}
+          />
         </div>
       </aside>
     </div>

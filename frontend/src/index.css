@@ -133,6 +133,40 @@ h4 {
   vertical-align: -0.19em;
 }
 
+/* Custom animations for popular emojis */
+@keyframes twemoji-heartbeat {
+  0% { transform: scale(1); }
+  14% { transform: scale(1.15); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.15); }
+  70% { transform: scale(1); }
+}
+.twemoji-icon[src*="2764"] {
+  animation: twemoji-heartbeat 1.4s infinite ease-in-out;
+  transform-origin: center;
+  display: inline-block !important;
+}
+
+@keyframes twemoji-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.twemoji-icon[src*="1f44d"] {
+  animation: twemoji-bounce 2s infinite ease-in-out;
+  transform-origin: center;
+  display: inline-block !important;
+}
+
+@keyframes twemoji-flicker {
+  0%, 100% { transform: scale(1) rotate(-1.5deg); opacity: 0.95; }
+  50% { transform: scale(1.08) rotate(1.5deg); opacity: 1; }
+}
+.twemoji-icon[src*="1f525"] {
+  animation: twemoji-flicker 0.8s infinite ease-in-out;
+  transform-origin: bottom center;
+  display: inline-block !important;
+}
+
 .twemoji-icon--composer {
   height: 1em;
   width: 1em;

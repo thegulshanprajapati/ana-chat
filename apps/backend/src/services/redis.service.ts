@@ -32,6 +32,15 @@ export async function deliverOfflineMessages(userId: string, io: Server) {
     try {
       const payload = JSON.parse(raw);
       io.to(`user_${userId}`).emit("receive_message", payload);
+
+      if (payload.sender_id && Number(payload.sender_id) !== Number(userId)) {
+        io.to(`user_${payload.sender_id}`).emit("message_status_update", {
+          messageId: payload.id,
+          chatId: payload.chat_id,
+          status: "delivered",
+          timestamp: new Date().toISOString()
+        });
+      }
     } catch (err) {
       logger.error(err, "[Redis] Failed to parse offline message");
     }
