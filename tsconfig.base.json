@@ -3,7 +3,11 @@
     "target": "ES2024",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["DOM", "DOM.Iterable", "ES2024"],
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ES2024"
+    ],
     "jsx": "preserve",
     "strict": true,
     "forceConsistentCasingInFileNames": true,
@@ -12,8 +16,19 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "apps/admin/src/*"
+      ]
+    }
   },
-  "include": ["apps/**/*", "packages/**/*"],
+  "include": [
+    "apps/**/*",
+    "packages/**/*"
+  ],
   "references": []
 }

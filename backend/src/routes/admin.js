@@ -443,29 +443,41 @@ router.post("/notify-user", requireAdmin, async (req, res) => {
 });
 
 router.post("/broadcast", requireAdmin, async (req, res) => {
+  const targetUserId = req.body?.targetUserId === null || req.body?.targetUserId === undefined || req.body?.targetUserId === ""
+    ? null
+    : Number(req.body.targetUserId);
   const title = (req.body?.title || "Announcement").toString().trim().slice(0, 120);
   const message = (req.body?.message || "").toString().trim().slice(0, 1000);
+  if (targetUserId !== null && (!Number.isInteger(targetUserId) || targetUserId <= 0)) {
+    return res.status(400).json({ message: "Valid targetUserId required" });
+  }
   if (!message) return res.status(400).json({ message: "message required" });
 
   const io = req.app.get("io");
   if (io) {
-    io.emit("admin_broadcast", {
+    const payload = {
       title,
       message,
       sentAt: new Date().toISOString()
-    });
+    };
+    if (targetUserId) {
+      io.to(userRoom(targetUserId)).emit("admin_broadcast", payload);
+    } else {
+      io.emit("admin_broadcast", payload);
+    }
   }
 
   const db = await getDb();
   await db.collection("admin_notifications").insertOne({
-    scope: "broadcast",
+    scope: targetUserId ? "user_broadcast" : "broadcast",
+    target_user_id: targetUserId,
     title,
     message,
     admin_id: req.admin.id,
     created_at: new Date()
   });
 
-  await audit(req, "SEND_BROADCAST", { title });
+  await audit(req, "SEND_BROADCAST", { title, targetUserId });
   res.json({ success: true });
 });
 
@@ -859,4 +871,3 @@ router.put("/email-settings", requireAdmin, async (req, res) => {
 });
 
 export default router;
-

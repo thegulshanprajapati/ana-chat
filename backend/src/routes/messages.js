@@ -316,7 +316,12 @@ router.post("/:messageId/react", requireUser, async (req, res) => {
       reactions[row.reaction] = (reactions[row.reaction] || 0) + 1;
     });
 
-    const my_reaction = reaction || null;
+    // Get actual my_reaction from db
+    const myRxRes = await query(
+      "SELECT reaction FROM message_reactions WHERE message_id = $1 AND user_id = $2",
+      [messageId, Number(userId)]
+    );
+    const my_reaction = myRxRes.rows.length > 0 ? myRxRes.rows[0].reaction : null;
 
     // Relay via Socket.IO to other participants
     const io = req.app.get("io");
@@ -342,4 +347,86 @@ router.post("/:messageId/react", requireUser, async (req, res) => {
   }
 });
 
+// Star / Unstar a message (stored locally per user in Postgres)
+router.post("/:messageId/star", requireUser, async (req, res) => {
+  const messageId = req.params.messageId;
+  const starred = Boolean(req.body?.starred);
+  const userId = Number(req.user.id);
+
+  try {
+    if (starred) {
+      await query(
+        `INSERT INTO starred_messages (message_id, user_id)
+         VALUES ($1, $2)
+         ON CONFLICT (message_id, user_id) DO NOTHING`,
+        [messageId, userId]
+      );
+    } else {
+      await query(
+        "DELETE FROM starred_messages WHERE message_id = $1 AND user_id = $2",
+        [messageId, userId]
+      );
+    }
+    res.json({ success: true, starred });
+  } catch (err) {
+    console.error("Star failed:", err);
+    res.status(500).json({ message: "Failed to star message: " + err.message });
+  }
+});
+
+// Forward a message to another chat
+router.post("/:messageId/forward", requireUser, async (req, res) => {
+  const { targetChatId, keys } = req.body;
+  const userId = req.user.id;
+
+  if (!targetChatId) {
+    return res.status(400).json({ message: "targetChatId is required" });
+  }
+
+  try {
+    const db = await getDb();
+    const chat = await getChatMembership(db, Number(targetChatId), userId);
+    if (!chat) {
+      return res.status(403).json({ message: "Not participant in target chat" });
+    }
+
+    const messageId = Date.now();
+    const forwardPayload = {
+      id: messageId,
+      chat_id: Number(targetChatId),
+      sender_id: Number(userId),
+      sender_name: req.user.name || req.user.mobile || req.user.email || "User",
+      body: null,
+      image_url: null,
+      forwarded: true,
+      e2ee: keys ? { v: 1, alg: "RSA-OAEP-256/AES-GCM-256", keys, text: null, media: null } : null,
+      seen: false,
+      created_at: new Date().toISOString(),
+      deleted_for_everyone: false
+    };
+
+    const io = req.app.get("io");
+    if (io) {
+      const participantIds = await getChatParticipantIds(db, chat);
+      for (const uid of participantIds) {
+        const userRoom = `user_${uid}`;
+        const payload = {
+          ...forwardPayload,
+          e2ee: forwardPayload.e2ee ? e2eeForUser(forwardPayload.e2ee, uid) : null
+        };
+        io.to(userRoom).emit("receive_message", payload);
+      }
+      participantIds.forEach(uid => {
+        io.to(`user_${uid}`).emit("chat_updated", { chatId: Number(targetChatId) });
+      });
+    }
+
+    res.json({ success: true, messageId });
+  } catch (err) {
+    console.error("Forward failed:", err);
+    res.status(500).json({ message: "Failed to forward message: " + err.message });
+  }
+});
+
 export default router;
+

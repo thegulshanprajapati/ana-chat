@@ -240,7 +240,7 @@ export default function AdminPortal() {
   const [searchUserActivity, setSearchUserActivity] = useState("");
   const [userActivityType, setUserActivityType] = useState("all");
   const [notifyForm, setNotifyForm] = useState({ userId: "", title: "", message: "" });
-  const [broadcastForm, setBroadcastForm] = useState({ title: "", message: "" });
+  const [broadcastForm, setBroadcastForm] = useState({ targetUserId: "all", title: "", message: "" });
   const [sendingNotice, setSendingNotice] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState(null);
 
@@ -302,7 +302,7 @@ export default function AdminPortal() {
         const normalized = normalizeDashboardPayload(data);
         setDashboard(normalized);
         setDashboardHistory((prev) => appendDashboardSnapshot(prev, normalized));
-      } else if (targetTab === "users") {
+      } else if (targetTab === "users" || targetTab === "broadcast") {
         const { data } = await api.get("/admin/users", { params: { q: searchUsers.trim() } });
         setUsers(Array.isArray(data) ? data : []);
       } else if (targetTab === "admins") {
@@ -395,8 +395,13 @@ export default function AdminPortal() {
   }
 
   async function sendBroadcast() {
+    const targetUserId = broadcastForm.targetUserId === "all" ? null : Number(broadcastForm.targetUserId);
     const title = (broadcastForm.title || "").trim();
     const message = (broadcastForm.message || "").trim();
+    if (broadcastForm.targetUserId !== "all" && (!Number.isInteger(targetUserId) || targetUserId <= 0)) {
+      setError("Select a valid user or choose All users");
+      return;
+    }
     if (!message) {
       setError("Message is required");
       return;
@@ -406,9 +411,9 @@ export default function AdminPortal() {
     setError("");
     setNotice("");
     try {
-      await api.post("/admin/broadcast", { title, message });
-      setNotice("Broadcast sent.");
-      setBroadcastForm({ title: "", message: "" });
+      await api.post("/admin/broadcast", { targetUserId, title, message });
+      setNotice(targetUserId ? "Broadcast sent to selected user." : "Broadcast sent to all users.");
+      setBroadcastForm({ targetUserId: "all", title: "", message: "" });
     } catch (err) {
       setError(err.response?.data?.message || "Failed to send broadcast");
     } finally {
@@ -750,8 +755,24 @@ export default function AdminPortal() {
     return (
       <section className={`${panelClass} p-3.5 md:p-4 space-y-3 max-w-3xl`}>
         <p className="text-sm text-slate-300">
-          Broadcast an announcement to all connected users.
+          Broadcast an announcement to all connected users or one selected user.
         </p>
+
+        <div>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Send to</label>
+          <select
+            value={broadcastForm.targetUserId}
+            onChange={(e) => setBroadcastForm((prev) => ({ ...prev, targetUserId: e.target.value }))}
+            className={inputClass}
+          >
+            <option value="all">All users</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name || u.email || u.mobile || `User ${u.id}`}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div>
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Title (optional)</label>
@@ -779,7 +800,7 @@ export default function AdminPortal() {
             {sendingNotice ? "Sending..." : "Send broadcast"}
           </button>
           <button
-            onClick={() => setBroadcastForm({ title: "", message: "" })}
+            onClick={() => setBroadcastForm({ targetUserId: "all", title: "", message: "" })}
             disabled={sendingNotice}
             className={subtleBtnClass}
           >
