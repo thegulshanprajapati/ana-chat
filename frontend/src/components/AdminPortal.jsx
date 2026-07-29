@@ -24,12 +24,11 @@ import EmailTemplatesPanel from "./panels/EmailTemplatesPanel";
 const tabs = [
   { id: "dashboard", label: "Dashboard", icon: Shield },
   { id: "users", label: "Users", icon: Users },
-  { id: "email", label: "Email Center", icon: Mail },
   { id: "templates", label: "Email Templates", icon: Mail },
   { id: "notify", label: "Notifications", icon: Bell },
   { id: "broadcast", label: "Broadcast", icon: Megaphone },
   { id: "admins", label: "Admin", icon: User },
-  { id: "emailSettings", label: "Settings", icon: Shield }
+  { id: "emailSettings", label: "SMTP Settings", icon: Shield }
 ];
 
 const pageBgClass = "min-h-[100dvh] bg-gradient-to-br from-slate-950 via-amber-950/25 to-slate-950 text-slate-100 font-sans";
@@ -1380,12 +1379,29 @@ export default function AdminPortal() {
 }
 
 function Sidebar({ admin, tab, onTabChange, onLogout, onClose, mobile = false }) {
-  const communicationOpen = ["templates", "notify", "broadcast"].includes(tab);
-  const adminOpen = tab === "admins";
+  const [openMenus, setOpenMenus] = useState({
+    communication: ["notify", "broadcast"].includes(tab),
+    emailCenter: ["templates", "emailSettings"].includes(tab),
+    admin: ["admins"].includes(tab)
+  });
+
+  useEffect(() => {
+    setOpenMenus(prev => ({
+      ...prev,
+      communication: prev.communication || ["notify", "broadcast"].includes(tab),
+      emailCenter: prev.emailCenter || ["templates", "emailSettings"].includes(tab),
+      admin: prev.admin || ["admins"].includes(tab)
+    }));
+  }, [tab]);
+
+  const toggleMenu = (menuKey) => {
+    setOpenMenus(prev => ({ ...prev, [menuKey]: !prev[menuKey] }));
+  };
+
   const navItemClass = (active, indent = false) => `flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-[15px] font-semibold transition ${
     active
-      ? "bg-slate-800/90 text-slate-50"
-      : "text-slate-300 hover:bg-slate-900/70 hover:text-slate-50"
+      ? "bg-slate-800/90 text-slate-50 border border-slate-700/50"
+      : "text-slate-300 hover:bg-slate-900/70 hover:text-slate-50 border border-transparent"
   } ${indent ? "py-2.5 pl-12 text-[13px] font-medium text-slate-400" : ""}`;
 
   const NavButton = ({ id, label, icon: Icon, indent = false }) => (
@@ -1394,10 +1410,12 @@ function Sidebar({ admin, tab, onTabChange, onLogout, onClose, mobile = false })
       onClick={() => onTabChange(id)}
       className={navItemClass(tab === id, indent)}
     >
-      {Icon && <Icon size={indent ? 15 : 18} className={tab === id ? "text-cyan-300" : "text-slate-400"} />}
+      {Icon && <Icon size={indent ? 15 : 18} className={tab === id ? "text-amber-400" : "text-slate-400"} />}
       <span className="min-w-0 truncate">{label}</span>
     </button>
   );
+
+  const isMenuGroupActive = (ids) => ids.includes(tab);
 
   return (
     <div className={`${mobile ? "h-full max-h-[100dvh] w-full max-w-[300px] rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-2xl" : "h-full border-r border-slate-900 bg-[#0b1222] p-4"} flex flex-col`}>
@@ -1414,52 +1432,68 @@ function Sidebar({ admin, tab, onTabChange, onLogout, onClose, mobile = false })
         )}
       </div>
 
-      <nav className="mt-7 space-y-2">
+      <nav className="mt-7 space-y-2 overflow-y-auto pr-1 flex-1">
         <NavButton id="dashboard" label="Dashboard" icon={Shield} />
         <NavButton id="users" label="Users" icon={Users} />
-        <NavButton id="email" label="Email Center" icon={Mail} />
 
+        {/* Communication */}
         <div>
           <button
             type="button"
-            onClick={() => onTabChange(communicationOpen ? "templates" : "templates")}
-            className={navItemClass(communicationOpen)}
+            onClick={() => toggleMenu("communication")}
+            className={navItemClass(isMenuGroupActive(["notify", "broadcast"]))}
           >
-            <Mail size={18} className={communicationOpen ? "text-cyan-300" : "text-slate-400"} />
+            <Bell size={18} className={isMenuGroupActive(["notify", "broadcast"]) ? "text-amber-400" : "text-slate-400"} />
             <span className="min-w-0 flex-1 truncate">Communication</span>
-            <ChevronDown size={15} className={`transition ${communicationOpen ? "rotate-180 text-slate-200" : "text-slate-500"}`} />
+            <ChevronDown size={15} className={`transition duration-200 ${openMenus.communication ? "rotate-180 text-slate-200" : "text-slate-500"}`} />
           </button>
-          {communicationOpen && (
+          {openMenus.communication && (
             <div className="ml-4 mt-2 space-y-1 border-l border-slate-800">
-              <NavButton id="templates" label="Email Templates" indent />
               <NavButton id="notify" label="Notifications" indent />
               <NavButton id="broadcast" label="Broadcast" indent />
             </div>
           )}
         </div>
 
-        <NavButton id="broadcast" label="Broadcast" icon={Megaphone} />
-
+        {/* Email Center */}
         <div>
           <button
             type="button"
-            onClick={() => onTabChange(adminOpen ? "admins" : "admins")}
-            className={navItemClass(adminOpen)}
+            onClick={() => toggleMenu("emailCenter")}
+            className={navItemClass(isMenuGroupActive(["templates", "emailSettings"]))}
           >
-            <User size={18} className={adminOpen ? "text-cyan-300" : "text-slate-400"} />
-            <span className="min-w-0 flex-1 truncate">Admin</span>
-            <ChevronDown size={15} className={`transition ${adminOpen ? "rotate-180 text-slate-200" : "text-slate-500"}`} />
+            <Mail size={18} className={isMenuGroupActive(["templates", "emailSettings"]) ? "text-amber-400" : "text-slate-400"} />
+            <span className="min-w-0 flex-1 truncate">Email Center</span>
+            <ChevronDown size={15} className={`transition duration-200 ${openMenus.emailCenter ? "rotate-180 text-slate-200" : "text-slate-500"}`} />
           </button>
-          {adminOpen && (
+          {openMenus.emailCenter && (
+            <div className="ml-4 mt-2 space-y-1 border-l border-slate-800">
+              <NavButton id="templates" label="Email Templates" indent />
+              <NavButton id="emailSettings" label="SMTP Settings" indent />
+            </div>
+          )}
+        </div>
+
+        {/* Admin Menu */}
+        <div>
+          <button
+            type="button"
+            onClick={() => toggleMenu("admin")}
+            className={navItemClass(isMenuGroupActive(["admins"]))}
+          >
+            <User size={18} className={isMenuGroupActive(["admins"]) ? "text-amber-400" : "text-slate-400"} />
+            <span className="min-w-0 flex-1 truncate">Admin</span>
+            <ChevronDown size={15} className={`transition duration-200 ${openMenus.admin ? "rotate-180 text-slate-200" : "text-slate-500"}`} />
+          </button>
+          {openMenus.admin && (
             <div className="ml-4 mt-2 space-y-1 border-l border-slate-800">
               <NavButton id="admins" label="Manage Admins" indent />
             </div>
           )}
         </div>
-
-        <NavButton id="emailSettings" label="Settings" icon={Shield} />
       </nav>
-      <div className="mt-auto space-y-2">
+
+      <div className="mt-auto pt-4 space-y-2 border-t border-slate-900">
         <a href="/" className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2.5 text-[13px] font-semibold text-slate-200 transition hover:bg-slate-800/80">
           <ArrowUpRight size={15} />
           Go to Chat App

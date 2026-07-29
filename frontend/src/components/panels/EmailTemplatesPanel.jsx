@@ -30,10 +30,12 @@ function Toast({ msg, type, onClose }) {
     return () => clearTimeout(t);
   }, [onClose]);
   return (
-    <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium shadow-lg ${
-      type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
+    <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold shadow-2xl border backdrop-blur-md ${
+      type === "success" 
+        ? "bg-emerald-950/95 text-emerald-200 border-emerald-500/30" 
+        : "bg-rose-950/95 text-rose-200 border-rose-500/30"
     }`}>
-      {type === "success" ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+      {type === "success" ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <AlertCircle className="h-4 w-4 text-rose-400" />}
       {msg}
       <button onClick={onClose} className="ml-2 opacity-70 hover:opacity-100"><X className="h-3.5 w-3.5" /></button>
     </div>
@@ -42,34 +44,46 @@ function Toast({ msg, type, onClose }) {
 
 function VariablePicker({ onInsert }) {
   const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-950/60 px-3.5 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-900 transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none"
       >
         <Zap className="h-3.5 w-3.5 text-amber-500" />
         Insert Variable
-        <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute top-full left-0 z-30 mt-1 w-64 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
-          <div className="p-2 border-b border-slate-100 dark:border-slate-800">
-            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide px-1">Available Variables</p>
+        <div className="absolute top-full right-0 z-30 mt-1.5 w-64 rounded-xl border border-slate-800 bg-slate-950 shadow-2xl overflow-hidden">
+          <div className="p-2.5 border-b border-slate-900 bg-slate-900/50">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-1">Available Variables</p>
           </div>
-          <div className="max-h-56 overflow-y-auto p-1.5">
+          <div className="max-h-56 overflow-y-auto p-1.5 space-y-0.5">
             {TEMPLATE_VARIABLES.map(v => (
               <button
                 key={v.key}
                 type="button"
                 onClick={() => { onInsert(`{{${v.key}}}`); setOpen(false); }}
-                className="w-full text-left flex items-start gap-2 rounded-lg px-2.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition group"
+                className="w-full text-left flex flex-col gap-1 rounded-lg px-2.5 py-2 hover:bg-slate-900 transition group"
               >
-                <code className="text-xs font-mono text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 px-1.5 py-0.5 rounded shrink-0">
+                <code className="text-[11px] font-mono text-amber-400 bg-amber-950/20 px-1.5 py-0.5 rounded shrink-0 self-start">
                   {`{{${v.key}}}`}
                 </code>
-                <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{v.desc}</span>
+                <span className="text-[11px] text-slate-400 group-hover:text-slate-300 pl-0.5">{v.desc}</span>
               </button>
             ))}
           </div>
@@ -98,16 +112,16 @@ function LivePreview({ html, variables, previewMode }) {
   });
 
   const widths = { desktop: "100%", mobile: "375px" };
-  const bgClass = previewMode === "dark" ? "bg-gray-900" : "bg-slate-100";
+  const bgClass = previewMode === "dark" ? "bg-slate-950" : "bg-slate-800";
   const width = widths[previewMode] || widths.desktop;
 
   return (
-    <div className={`rounded-xl ${bgClass} p-4 border border-slate-200 dark:border-slate-700 overflow-auto min-h-[400px] flex items-start justify-center transition-all`}>
-      <div style={{ width, maxWidth: "100%" }}>
+    <div className={`rounded-xl ${bgClass} p-4 border border-slate-850 overflow-auto min-h-[400px] flex items-start justify-center transition-all`}>
+      <div style={{ width, maxWidth: "100%" }} className="transition-all duration-300">
         <iframe
           title="Email Preview"
           srcDoc={`<!DOCTYPE html><html><body style="margin:0;font-family:sans-serif;background:${previewMode === "dark" ? "#111827" : "#fff"}">${renderedHtml}</body></html>`}
-          className="w-full rounded-lg"
+          className="w-full rounded-lg bg-white shadow-lg"
           style={{ minHeight: 400, border: "none" }}
         />
       </div>
@@ -147,7 +161,7 @@ function EmailSettingsTab({ adminToken }) {
       });
       const d = await r.json();
       if (r.ok) {
-        setToast({ msg: "Email settings saved!", type: "success" });
+        setToast({ msg: "Email settings saved successfully!", type: "success" });
       } else {
         setToast({ msg: d.message || "Failed to save settings", type: "error" });
       }
@@ -161,7 +175,7 @@ function EmailSettingsTab({ adminToken }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <RefreshCw className="h-6 w-6 animate-spin text-slate-400" />
+        <RefreshCw className="h-6 w-6 animate-spin text-amber-500" />
       </div>
     );
   }
@@ -170,20 +184,20 @@ function EmailSettingsTab({ adminToken }) {
     <div className="space-y-6">
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       <div>
-        <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">Email Provider</label>
+        <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2.5">Email Provider</label>
         <div className="flex gap-2">
           {PROVIDER_OPTS.map(p => (
             <button
               key={p}
               type="button"
               onClick={() => setSettings(s => ({ ...s, provider: p }))}
-              className={`px-4 py-2 rounded-xl text-sm font-bold transition ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold border transition duration-200 active:scale-[0.98] ${
                 settings.provider === p
-                  ? "bg-rose-500 text-white shadow-md shadow-rose-500/25"
-                  : "border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  ? "bg-gradient-to-r from-amber-600 to-yellow-600 text-slate-950 border-transparent shadow-lg shadow-amber-500/10"
+                  : "border-slate-800 text-slate-400 hover:bg-slate-900"
               }`}
             >
-              {p === "smtp" ? "SMTP" : "Resend API"}
+              {p === "smtp" ? "SMTP Server" : "Resend API"}
             </button>
           ))}
         </div>
@@ -201,45 +215,45 @@ function EmailSettingsTab({ adminToken }) {
             { label: "Reply-To", key: "reply_to", type: "email", placeholder: "support@myana.site" }
           ].map(f => (
             <div key={f.key}>
-              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">{f.label}</label>
+              <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wide">{f.label}</label>
               <input
                 type={f.type}
                 value={settings[f.key] || ""}
                 onChange={e => setSettings(s => ({ ...s, [f.key]: e.target.value }))}
                 placeholder={f.placeholder}
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-400 transition"
+                className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3.5 py-2.5 text-xs text-slate-100 outline-none transition placeholder:text-slate-650 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
               />
             </div>
           ))}
           <div>
-            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">Encryption</label>
+            <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wide">Encryption</label>
             <select
               value={settings.smtp_encryption || "tls"}
               onChange={e => setSettings(s => ({ ...s, smtp_encryption: e.target.value }))}
-              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400 transition"
+              className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3.5 py-2.5 text-xs text-slate-100 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
             >
-              {ENCRYPTION_OPTS.map(o => <option key={o} value={o}>{o.toUpperCase()}</option>)}
+              {ENCRYPTION_OPTS.map(o => <option key={o} value={o} className="bg-slate-950">{o.toUpperCase()}</option>)}
             </select>
           </div>
         </div>
       ) : (
         <div>
-          <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">Resend API Key</label>
+          <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wide">Resend API Key</label>
           <input
             type="password"
             value={settings.resend_api_key || ""}
             onChange={e => setSettings(s => ({ ...s, resend_api_key: e.target.value }))}
             placeholder="re_..."
-            className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-400 transition"
+            className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-950/60 px-3.5 py-2.5 text-xs text-slate-100 outline-none transition placeholder:text-slate-650 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
           />
-          <p className="mt-2 text-xs text-slate-400">Get your API key from <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="text-rose-500 hover:underline">resend.com</a></p>
+          <p className="mt-2 text-[11px] text-slate-500">Get your API key from <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="text-amber-500 hover:underline font-semibold">resend.com</a></p>
         </div>
       )}
 
       <button
         onClick={handleSave}
         disabled={saving}
-        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-rose-500/25 hover:shadow-rose-500/40 disabled:opacity-60 transition-all"
+        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 px-5 py-2.5 text-xs font-semibold text-slate-950 hover:from-amber-500 hover:to-yellow-500 shadow-md active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
       >
         {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
         {saving ? "Saving…" : "Save Settings"}
@@ -257,7 +271,7 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
   const [sending, setSending] = useState(false);
   const [testEmail, setTestEmail] = useState("");
   const [previewMode, setPreviewMode] = useState("desktop");
-  const [activeTab, setActiveTab] = useState("html"); // html | plain | style | settings
+  const [activeTab, setActiveTab] = useState("html"); // html | plain | style | preview
   const [toast, setToast] = useState(null);
   const htmlRef = useRef(null);
 
@@ -281,7 +295,7 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
 
   // Load selected template
   useEffect(() => {
-    if (!selectedKey) return;
+    if (!selectedKey || selectedKey === "__settings") return;
     fetch(`${API}/admin/email-templates/${selectedKey}`, {
       headers: { Authorization: `Bearer ${adminToken}` },
       credentials: "include"
@@ -291,8 +305,15 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
       .catch(() => {});
   }, [selectedKey, adminToken]);
 
+  // Watch for change in initialSelectedKey prop from parent tab switches
+  useEffect(() => {
+    if (initialSelectedKey) {
+      setSelectedKey(initialSelectedKey);
+    }
+  }, [initialSelectedKey]);
+
   const handleSave = async () => {
-    if (!template) return;
+    if (!template || selectedKey === "__settings") return;
     setSaving(true);
     try {
       const r = await fetch(`${API}/admin/email-templates/${selectedKey}`, {
@@ -316,7 +337,7 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
   };
 
   const handleSendTest = async () => {
-    if (!testEmail) return;
+    if (!testEmail || selectedKey === "__settings") return;
     setSending(true);
     try {
       const r = await fetch(`${API}/admin/email-templates/test`, {
@@ -326,7 +347,7 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
         body: JSON.stringify({ to: testEmail, template_key: selectedKey })
       });
       const d = await r.json();
-      if (r.ok) showToast(`Test email sent to ${testEmail}`);
+      if (r.ok) showToast(`Test email sent successfully to ${testEmail}`);
       else showToast(d.message || "Failed to send test email", "error");
     } catch {
       showToast("Network error", "error");
@@ -356,7 +377,7 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="h-6 w-6 animate-spin text-rose-500" />
+        <RefreshCw className="h-6 w-6 animate-spin text-amber-500" />
       </div>
     );
   }
@@ -366,14 +387,25 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 border-b border-slate-800/40 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Mail className="h-5 w-5 text-rose-500" />
-            Email Templates
+          <h2 className="text-xl font-bold text-slate-50 flex items-center gap-2">
+            {selectedKey === "__settings" ? (
+              <>
+                <Settings className="h-5 w-5 text-amber-500" />
+                SMTP & Email Settings
+              </>
+            ) : (
+              <>
+                <Mail className="h-5 w-5 text-amber-500" />
+                Email Templates
+              </>
+            )}
           </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Customize all outgoing emails from one place
+          <p className="text-xs text-slate-400 mt-0.5">
+            {selectedKey === "__settings" 
+              ? "Configure your server's SMTP and sender details" 
+              : "Customize all outgoing system emails from one place"}
           </p>
         </div>
       </div>
@@ -386,31 +418,31 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
               key={t.template_key}
               type="button"
               onClick={() => setSelectedKey(t.template_key)}
-              className={`w-full text-left rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+              className={`w-full text-left rounded-xl px-3 py-2.5 text-xs font-semibold border transition duration-200 ${
                 selectedKey === t.template_key
-                  ? "bg-rose-500 text-white shadow-md shadow-rose-500/20"
-                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  ? "bg-slate-800/90 text-slate-50 border-slate-700/50 shadow-md"
+                  : "border-transparent text-slate-400 hover:bg-slate-900/60 hover:text-slate-200"
               }`}
             >
-              <div className="font-semibold truncate">{t.name}</div>
-              <div className={`text-xs mt-0.5 truncate ${selectedKey === t.template_key ? "text-rose-100" : "text-slate-400"}`}>
+              <div className="truncate">{t.name}</div>
+              <div className={`text-[10px] mt-0.5 truncate font-normal ${selectedKey === t.template_key ? "text-amber-400" : "text-slate-500"}`}>
                 {t.template_key}
               </div>
             </button>
           ))}
 
           {/* Settings link */}
-          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+          <div className="mt-4 pt-4 border-t border-slate-800/80">
             <button
               type="button"
               onClick={() => setSelectedKey("__settings")}
-              className={`w-full text-left rounded-xl px-3 py-2.5 text-sm font-medium transition flex items-center gap-2 ${
+              className={`w-full text-left rounded-xl px-3 py-2.5 text-xs font-semibold border transition duration-200 flex items-center gap-2 ${
                 selectedKey === "__settings"
-                  ? "bg-rose-500 text-white shadow-md shadow-rose-500/20"
-                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  ? "bg-slate-800/90 text-slate-50 border-slate-700/50 shadow-md"
+                  : "border-transparent text-slate-400 hover:bg-slate-900/60 hover:text-slate-200"
               }`}
             >
-              <Settings className="h-4 w-4" />
+              <Settings className="h-4 w-4 text-amber-500" />
               Email Settings
             </button>
           </div>
@@ -423,51 +455,51 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
           ) : template ? (
             <div className="space-y-4">
               {/* Subject + metadata */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">Subject Line</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Subject Line</label>
                   <input
                     type="text"
                     value={template.subject || ""}
                     onChange={e => setTemplate(t => ({ ...t, subject: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400 transition"
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3.5 py-2.5 text-xs text-slate-100 outline-none transition placeholder:text-slate-650 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
                     placeholder="Email subject..."
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">Sender Name</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Sender Name</label>
                   <input
                     type="text"
                     value={template.sender_name || ""}
                     onChange={e => setTemplate(t => ({ ...t, sender_name: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400 transition"
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3.5 py-2.5 text-xs text-slate-100 outline-none transition placeholder:text-slate-650 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
                     placeholder="AnaChat"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">Reply-To Email</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Reply-To Email</label>
                   <input
                     type="email"
                     value={template.reply_to || ""}
                     onChange={e => setTemplate(t => ({ ...t, reply_to: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400 transition"
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3.5 py-2.5 text-xs text-slate-100 outline-none transition placeholder:text-slate-650 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
                     placeholder="support@myana.site"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">Support Email</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Support Email</label>
                   <input
                     type="email"
                     value={template.support_email || ""}
                     onChange={e => setTemplate(t => ({ ...t, support_email: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400 transition"
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3.5 py-2.5 text-xs text-slate-100 outline-none transition placeholder:text-slate-650 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
                     placeholder="support@myana.site"
                   />
                 </div>
               </div>
 
               {/* Tabs */}
-              <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-700 pb-0">
+              <div className="flex items-center gap-2 border-b border-slate-800/80 pb-0 pt-2">
                 {[
                   { id: "html", icon: <Code className="h-3.5 w-3.5" />, label: "HTML" },
                   { id: "plain", icon: <FileText className="h-3.5 w-3.5" />, label: "Plain Text" },
@@ -478,10 +510,10 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
                     key={tab.id}
                     type="button"
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-t-lg transition -mb-px border-b-2 ${
+                    className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-t-lg transition -mb-px border-b-2 duration-200 ${
                       activeTab === tab.id
-                        ? "border-rose-500 text-rose-600 dark:text-rose-400"
-                        : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                        ? "border-amber-500 text-amber-400"
+                        : "border-transparent text-slate-500 hover:text-slate-300"
                     }`}
                   >
                     {tab.icon}{tab.label}
@@ -497,7 +529,7 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
                   ref={htmlRef}
                   value={template.html_content || ""}
                   onChange={e => setTemplate(t => ({ ...t, html_content: e.target.value }))}
-                  className="w-full h-72 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-400 resize-y transition"
+                  className="w-full h-80 rounded-xl border border-slate-800 bg-slate-950/60 px-3.5 py-3 text-[11px] font-mono text-slate-100 focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 resize-y transition"
                   spellCheck={false}
                   placeholder="<div>Your email HTML here...</div>"
                 />
@@ -508,44 +540,44 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
                 <textarea
                   value={template.plain_text || ""}
                   onChange={e => setTemplate(t => ({ ...t, plain_text: e.target.value }))}
-                  className="w-full h-72 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-400 resize-y transition"
+                  className="w-full h-80 rounded-xl border border-slate-800 bg-slate-950/60 px-3.5 py-3 text-xs font-mono text-slate-100 focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 resize-y transition"
                   placeholder="Plain text version of the email..."
                 />
               )}
 
               {/* Style editor */}
               {activeTab === "style" && (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {[
                     { label: "Button Color", key: "button_color" },
                     { label: "Brand Color", key: "brand_color" },
                     { label: "Background Color", key: "bg_color" }
                   ].map(s => (
                     <div key={s.key}>
-                      <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1.5">{s.label}</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">{s.label}</label>
                       <div className="flex items-center gap-2">
                         <input
                           type="color"
                           value={template[s.key] || "#e11d48"}
                           onChange={e => setTemplate(t => ({ ...t, [s.key]: e.target.value }))}
-                          className="h-9 w-12 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer p-0.5"
+                          className="h-10 w-12 rounded-xl border border-slate-800 cursor-pointer bg-slate-950 p-1 outline-none"
                         />
                         <input
                           type="text"
                           value={template[s.key] || ""}
                           onChange={e => setTemplate(t => ({ ...t, [s.key]: e.target.value }))}
-                          className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-2 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400"
+                          className="flex-1 rounded-xl border border-slate-800 bg-slate-950/60 px-2.5 py-2.5 text-xs font-mono text-slate-100 focus:border-amber-500 outline-none"
                         />
                       </div>
                     </div>
                   ))}
                   <div className="col-span-full">
-                    <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1.5">Logo URL</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Logo URL</label>
                     <input
                       type="url"
                       value={template.logo_url || ""}
                       onChange={e => setTemplate(t => ({ ...t, logo_url: e.target.value }))}
-                      className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400 transition"
+                      className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-3.5 py-2.5 text-xs text-slate-100 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
                       placeholder="https://..."
                     />
                   </div>
@@ -554,22 +586,22 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
 
               {/* Preview */}
               {activeTab === "preview" && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Preview Mode:</span>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Preview Mode:</span>
                     {[
-                      { id: "desktop", icon: <Monitor className="h-4 w-4" />, label: "Desktop" },
-                      { id: "mobile", icon: <Smartphone className="h-4 w-4" />, label: "Mobile" },
-                      { id: "dark", icon: <Moon className="h-4 w-4" />, label: "Dark" }
+                      { id: "desktop", icon: <Monitor className="h-3.5 w-3.5" />, label: "Desktop" },
+                      { id: "mobile", icon: <Smartphone className="h-3.5 w-3.5" />, label: "Mobile" },
+                      { id: "dark", icon: <Moon className="h-3.5 w-3.5" />, label: "Dark Background" }
                     ].map(m => (
                       <button
                         key={m.id}
                         type="button"
                         onClick={() => setPreviewMode(m.id)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition duration-200 ${
                           previewMode === m.id
-                            ? "bg-rose-500 text-white shadow-md"
-                            : "border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            ? "bg-amber-500 text-slate-950 border-transparent shadow-md shadow-amber-500/10"
+                            : "border-slate-850 text-slate-400 hover:bg-slate-900"
                         }`}
                       >
                         {m.icon}{m.label}
@@ -585,11 +617,11 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
               )}
 
               {/* Actions bar */}
-              <div className="flex items-center gap-3 pt-2 border-t border-slate-200 dark:border-slate-700 flex-wrap">
+              <div className="flex items-center gap-3 pt-4 border-t border-slate-800/80 flex-wrap">
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-rose-500/20 hover:shadow-rose-500/35 disabled:opacity-60 transition-all"
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 px-5 py-2.5 text-xs font-semibold text-slate-950 hover:from-amber-500 hover:to-yellow-500 shadow-md active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
                 >
                   {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {saving ? "Saving…" : "Save Template"}
@@ -602,21 +634,21 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
                     value={testEmail}
                     onChange={e => setTestEmail(e.target.value)}
                     placeholder="test@email.com"
-                    className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-400 w-48 transition"
+                    className="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-xs text-slate-100 outline-none transition placeholder:text-slate-650 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 w-48"
                   />
                   <button
                     onClick={handleSendTest}
                     disabled={sending || !testEmail}
-                    className="inline-flex items-center gap-2 rounded-xl bg-slate-700 dark:bg-slate-700 hover:bg-slate-800 dark:hover:bg-slate-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50 transition"
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-2 text-xs font-bold text-slate-350 hover:bg-slate-850 hover:text-slate-200 transition focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 disabled:opacity-50"
                   >
-                    {sending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    {sending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 text-amber-500" />}
                     {sending ? "Sending…" : "Send Test"}
                   </button>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-48 text-slate-400 text-sm">
+            <div className="flex items-center justify-center h-48 text-slate-500 text-xs">
               Select a template to edit
             </div>
           )}
