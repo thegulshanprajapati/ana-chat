@@ -532,24 +532,24 @@ async function seedDefaultEmailTemplates() {
       key: "forgot_password",
       name: "Forgot Password",
       subject: "Reset your AnaChat password",
-      html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#f8fafc;border-radius:12px">
-  <div style="text-align:center;margin-bottom:24px">
-    <h1 style="color:#e11d48;margin:0">🔒 AnaChat</h1>
+      html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:40px 20px;background:#0f172a;color:#f8fafc;border-radius:16px;border:1px solid #1e293b">
+  <div style="text-align:center;margin-bottom:32px">
+    <h1 style="color:#e11d48;margin:0;font-size:28px;letter-spacing:1px;font-weight:800">🔒 AnaChat</h1>
+    <p style="color:#64748b;margin:4px 0 0 0;font-size:12px;text-transform:uppercase;letter-spacing:2px">Admin & Security Center</p>
   </div>
-  <div style="background:#fff;border-radius:8px;padding:32px;border:1px solid #e2e8f0">
-    <h2 style="color:#0f172a;margin-top:0">Reset Your Password</h2>
-    <p style="color:#475569">Hi {{user_name}},</p>
-    <p style="color:#475569">We received a request to reset the password for your AnaChat account associated with <strong>{{user_email}}</strong>.</p>
-    <p style="color:#475569">Click the button below to reset your password. This link will expire in <strong>{{expiry_time}}</strong>.</p>
-    <div style="text-align:center;margin:32px 0">
-      <a href="{{reset_link}}" style="background:{{button_color}};color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:16px;display:inline-block">Reset Password</a>
+  <div style="background:#1e293b;border-radius:12px;padding:32px;border:1px solid #334155">
+    <h2 style="color:#ffffff;margin-top:0;font-size:20px;font-weight:700">Reset Your Password</h2>
+    <p style="color:#cbd5e1;line-height:1.6;font-size:14px">Hi {{user_name}},</p>
+    <p style="color:#cbd5e1;line-height:1.6;font-size:14px">We received a request to reset the password for your AnaChat account associated with <strong>{{user_email}}</strong>.</p>
+    <p style="color:#cbd5e1;line-height:1.6;font-size:14px">Click the button below to reset your password. This link will expire in <strong>{{expiry_time}}</strong>.</p>
+    <div style="text-align:center;margin:36px 0">
+      <a href="{{reset_link}}" style="background:{{button_color}};color:#ffffff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:14px;display:inline-block;box-shadow:0 4px 12px rgba(225,29,72,0.2)">Reset Password</a>
     </div>
-    <p style="color:#94a3b8;font-size:13px">If you didn't request this, you can safely ignore this email. Your password won't change.</p>
-    <p style="color:#94a3b8;font-size:13px">This link will expire in {{expiry_time}}.</p>
+    <p style="color:#94a3b8;font-size:12px;line-height:1.5;margin-bottom:0">If you didn't request this, you can safely ignore this email. Your password won't change.</p>
   </div>
-  <div style="text-align:center;margin-top:24px;color:#94a3b8;font-size:12px">
-    <p>&copy; {{current_year}} {{brand_name}}. All rights reserved.</p>
-    <p>Need help? Contact us at <a href="mailto:{{support_email}}" style="color:#e11d48">{{support_email}}</a></p>
+  <div style="text-align:center;margin-top:32px;color:#64748b;font-size:11px;line-height:1.6">
+    <p style="margin:0">&copy; {{current_year}} {{brand_name}}. All rights reserved.</p>
+    <p style="margin:4px 0 0 0">Need help? Contact us at <a href="mailto:{{support_email}}" style="color:#e11d48;text-decoration:none">{{support_email}}</a></p>
   </div>
 </div>`,
       plain_text: `Reset your AnaChat password\n\nHi {{user_name}},\n\nReset your password: {{reset_link}}\n\nThis link expires in {{expiry_time}}.\n\nIf you didn't request this, ignore this email.\n\n{{brand_name}} Team`
@@ -558,19 +558,76 @@ async function seedDefaultEmailTemplates() {
       key: "welcome",
       name: "Welcome Email",
       subject: "Welcome to {{brand_name}}! 🎉",
-      html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#f8fafc;border-radius:12px">
-  <div style="background:#fff;border-radius:8px;padding:32px;border:1px solid #e2e8f0">
-    <h2 style="color:#0f172a">Welcome to {{brand_name}}! 🎉</h2>
-    <p style="color:#475569">Hi {{user_name}}, your account is ready. Start chatting securely!</p>
-    <div style="text-align:center;margin:32px 0">
-      <a href="{{website}}" style="background:{{button_color}};color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600">Open AnaChat</a>
+      html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:40px 20px;background:#0f172a;color:#f8fafc;border-radius:16px;border:1px solid #1e293b">
+  <div style="text-align:center;margin-bottom:32px">
+    <h1 style="color:#e11d48;margin:0;font-size:28px;letter-spacing:1px;font-weight:800">AnaChat</h1>
+    <p style="color:#64748b;margin:4px 0 0 0;font-size:12px;text-transform:uppercase;letter-spacing:2px">Welcome onboarding</p>
+  </div>
+  <div style="background:#1e293b;border-radius:12px;padding:32px;border:1px solid #334155">
+    <h2 style="color:#ffffff;margin-top:0;font-size:20px;font-weight:700">Welcome to {{brand_name}}! 🎉</h2>
+    <p style="color:#cbd5e1;line-height:1.6;font-size:14px">Hi {{user_name}},</p>
+    <p style="color:#cbd5e1;line-height:1.6;font-size:14px">Your account is ready. Start chatting securely with end-to-end encryption and gorgeous theme customizability!</p>
+    <div style="text-align:center;margin:36px 0">
+      <a href="{{website}}" style="background:{{button_color}};color:#ffffff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:14px;display:inline-block;box-shadow:0 4px 12px rgba(225,29,72,0.2)">Open AnaChat</a>
     </div>
   </div>
-  <div style="text-align:center;margin-top:24px;color:#94a3b8;font-size:12px">
-    <p>&copy; {{current_year}} {{brand_name}}</p>
+  <div style="text-align:center;margin-top:32px;color:#64748b;font-size:11px;line-height:1.6">
+    <p style="margin:0">&copy; {{current_year}} {{brand_name}}. All rights reserved.</p>
   </div>
 </div>`,
       plain_text: `Welcome to {{brand_name}}!\n\nHi {{user_name}}, your account is ready.\n\nVisit: {{website}}`
+    },
+    {
+      key: "update_mail",
+      name: "Profile Update Email",
+      subject: "Your AnaChat profile was updated",
+      html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:40px 20px;background:#0f172a;color:#f8fafc;border-radius:16px;border:1px solid #1e293b">
+  <div style="text-align:center;margin-bottom:32px">
+    <h1 style="color:#e11d48;margin:0;font-size:28px;letter-spacing:1px;font-weight:800">AnaChat</h1>
+    <p style="color:#64748b;margin:4px 0 0 0;font-size:12px;text-transform:uppercase;letter-spacing:2px">Account Security Notice</p>
+  </div>
+  <div style="background:#1e293b;border-radius:12px;padding:32px;border:1px solid #334155">
+    <h2 style="color:#ffffff;margin-top:0;font-size:20px;font-weight:700">Profile Details Changed</h2>
+    <p style="color:#cbd5e1;line-height:1.6;font-size:14px">Hi {{user_name}},</p>
+    <p style="color:#cbd5e1;line-height:1.6;font-size:14px">We are writing to confirm that details on your AnaChat profile (such as name, verified status, or security settings) were recently updated.</p>
+    <p style="color:#cbd5e1;line-height:1.6;font-size:14px">If you made this change, you can safely ignore this. If this was not you, please log out other sessions and change your password immediately.</p>
+    <div style="text-align:center;margin:36px 0">
+      <a href="{{website}}" style="background:{{button_color}};color:#ffffff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:14px;display:inline-block">Go to App</a>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:32px;color:#64748b;font-size:11px;line-height:1.6">
+    <p style="margin:0">&copy; {{current_year}} {{brand_name}}. All rights reserved.</p>
+    <p style="margin:4px 0 0 0">Security Support: <a href="mailto:{{support_email}}" style="color:#e11d48;text-decoration:none">{{support_email}}</a></p>
+  </div>
+</div>`,
+      plain_text: `Hi {{user_name}}, your AnaChat profile details were recently updated. If this wasn't you, reset your password.`
+    },
+    {
+      key: "help_center_mail",
+      name: "Help Center Response",
+      subject: "Support Ticket Received - {{brand_name}} Support",
+      html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:40px 20px;background:#0f172a;color:#f8fafc;border-radius:16px;border:1px solid #1e293b">
+  <div style="text-align:center;margin-bottom:32px">
+    <h1 style="color:#e11d48;margin:0;font-size:28px;letter-spacing:1px;font-weight:800">AnaChat</h1>
+    <p style="color:#64748b;margin:4px 0 0 0;font-size:12px;text-transform:uppercase;letter-spacing:2px">Help Desk & Support</p>
+  </div>
+  <div style="background:#1e293b;border-radius:12px;padding:32px;border:1px solid #334155">
+    <h2 style="color:#ffffff;margin-top:0;font-size:20px;font-weight:700">Ticket Acknowledged</h2>
+    <p style="color:#cbd5e1;line-height:1.6;font-size:14px">Hi {{user_name}},</p>
+    <p style="color:#cbd5e1;line-height:1.6;font-size:14px">Thank you for reaching out to the AnaChat Help Center. We have received your query and a support representative has been assigned to assist you.</p>
+    <div style="padding:20px;background:#0f172a;border-radius:8px;border:1px solid #1e293b;margin:24px 0">
+      <p style="margin:0 0 8px 0;font-size:11px;font-weight:bold;color:#e11d48;text-transform:uppercase;letter-spacing:1.5px">Query Status</p>
+      <p style="margin:0;color:#f8fafc;font-size:13px;line-height:1.5">Our support agents typically respond within 24 hours. Your ticket code is being queued.</p>
+    </div>
+    <div style="text-align:center;margin:12px 0">
+      <a href="{{website}}" style="background:{{button_color}};color:#ffffff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:700;font-size:13px;display:inline-block">Visit Help Desk</a>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:32px;color:#64748b;font-size:11px;line-height:1.6">
+    <p style="margin:0">&copy; {{current_year}} {{brand_name}}. All rights reserved.</p>
+  </div>
+</div>`,
+      plain_text: `Hi {{user_name}}, we received your support ticket request. We will review it shortly. AnaChat Support.`
     },
     {
       key: "login_alert",
@@ -638,31 +695,41 @@ async function seedDefaultEmailTemplates() {
     await query(
       `INSERT INTO email_templates (template_key, name, subject, html_content, plain_text)
        VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (template_key) DO NOTHING`,
+       ON CONFLICT (template_key) DO UPDATE SET
+         name = EXCLUDED.name,
+         subject = EXCLUDED.subject,
+         html_content = EXCLUDED.html_content,
+         plain_text = EXCLUDED.plain_text`,
       [tpl.key, tpl.name, tpl.subject, tpl.html, tpl.plain_text]
     ).catch(() => { });
     // Also seed mock
-    if (!mockDb.email_templates.find(r => r.template_key === tpl.key)) {
+    const idx = mockDb.email_templates.findIndex(r => r.template_key === tpl.key);
+    const mockRow = {
+      template_key: tpl.key,
+      name: tpl.name,
+      subject: tpl.subject,
+      html_content: tpl.html,
+      plain_text: tpl.plain_text,
+      sender_name: 'AnaChat',
+      reply_to: '',
+      button_color: '#e11d48',
+      brand_color: '#e11d48',
+      bg_color: '#f8fafc',
+      logo_url: '',
+      support_email: '',
+      social_links: '[]',
+      header_html: '',
+      footer_html: '',
+      is_active: true,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+    if (idx !== -1) {
+      mockDb.email_templates[idx] = { ...mockDb.email_templates[idx], ...mockRow };
+    } else {
       mockDb.email_templates.push({
         id: mockDb.email_templates.length + 1,
-        template_key: tpl.key,
-        name: tpl.name,
-        subject: tpl.subject,
-        html_content: tpl.html,
-        plain_text: tpl.plain_text,
-        sender_name: 'AnaChat',
-        reply_to: '',
-        button_color: '#e11d48',
-        brand_color: '#e11d48',
-        bg_color: '#f8fafc',
-        logo_url: '',
-        support_email: '',
-        social_links: '[]',
-        header_html: '',
-        footer_html: '',
-        is_active: true,
-        created_at: new Date(),
-        updated_at: new Date()
+        ...mockRow
       });
     }
   }
