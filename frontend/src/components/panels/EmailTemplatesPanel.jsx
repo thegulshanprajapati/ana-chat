@@ -4,8 +4,7 @@ import {
   ChevronDown, RefreshCw, CheckCircle2, X, AlertCircle,
   Settings, Palette, Type, Code, Zap, FileText
 } from "lucide-react";
-
-const API = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(/\/$/, "");
+import { api } from "../../api/client";
 
 const TEMPLATE_VARIABLES = [
   { key: "user_name", desc: "Recipient's display name" },
@@ -129,7 +128,7 @@ function LivePreview({ html, variables, previewMode }) {
   );
 }
 
-function EmailSettingsTab({ adminToken }) {
+function EmailSettingsTab() {
   const [settings, setSettings] = useState({
     provider: "smtp", smtp_host: "", smtp_port: 587, smtp_user: "",
     smtp_pass: "", smtp_encryption: "tls", sender_email: "",
@@ -140,33 +139,19 @@ function EmailSettingsTab({ adminToken }) {
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
-    fetch(`${API}/admin/email-settings`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
-      credentials: "include"
-    })
-      .then(r => r.json())
-      .then(d => { if (d.settings) setSettings(s => ({ ...s, ...d.settings })); })
+    api.get("/admin/email-settings")
+      .then(({ data }) => { if (data.settings) setSettings(s => ({ ...s, ...data.settings })); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [adminToken]);
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const r = await fetch(`${API}/admin/email-settings`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` },
-        credentials: "include",
-        body: JSON.stringify(settings)
-      });
-      const d = await r.json();
-      if (r.ok) {
-        setToast({ msg: "Email settings saved successfully!", type: "success" });
-      } else {
-        setToast({ msg: d.message || "Failed to save settings", type: "error" });
-      }
-    } catch {
-      setToast({ msg: "Network error", type: "error" });
+      await api.put("/admin/email-settings", settings);
+      setToast({ msg: "Email settings saved successfully!", type: "success" });
+    } catch (err) {
+      setToast({ msg: err.response?.data?.message || "Failed to save settings", type: "error" });
     } finally {
       setSaving(false);
     }
@@ -262,7 +247,7 @@ function EmailSettingsTab({ adminToken }) {
   );
 }
 
-export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = null }) {
+export default function EmailTemplatesPanel({ initialSelectedKey = null }) {
   const [templates, setTemplates] = useState([]);
   const [selectedKey, setSelectedKey] = useState(null);
   const [template, setTemplate] = useState(null);
@@ -279,31 +264,23 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
 
   // Load all templates
   useEffect(() => {
-    fetch(`${API}/admin/email-templates`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
-      credentials: "include"
-    })
-      .then(r => r.json())
-      .then(d => {
-        setTemplates(d.templates || []);
+    api.get("/admin/email-templates")
+      .then(({ data }) => {
+        setTemplates(data.templates || []);
         if (initialSelectedKey) setSelectedKey(initialSelectedKey);
-        else if (d.templates?.length) setSelectedKey(d.templates[0].template_key);
+        else if (data.templates?.length) setSelectedKey(data.templates[0].template_key);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [adminToken, initialSelectedKey]);
+  }, [initialSelectedKey]);
 
   // Load selected template
   useEffect(() => {
     if (!selectedKey || selectedKey === "__settings") return;
-    fetch(`${API}/admin/email-templates/${selectedKey}`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
-      credentials: "include"
-    })
-      .then(r => r.json())
-      .then(d => setTemplate(d.template || null))
+    api.get(`/admin/email-templates/${selectedKey}`)
+      .then(({ data }) => setTemplate(data.template || null))
       .catch(() => {});
-  }, [selectedKey, adminToken]);
+  }, [selectedKey]);
 
   // Watch for change in initialSelectedKey prop from parent tab switches
   useEffect(() => {
@@ -316,21 +293,11 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
     if (!template || selectedKey === "__settings") return;
     setSaving(true);
     try {
-      const r = await fetch(`${API}/admin/email-templates/${selectedKey}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` },
-        credentials: "include",
-        body: JSON.stringify(template)
-      });
-      const d = await r.json();
-      if (r.ok) {
-        setTemplate(d.template);
-        showToast("Template saved successfully!");
-      } else {
-        showToast(d.message || "Failed to save template", "error");
-      }
-    } catch {
-      showToast("Network error", "error");
+      const { data } = await api.put(`/admin/email-templates/${selectedKey}`, template);
+      setTemplate(data.template);
+      showToast("Template saved successfully!");
+    } catch (err) {
+      showToast(err.response?.data?.message || "Failed to save template", "error");
     } finally {
       setSaving(false);
     }
@@ -340,17 +307,10 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
     if (!testEmail || selectedKey === "__settings") return;
     setSending(true);
     try {
-      const r = await fetch(`${API}/admin/email-templates/test`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` },
-        credentials: "include",
-        body: JSON.stringify({ to: testEmail, template_key: selectedKey })
-      });
-      const d = await r.json();
-      if (r.ok) showToast(`Test email sent successfully to ${testEmail}`);
-      else showToast(d.message || "Failed to send test email", "error");
-    } catch {
-      showToast("Network error", "error");
+      await api.post("/admin/email-templates/test", { to: testEmail, template_key: selectedKey });
+      showToast(`Test email sent successfully to ${testEmail}`);
+    } catch (err) {
+      showToast(err.response?.data?.message || "Failed to send test email", "error");
     } finally {
       setSending(false);
     }
@@ -437,7 +397,7 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
         {/* Editor area */}
         <div className="flex-1 min-w-0 overflow-y-auto">
           {selectedKey === "__settings" ? (
-            <EmailSettingsTab adminToken={adminToken} />
+            <EmailSettingsTab />
           ) : template ? (
             <div className="space-y-4">
               {/* Subject + metadata */}
