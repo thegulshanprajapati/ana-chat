@@ -64,6 +64,7 @@ export async function query(text, params) {
 export async function initDb() {
   if (useMock) {
     console.log("[Postgres] In-Memory Mock database initialized successfully.");
+    await seedDefaultEmailTemplates().catch(() => {});
     return;
   }
 

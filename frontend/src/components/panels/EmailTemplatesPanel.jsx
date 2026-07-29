@@ -412,41 +412,27 @@ export default function EmailTemplatesPanel({ adminToken, initialSelectedKey = n
 
       <div className="flex gap-6 flex-1 min-h-0">
         {/* Template list sidebar */}
-        <div className="w-56 shrink-0 flex flex-col gap-1">
-          {templates.map(t => (
-            <button
-              key={t.template_key}
-              type="button"
-              onClick={() => setSelectedKey(t.template_key)}
-              className={`w-full text-left rounded-xl px-3 py-2.5 text-xs font-semibold border transition duration-200 ${
-                selectedKey === t.template_key
-                  ? "bg-slate-800/90 text-slate-50 border-slate-700/50 shadow-md"
-                  : "border-transparent text-slate-400 hover:bg-slate-900/60 hover:text-slate-200"
-              }`}
-            >
-              <div className="truncate">{t.name}</div>
-              <div className={`text-[10px] mt-0.5 truncate font-normal ${selectedKey === t.template_key ? "text-amber-400" : "text-slate-500"}`}>
-                {t.template_key}
-              </div>
-            </button>
-          ))}
-
-          {/* Settings link */}
-          <div className="mt-4 pt-4 border-t border-slate-800/80">
-            <button
-              type="button"
-              onClick={() => setSelectedKey("__settings")}
-              className={`w-full text-left rounded-xl px-3 py-2.5 text-xs font-semibold border transition duration-200 flex items-center gap-2 ${
-                selectedKey === "__settings"
-                  ? "bg-slate-800/90 text-slate-50 border-slate-700/50 shadow-md"
-                  : "border-transparent text-slate-400 hover:bg-slate-900/60 hover:text-slate-200"
-              }`}
-            >
-              <Settings className="h-4 w-4 text-amber-500" />
-              Email Settings
-            </button>
+        {selectedKey !== "__settings" && (
+          <div className="w-56 shrink-0 flex flex-col gap-1">
+            {templates.map(t => (
+              <button
+                key={t.template_key}
+                type="button"
+                onClick={() => setSelectedKey(t.template_key)}
+                className={`w-full text-left rounded-xl px-3 py-2.5 text-xs font-semibold border transition duration-200 ${
+                  selectedKey === t.template_key
+                    ? "bg-slate-800/90 text-slate-50 border-slate-700/50 shadow-md"
+                    : "border-transparent text-slate-400 hover:bg-slate-900/60 hover:text-slate-200"
+                }`}
+              >
+                <div className="truncate">{t.name}</div>
+                <div className={`text-[10px] mt-0.5 truncate font-normal ${selectedKey === t.template_key ? "text-amber-400" : "text-slate-500"}`}>
+                  {t.template_key}
+                </div>
+              </button>
+            ))}
           </div>
-        </div>
+        )}
 
         {/* Editor area */}
         <div className="flex-1 min-w-0 overflow-y-auto">
