@@ -8,6 +8,7 @@ import { wipeUserChats } from "../services/userData.js";
 import { signAdminToken, verifyToken } from "../services/tokens.js";
 import { requireUser } from "../middleware/auth.js";
 import { computeIsAdmin, isSuperAdminPhone } from "../models/User.js";
+import { redisClient } from "../redis.js";
 
 const router = express.Router();
 const googleClient = new OAuth2Client();
@@ -772,6 +773,105 @@ router.get("/devices", requireUser, async (req, res) => {
     activeSessions,
     maxActiveDevices: Number(process.env.MAX_ACTIVE_DEVICES || 4)
   });
+});
+
+router.post("/devices/self-revoke", requireUser, async (req, res) => {
+  const { sessionId } = req.body;
+  if (!sessionId) {
+    return res.status(400).json({ message: "sessionId is required" });
+  }
+  try {
+    await revokeSessionById(req.user.id, sessionId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to revoke session: " + err.message });
+  }
+});
+
+router.post("/devices/self-revoke-all", requireUser, async (req, res) => {
+  const deleteChats = req.body?.deleteChats ?? false;
+  try {
+    await revokeAllUserSessions(req.user.id);
+    await wipeUserChats({ userId: req.user.id, deleteChats });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to revoke all sessions: " + err.message });
+  }
+});
+
+router.post("/devices/pairing-code", async (req, res) => {
+  try {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+    for (let i = 0; i < 8; i++) {
+      if (i === 4) code += "-";
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    const payload = {
+      status: "pending",
+      createdAt: Date.now()
+    };
+    await redisClient.set(`pair:${code}`, JSON.stringify(payload));
+    res.json({ code });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to generate pairing code: " + err.message });
+  }
+});
+
+router.get("/devices/pairing-status/:code", async (req, res) => {
+  const code = req.params.code;
+  try {
+    const raw = await redisClient.get(`pair:${code}`);
+    if (!raw) {
+      return res.status(404).json({ message: "Invalid or expired pairing code" });
+    }
+    const data = JSON.parse(raw);
+    if (data.status === "authorized") {
+      setAuthCookies(res, data.accessToken, data.refreshToken);
+      const db = await getDb();
+      const user = await db.collection("users").findOne({ id: Number(data.userId) });
+      await redisClient.del(`pair:${code}`);
+
+      return res.json({
+        status: "authorized",
+        user: publicUser(user),
+        accessToken: data.accessToken
+      });
+    }
+    res.json({ status: "pending" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to verify pairing status: " + err.message });
+  }
+});
+
+router.post("/devices/authorize-code", requireUser, async (req, res) => {
+  const { code } = req.body;
+  if (!code) {
+    return res.status(400).json({ message: "Pairing code is required" });
+  }
+  try {
+    const raw = await redisClient.get(`pair:${code}`);
+    if (!raw) {
+      return res.status(404).json({ message: "Invalid or expired pairing code" });
+    }
+    const data = JSON.parse(raw);
+    if (data.status !== "pending") {
+      return res.status(400).json({ message: "Code already processed" });
+    }
+
+    const { accessToken, refreshToken } = await createSessionForUser(req.user.id, req);
+    
+    data.status = "authorized";
+    data.userId = req.user.id;
+    data.accessToken = accessToken;
+    data.refreshToken = refreshToken;
+
+    await redisClient.set(`pair:${code}`, JSON.stringify(data));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to authorize pairing code: " + err.message });
+  }
 });
 
 router.post("/restore-key", requireUser, async (req, res) => {
