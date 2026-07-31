@@ -26,7 +26,8 @@ import {
   X,
   IndianRupee,
   Mic,
-  RefreshCw
+  RefreshCw,
+  BarChart2
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import EmojiPicker from "emoji-picker-react";
@@ -141,6 +142,7 @@ export default function Composer({
   const [showFormat, setShowFormat] = useState(false);
   const [toolStep, setToolStep] = useState("root");
   const [dragActive, setDragActive] = useState(false);
+  const [showPollComposer, setShowPollComposer] = useState(false);
   const imageRef = useRef(null);
   const cameraVideoRef = useRef(null);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -619,6 +621,25 @@ export default function Composer({
     }
   }
 
+  const handleCreatePoll = async (question, options) => {
+    try {
+      const pollPayload = JSON.stringify({ type: "poll", question, options });
+      await onSend?.({
+        body: pollPayload,
+        media: null,
+        replyToMessageId: replyTo?.id || null,
+        messageType: "poll"
+      });
+      onCancelReply?.();
+    } catch (err) {
+      notify?.({
+        type: "error",
+        title: "Poll creation failed",
+        message: err?.response?.data?.message || err?.message || "Unable to create poll."
+      });
+    }
+  };
+
   function openPicker(ref) {
     ref.current?.click();
     setShowTools(false);
@@ -662,6 +683,12 @@ export default function Composer({
         <ToolOption icon={<Video size={14} />} label="Video" onClick={() => setToolStep("video")} />
         <ToolOption icon={<Paperclip size={14} />} label="File" onClick={() => openPicker(fileRef)} />
         <ToolOption icon={<Link2 size={14} />} label="Link" onClick={insertLink} />
+        <div className="col-span-2">
+          <ToolOption icon={<BarChart2 size={14} />} label="Poll" onClick={() => {
+            setShowTools(false);
+            setShowPollComposer(true);
+          }} />
+        </div>
       </div>
     );
   }
@@ -1324,6 +1351,11 @@ export default function Composer({
         </div>,
         document.body
       )}
+      <PollComposerModal
+        isOpen={showPollComposer}
+        onClose={() => setShowPollComposer(false)}
+        onCreatePoll={handleCreatePoll}
+      />
     </form>
   );
 }
@@ -1385,5 +1417,122 @@ function ComposerIconButton({ children, label, onClick, active = false, disabled
     >
       {children}
     </button>
+  );
+}
+
+function PollComposerModal({ isOpen, onClose, onCreatePoll }) {
+  const [question, setQuestion] = useState("");
+  const [options, setOptions] = useState(["", ""]);
+
+  if (!isOpen) return null;
+
+  const handleAddOption = () => {
+    if (options.length < 8) {
+      setOptions([...options, ""]);
+    }
+  };
+
+  const handleRemoveOption = (index) => {
+    if (options.length > 2) {
+      setOptions(options.filter((_, idx) => idx !== index));
+    }
+  };
+
+  const handleOptionChange = (index, val) => {
+    const next = [...options];
+    next[index] = val;
+    setOptions(next);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const cleanQuestion = question.trim();
+    const cleanOptions = options.map((opt) => opt.trim()).filter(Boolean);
+
+    if (!cleanQuestion) return;
+    if (cleanOptions.length < 2) return;
+
+    onCreatePoll(cleanQuestion, cleanOptions);
+    setQuestion("");
+    setOptions(["", ""]);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-md rounded-2xl border p-5 shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col gap-4 bg-[var(--panel-bg)] border-[var(--panel-border)] text-[var(--panel-text)]">
+        <div className="flex items-center justify-between border-b border-[var(--panel-border)] pb-3">
+          <h3 className="text-base font-bold">Create Poll</h3>
+          <button type="button" onClick={onClose} className="rounded-lg p-1 hover:bg-black/5 dark:hover:bg-white/5 transition">
+            <X size={16} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-[var(--panel-muted)]">Question</label>
+            <input
+              type="text"
+              required
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="Ask a question..."
+              className="w-full rounded-xl border border-[var(--panel-border)] bg-transparent px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-rose-500"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-semibold text-[var(--panel-muted)]">Options (Min 2)</label>
+            {options.map((option, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  required
+                  value={option}
+                  onChange={(e) => handleOptionChange(idx, e.target.value)}
+                  placeholder={`Option ${idx + 1}`}
+                  className="flex-1 rounded-xl border border-[var(--panel-border)] bg-transparent px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-rose-500"
+                />
+                {options.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveOption(idx)}
+                    className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-500/10 transition"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {options.length < 8 && (
+              <button
+                type="button"
+                onClick={handleAddOption}
+                className="mt-1 self-start text-xs font-semibold text-rose-500 hover:underline"
+              >
+                + Add Option
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end gap-2 border-t border-[var(--panel-border)] pt-3 mt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl border border-[var(--panel-border)] text-xs font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-rose-500 hover:bg-rose-600 transition"
+            >
+              Create
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

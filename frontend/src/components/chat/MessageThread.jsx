@@ -102,7 +102,10 @@ export default function MessageThread({
   onSelectToggle,
   selectedMessageIds,
   notify,
-  onHideChat
+  onHideChat,
+  pinnedMessageId = null,
+  onTogglePin,
+  onVotePoll
 }) {
   const scrollRef = useRef(null);
   const bottomRef = useRef(null);
@@ -271,6 +274,9 @@ export default function MessageThread({
               onReact={onReact}
               onForward={onForward}
               onSelectToggle={onSelectToggle}
+              onTogglePin={onTogglePin}
+              onVotePoll={onVotePoll}
+              pinnedMessageId={pinnedMessageId}
               selectedMessageIds={selectedMessageIds}
               notify={notify}
               onHideChat={onHideChat}

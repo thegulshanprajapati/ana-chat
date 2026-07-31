@@ -284,10 +284,16 @@ export default function EmailTemplatesPanel({ initialSelectedKey = null }) {
 
   // Watch for change in initialSelectedKey prop from parent tab switches
   useEffect(() => {
-    if (initialSelectedKey) {
+    if (initialSelectedKey === "__settings") {
+      setSelectedKey("__settings");
+    } else if (initialSelectedKey) {
       setSelectedKey(initialSelectedKey);
+    } else if (templates.length > 0) {
+      setSelectedKey(templates[0].template_key);
+    } else {
+      setSelectedKey(null);
     }
-  }, [initialSelectedKey]);
+  }, [initialSelectedKey, templates]);
 
   const handleSave = async () => {
     if (!template || selectedKey === "__settings") return;

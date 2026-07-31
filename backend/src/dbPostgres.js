@@ -27,6 +27,7 @@ export const mockDb = {
   email_templates: [],
   email_settings: [],
   audit_logs: [],
+  message_reactions: [],
   counters: { users: 0, groups: 0, sessions: 0, devices: 0 }
 };
 
@@ -273,11 +274,8 @@ export async function initDb() {
       );
     `);
 
-    // Seed default email templates if none exist
-    const existing = await query("SELECT COUNT(*) FROM email_templates");
-    if (Number(existing.rows[0].count) === 0) {
-      await seedDefaultEmailTemplates();
-    }
+    // Seed and update default email templates
+    await seedDefaultEmailTemplates();
 
     console.log("[Postgres] Database tables initialized successfully.");
   } catch (err) {
@@ -520,6 +518,50 @@ async function queryMock(text, params = []) {
     const row = { id: mockDb.audit_logs.length + 1, user_id: params[0] || null, admin_id: params[1] || null, action: params[2], metadata: params[3] || '{}', ip: params[4] || null, created_at: new Date() };
     mockDb.audit_logs.push(row);
     return { rows: [row] };
+  }
+
+  // message_reactions query handlers
+  if (norm.startsWith("delete from message_reactions")) {
+    const msgId = params[0];
+    const userId = Number(params[1]);
+    mockDb.message_reactions = (mockDb.message_reactions || []).filter(
+      r => !(r.message_id === msgId && r.user_id === userId)
+    );
+    return { rows: [] };
+  }
+  if (norm.startsWith("insert into message_reactions")) {
+    const msgId = params[0];
+    const userId = Number(params[1]);
+    const reaction = params[2];
+    if (!mockDb.message_reactions) mockDb.message_reactions = [];
+    const existing = mockDb.message_reactions.find(r => r.message_id === msgId && r.user_id === userId);
+    if (existing) {
+      existing.reaction = reaction;
+    } else {
+      mockDb.message_reactions.push({ message_id: msgId, user_id: userId, reaction });
+    }
+    return { rows: [] };
+  }
+  if (norm.includes("from message_reactions")) {
+    if (!mockDb.message_reactions) mockDb.message_reactions = [];
+    
+    // Check if it's querying for a list of message_ids using ANY($1)
+    if (norm.includes("any($1)") || norm.includes("any ($1)")) {
+      const msgIds = params[0] || []; // Array of message ids
+      const rows = mockDb.message_reactions.filter(r => msgIds.includes(r.message_id));
+      return { rows };
+    }
+    
+    // Otherwise single message_id query
+    const msgId = params[0];
+    if (norm.includes("user_id =")) {
+      const userId = Number(params[1]);
+      const rows = mockDb.message_reactions.filter(r => r.message_id === msgId && r.user_id === userId);
+      return { rows };
+    } else {
+      const rows = mockDb.message_reactions.filter(r => r.message_id === msgId);
+      return { rows };
+    }
   }
 
   return { rows: [] };

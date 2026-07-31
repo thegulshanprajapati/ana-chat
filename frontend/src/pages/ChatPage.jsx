@@ -298,6 +298,7 @@ export default function ChatPage() {
   const [localCallStream, setLocalCallStream] = useState(null);
   const [remoteCallStream, setRemoteCallStream] = useState(null);
   const [watchSessions, setWatchSessions] = useState({});
+  const [callChatMessages, setCallChatMessages] = useState([]);
 
   const activeChatIdRef = useRef(null);
   const callRef = useRef(IDLE_CALL);
@@ -1149,7 +1150,7 @@ export default function ChatPage() {
     }
   }, [notify]);
 
-  const sendMessage = useCallback(async ({ body, media, replyToMessageId }) => {
+  const sendMessage = useCallback(async ({ body, media, replyToMessageId, messageType = "text" }) => {
     if (!activeChat?.id) return;
     if (activeChat.chat_type !== "group") {
       if (activeChat.blocked_by_me) {
@@ -1186,6 +1187,8 @@ export default function ChatPage() {
       reply_to_body: replyTarget?.body || null,
       reply_to_image_url: replyTarget?.image_url || null,
       reply_to_deleted_for_everyone: Boolean(replyTarget?.deleted_for_everyone),
+      message_type: messageType,
+      poll_votes: messageType === "poll" ? {} : undefined,
       seen: 0,
       delivery_status: "sending",
       created_at: new Date().toISOString(),
@@ -1215,6 +1218,7 @@ export default function ChatPage() {
     const form = new FormData();
     form.append("chatId", String(activeChat.id));
     form.append("clientMessageId", clientMessageId);
+    form.append("messageType", messageType);
     if (replyTarget?.id) form.append("replyToMessageId", String(replyTarget.id));
 
     try {
@@ -1268,67 +1272,29 @@ export default function ChatPage() {
   }, [activeChat, decryptMessageForMe, getChatRecipients, messages, replyToMessage, user?.id]);
 
   const sendCallChatMessage = useCallback(async (text) => {
-    const chatId = callRef.current.chatId || activeChatIdRef.current;
+    const chatId = callRef.current.chatId;
+    const toUserId = callRef.current.peerUserId;
     const body = (text || "").trim();
-    if (!chatId || !body) return;
-    const chat = chatsRef.current.find((item) => Number(item.id) === Number(chatId));
-    if (chat?.chat_type !== "group") {
-      if (chat?.blocked_by_me) {
-        notify({ type: "info", message: "You blocked this user. Unblock to send messages." });
-        return;
-      }
-      if (chat?.blocked_me) {
-        notify({ type: "info", message: "This user blocked you. Message cannot be sent." });
-        return;
-      }
-    }
-    const clientMessageId = createClientMessageId();
+    if (!chatId || !body || !toUserId) return;
 
-    const form = new FormData();
-    form.append("chatId", String(chatId));
-    form.append("clientMessageId", clientMessageId);
+    const tempId = `call-temp-${Date.now()}-${Math.random()}`;
+    const newMsg = {
+      id: tempId,
+      sender_id: user?.id,
+      body,
+      created_at: new Date().toISOString()
+    };
 
-    let data;
-    try {
-      const recipients = await getChatRecipients(chatId);
-      const { e2ee } = await encryptOutgoingMessage({
-        plaintext: body,
-        file: null,
-        recipients
+    setCallChatMessages((prev) => [...prev, newMsg]);
+
+    if (socket && socket.emit) {
+      socket.emit("call_chat_message", {
+        toUserId,
+        body,
+        chatId
       });
-      form.append("e2ee", JSON.stringify(e2ee));
-
-      const response = await api.post("/messages", form, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
-      data = await decryptMessageForMe(response.data);
-    } catch (err) {
-      notify({
-        type: "error",
-        message: err.response?.data?.message || "Unable to send chat message in call."
-      });
-      throw err;
     }
-
-    if (chatId === activeChatIdRef.current) {
-      setMessages((prev) => (
-        prev.some((item) => String(item.id) === String(data.id))
-          ? prev
-          : [...prev, data]
-      ));
-    }
-
-    setChats((prev) => sortChats(prev.map((chat) => (
-      chat.id === chatId
-        ? {
-            ...chat,
-            last_message_at: data.created_at,
-            last_message_body: data.body,
-            last_message_image: data.image_url
-          }
-        : chat
-    ))));
-  }, [decryptMessageForMe, getChatRecipients, notify]);
+  }, [socket, user?.id]);
 
   const removeLocalMessage = useCallback(async (message) => {
     if (!message?.id) return;
@@ -1367,6 +1333,53 @@ export default function ChatPage() {
       });
     }
   }, [applyMessagePatch, decryptMessageForMe, getChatRecipients, notify]);
+
+  const handleTogglePin = useCallback(async (message) => {
+    if (!activeChat?.id) return;
+    const isCurrentlyPinned = activeChat.pinned_message_id === message.id;
+    try {
+      if (isCurrentlyPinned) {
+        await api.delete(`/chats/${activeChat.id}/pin-message`);
+        setActiveChat(prev => prev ? { ...prev, pinned_message_id: null } : null);
+        setChats(prev => prev.map(c => c.id === activeChat.id ? { ...c, pinned_message_id: null } : c));
+      } else {
+        await api.post(`/chats/${activeChat.id}/pin-message`, { messageId: message.id });
+        setActiveChat(prev => prev ? { ...prev, pinned_message_id: message.id } : null);
+        setChats(prev => prev.map(c => c.id === activeChat.id ? { ...c, pinned_message_id: message.id } : c));
+      }
+    } catch (err) {
+      notify?.({
+        type: "error",
+        title: isCurrentlyPinned ? "Failed to unpin message" : "Failed to pin message",
+        message: err?.response?.data?.message || err?.message || "Operation failed."
+      });
+    }
+  }, [activeChat, notify]);
+
+  const handleVotePoll = useCallback(async (messageId, optionIndex) => {
+    if (!activeChat?.id) return;
+    if (socket && socket.emit) {
+      socket.emit("vote_poll", { messageId, chatId: activeChat.id, optionIndex });
+    }
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId
+          ? {
+              ...msg,
+              poll_votes: {
+                ...(msg.poll_votes || {}),
+                [user.id]: optionIndex
+              }
+            }
+          : msg
+      )
+    );
+    try {
+      await api.post(`/messages/${messageId}/vote`, { optionIndex });
+    } catch (err) {
+      console.error("Failed to persist vote:", err);
+    }
+  }, [activeChat?.id, socket, user?.id]);
 
   const deleteForEveryone = useCallback(async (message) => {
     if (!message?.id) return;
@@ -1446,21 +1459,24 @@ export default function ChatPage() {
       type: "forward",
       title: messagesArray.length > 1 ? "Forward Messages" : "Forward Message",
       message: messagesArray.length > 1 
-        ? `Select a chat to forward the ${messagesArray.length} messages to:` 
-        : "Select a chat to forward the message to:",
+        ? `Select chats to forward the ${messagesArray.length} messages to:` 
+        : "Select chats to forward the message to:",
       candidates,
-      onConfirm: async (targetChatId) => {
+      onConfirm: async (targetChatIds) => {
         try {
-          const recipients = await getChatRecipients(targetChatId);
+          const targetIds = Array.isArray(targetChatIds) ? targetChatIds : [targetChatIds];
           const pair = await getOrCreateRsaKeyPair(user.id);
           
-          for (const message of messagesArray) {
-            const keys = await reencryptAesKeyForRecipients({
-              e2ee: message.e2ee,
-              privateJwk: pair.privateJwk,
-              recipients
-            });
-            await api.post(`/messages/${message.id}/forward`, { targetChatId, keys });
+          for (const targetChatId of targetIds) {
+            const recipients = await getChatRecipients(targetChatId);
+            for (const message of messagesArray) {
+              const keys = await reencryptAesKeyForRecipients({
+                e2ee: message.e2ee,
+                privateJwk: pair.privateJwk,
+                recipients
+              });
+              await api.post(`/messages/${message.id}/forward`, { targetChatId, keys });
+            }
           }
 
           notify({ 
@@ -1691,6 +1707,7 @@ export default function ChatPage() {
     setLocalCallStream(null);
     setRemoteCallStream(null);
     setCall(IDLE_CALL);
+    setCallChatMessages([]);
   }, []);
 
   const endCall = useCallback((notifyPeer = true, reason = "ended") => {
@@ -2395,6 +2412,17 @@ export default function ChatPage() {
       resetCallState();
     };
 
+    const onCallChatMessage = (payload) => {
+      if (payload?.chatId === callRef.current.chatId) {
+        setCallChatMessages((prev) => [...prev, {
+          id: payload.id,
+          sender_id: payload.fromUserId,
+          body: payload.body,
+          created_at: payload.created_at
+        }]);
+      }
+    };
+
     const onWatchSessionState = (payload) => {
       const chatId = Number(payload?.chatId);
       if (!chatId) return;
@@ -2513,6 +2541,37 @@ export default function ChatPage() {
       );
     };
 
+    const onPollVoteUpdate = (payload) => {
+      const { messageId, userId, optionIndex } = payload;
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? {
+                ...msg,
+                poll_votes: {
+                  ...(msg.poll_votes || {}),
+                  [userId]: optionIndex
+                }
+              }
+            : msg
+        )
+      );
+    };
+
+    const onChatPinUpdate = (payload) => {
+      const { chatId, pinnedMessageId } = payload;
+      setChats((prev) =>
+        prev.map((chat) =>
+          chat.id === chatId
+            ? { ...chat, pinned_message_id: pinnedMessageId }
+            : chat
+        )
+      );
+      if (activeChatIdRef.current === chatId) {
+        setActiveChat((prev) => prev ? { ...prev, pinned_message_id: pinnedMessageId } : prev);
+      }
+    };
+
     const socketEvents = [
       ["receive_message", onReceive],
       ["typing", onTyping],
@@ -2529,12 +2588,15 @@ export default function ChatPage() {
       ["call_end", onCallEnd],
       ["call_reject", onCallReject],
       ["call_error", onCallError],
+      ["call_chat_message", onCallChatMessage],
       ["watch_session_state", onWatchSessionState],
       ["watch_playback_sync", onWatchPlaybackSync],
       ["watch_error", onWatchError],
       ["message_delivered", onMessageDelivered],
       ["message_read", onMessageRead],
-      ["message_status_update", onMessageStatusUpdate]
+      ["message_status_update", onMessageStatusUpdate],
+      ["poll_vote_update", onPollVoteUpdate],
+      ["chat_pin_update", onChatPinUpdate]
     ];
 
     if (socket && socket.on && socket.off) {
@@ -2741,6 +2803,8 @@ export default function ChatPage() {
                 onReact={reactToMessage}
                 onForward={forwardMessage}
                 onSelectToggle={toggleSelectMessage}
+                onTogglePin={handleTogglePin}
+                onVotePoll={handleVotePoll}
                 selectedMessageIds={selectedMessageIds}
                 onClearSelection={() => setSelectedMessageIds({})}
                 compactMode={userSettings.compactMode}
@@ -2810,7 +2874,7 @@ export default function ChatPage() {
         localStream={localCallStream}
         remoteStream={remoteCallStream}
         meId={user?.id}
-        chatMessages={messages}
+        chatMessages={callChatMessages}
         onSendChat={sendCallChatMessage}
         onAccept={acceptIncomingCall}
         onReject={rejectIncomingCall}
@@ -2866,6 +2930,7 @@ export default function ChatPage() {
 
 function CustomDialogModal({ config, onClose }) {
   const [inputValue, setInputValue] = useState(config.defaultValue || "");
+  const [selectedChatIds, setSelectedChatIds] = useState([]);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -2878,6 +2943,14 @@ function CustomDialogModal({ config, onClose }) {
     e.preventDefault();
     config.onConfirm?.(inputValue);
     onClose();
+  };
+
+  const toggleSelectChat = (chatId) => {
+    setSelectedChatIds((prev) =>
+      prev.includes(chatId)
+        ? prev.filter((id) => id !== chatId)
+        : [...prev, chatId]
+    );
   };
 
   return (
@@ -2914,29 +2987,35 @@ function CustomDialogModal({ config, onClose }) {
 
         {config.type === "forward" && (
           <div className="max-h-60 overflow-y-auto flex flex-col gap-1 pr-1">
-            {config.candidates?.map((chat) => (
-              <button
-                key={chat.id}
-                type="button"
-                onClick={() => {
-                  config.onConfirm?.(chat.id);
-                  onClose();
-                }}
-                className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/60 transition text-left"
-              >
-                <div className="h-9 w-9 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center text-sm font-semibold text-violet-700 dark:text-violet-300">
-                  {(chat.other_user_name || chat.group_name || "?").charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
-                    {chat.other_user_name || chat.group_name}
-                  </p>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">
-                    {chat.chat_type === "group" ? "Group Chat" : "Private Chat"}
-                  </p>
-                </div>
-              </button>
-            ))}
+            {config.candidates?.map((chat) => {
+              const isSelected = selectedChatIds.includes(chat.id);
+              return (
+                <button
+                  key={chat.id}
+                  type="button"
+                  onClick={() => toggleSelectChat(chat.id)}
+                  className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/60 transition text-left"
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    readOnly
+                    className="h-3.5 w-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 shrink-0"
+                  />
+                  <div className="h-8 w-8 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center text-xs font-semibold text-violet-700 dark:text-violet-300 shrink-0">
+                    {(chat.other_user_name || chat.group_name || "?").charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate">
+                      {chat.other_user_name || chat.group_name}
+                    </p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                      {chat.chat_type === "group" ? "Group Chat" : "Private Chat"}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -2955,7 +3034,7 @@ function CustomDialogModal({ config, onClose }) {
               Cancel
             </button>
           )}
-          {config.type !== "forward" && (
+          {config.type !== "forward" ? (
             <button
               type="button"
               onClick={() => {
@@ -2968,6 +3047,21 @@ function CustomDialogModal({ config, onClose }) {
               }}
             >
               OK
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={selectedChatIds.length === 0}
+              onClick={() => {
+                config.onConfirm?.(selectedChatIds);
+                onClose();
+              }}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-white transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+              style={{
+                backgroundColor: "var(--accent)"
+              }}
+            >
+              Forward ({selectedChatIds.length})
             </button>
           )}
         </div>

@@ -14,6 +14,9 @@ export default function MessageGroup({
   onReact,
   onForward,
   onSelectToggle,
+  onTogglePin,
+  onVotePoll,
+  pinnedMessageId,
   selectedMessageIds,
   notify,
   onHideChat
@@ -42,6 +45,9 @@ export default function MessageGroup({
           onReact={onReact}
           onForward={onForward}
           onSelectToggle={onSelectToggle}
+          onTogglePin={onTogglePin}
+          onVotePoll={onVotePoll}
+          isPinned={pinnedMessageId === message.id}
           selected={Boolean(selectedMessageIds?.[message.id])}
           isSelectionMode={Object.keys(selectedMessageIds || {}).length > 0}
           notify={notify}

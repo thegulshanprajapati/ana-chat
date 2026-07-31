@@ -606,6 +606,20 @@ export async function initSocket(httpServer) {
       });
     });
 
+    socket.on("call_chat_message", ({ toUserId, body, chatId }) => {
+      const targetId = Number(toUserId);
+      if (!targetId) return;
+
+      io.to(userRoom(targetId)).emit("call_chat_message", {
+        fromUserId: userId,
+        toUserId: targetId,
+        body,
+        chatId: chatId ? Number(chatId) : null,
+        created_at: new Date().toISOString(),
+        id: `call-temp-${Date.now()}-${Math.random()}`
+      });
+    });
+
     socket.on("call_end", ({ toUserId, reason, chatId }) => {
       const targetId = Number(toUserId);
       if (!targetId) return;

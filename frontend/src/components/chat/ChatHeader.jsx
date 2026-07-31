@@ -203,14 +203,7 @@ export default function ChatHeader({
           <HeaderAction label="Search in chat" onClick={onSearchInChat}>
             <Search size={16} />
           </HeaderAction>
-          <HeaderAction
-            label={watchTogetherOpen ? "Hide Watch Together" : "Watch Together"}
-            onClick={onToggleWatchTogether}
-            disabled={watchDisabled}
-            className={`hidden md:inline-flex ${hasActiveWatchSession ? "text-violet-600 dark:text-violet-300" : ""}`}
-          >
-            <MessageSquareText size={16} />
-          </HeaderAction>
+          {/* Watch Together Action Disabled */}
           {!isGroup && (
             <>
               <HeaderAction label="Voice call" onClick={onVoiceCall} disabled={blocked} className="hidden md:inline-flex">
@@ -234,18 +227,18 @@ export default function ChatHeader({
               <MoreHorizontal size={16} />
             </HeaderAction>
 
-            {menuOpen && (
-              <div className="absolute right-0 top-11 z-20 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                <div className="mb-2 rounded-lg border border-slate-200/70 bg-slate-50/70 p-2.5 dark:border-slate-700 dark:bg-slate-800/70">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Chat details</p>
-                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{displayName}</p>
+             {menuOpen && (
+              <div className="absolute right-0 top-12 z-20 w-72 rounded-2xl border border-slate-200/80 bg-white/95 p-3 shadow-[0_20px_50px_rgba(0,0,0,0.15)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/95 max-h-[80vh] overflow-y-auto no-scrollbar">
+                <div className="mb-3 rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50/50 to-pink-50/30 p-4 dark:border-violet-950/40 dark:from-violet-950/20 dark:to-pink-950/10">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-violet-500 dark:text-violet-400 mb-1.5">Chat details</p>
+                  <p className="truncate text-base font-bold text-slate-900 dark:text-slate-100 leading-tight">{displayName}</p>
                   {!isGroup && aboutText && (
-                    <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-300">{aboutText}</p>
+                    <p className="mt-1 truncate text-xs font-medium text-slate-600 dark:text-slate-300 italic">“{aboutText}”</p>
                   )}
-                  <p className="truncate text-xs text-slate-600 dark:text-slate-300">{contactText}</p>
+                  <p className="mt-2 truncate text-xs font-semibold text-slate-500 dark:text-slate-400 font-mono tracking-tight bg-white/60 dark:bg-black/20 px-2 py-1 rounded-lg border border-black/5 dark:border-white/5 inline-block">{contactText}</p>
                   {isGroup && (
-                    <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                      {memberCount ? `${memberCount} members` : "Group chat"}
+                    <p className="mt-1.5 text-xs font-medium text-slate-600 dark:text-slate-400">
+                      👥 {memberCount ? `${memberCount} members` : "Group chat"}
                     </p>
                   )}
                   {showOnlineStatus && (
@@ -271,15 +264,7 @@ export default function ChatHeader({
                     setMenuOpen(false);
                   }}
                 />
-                <MenuButton
-                  icon={<MessageSquareText size={14} />}
-                  label={watchTogetherOpen ? "Hide Watch Together" : "Watch Together"}
-                  disabled={watchDisabled}
-                  onClick={() => {
-                    onToggleWatchTogether?.();
-                    setMenuOpen(false);
-                  }}
-                />
+                {/* Watch Together Dropdown Button Disabled */}
                 {!isGroup && (
                   <>
                     <MenuButton
@@ -444,21 +429,29 @@ function HeaderAction({ children, label, onClick, className = "", disabled = fal
 }
 
 function MenuButton({ icon, label, onClick, danger = false, disabled = false }) {
+  const iconBaseClass = `flex h-7 w-7 items-center justify-center rounded-lg transition-transform group-hover:scale-115 duration-200 shrink-0 ${
+    danger 
+      ? "bg-rose-500/10 text-rose-500 dark:bg-rose-500/20 dark:text-rose-400"
+      : "bg-violet-500/10 text-violet-500 dark:bg-violet-500/20 dark:text-violet-400"
+  }`;
+
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-medium transition ${
+      className={`group flex w-full items-center gap-3 rounded-xl px-2.5 py-1.5 text-left text-xs font-semibold transition-all duration-200 ${
         disabled
-          ? "cursor-not-allowed opacity-45"
+          ? "cursor-not-allowed opacity-35"
           : danger
-            ? "text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
-            : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+            ? "text-rose-600 hover:bg-rose-50/80 dark:text-rose-300 dark:hover:bg-rose-950/20"
+            : "text-slate-700 hover:bg-violet-50/60 dark:text-slate-200 dark:hover:bg-violet-950/15"
       }`}
     >
-      {icon}
-      <span>{label}</span>
+      <div className={iconBaseClass}>
+        {icon}
+      </div>
+      <span className="truncate">{label}</span>
     </button>
   );
 }

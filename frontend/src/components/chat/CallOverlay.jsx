@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, forwardRef } from "react";
 import {
   MessageSquareText,
   Mic,
@@ -14,7 +14,8 @@ import {
   ChevronDown,
   Signal,
   Maximize2,
-  Minimize2
+  Minimize2,
+  PictureInPicture
 } from "lucide-react";
 import Avatar from "../common/Avatar";
 
@@ -31,13 +32,15 @@ function fmtTime(s) {
 }
 
 /* ─── video element ─── */
-function VideoEl({ stream, muted, className }) {
-  const ref = useRef(null);
+const VideoEl = forwardRef(({ stream, muted, className }, ref) => {
+  const localRef = useRef(null);
+  const actualRef = ref || localRef;
   useEffect(() => {
-    if (ref.current) ref.current.srcObject = stream || null;
-  }, [stream]);
-  return <video ref={ref} autoPlay playsInline muted={muted} className={className} />;
-}
+    if (actualRef.current) actualRef.current.srcObject = stream || null;
+  }, [stream, actualRef]);
+  return <video ref={actualRef} autoPlay playsInline muted={muted} className={className} />;
+});
+VideoEl.displayName = "VideoEl";
 
 /* ─── main export ─── */
 export default function CallOverlay({
@@ -73,6 +76,78 @@ export default function CallOverlay({
   const [fullscreen, setFullscreen] = useState(false);
   const hideTimer = useRef(null);
   const chatEndRef = useRef(null);
+
+  const remoteVideoRef = useRef(null);
+
+  async function togglePiP() {
+    try {
+      if (!document.pictureInPictureElement) {
+        if (remoteVideoRef.current) {
+          await remoteVideoRef.current.requestPictureInPicture();
+        }
+      } else {
+        await document.exitPictureInPicture();
+      }
+    } catch (err) {
+      console.error("Failed to toggle Picture-in-Picture:", err);
+    }
+  }
+
+  // Draggable chat panel state
+  const [chatPosition, setChatPosition] = useState(() => {
+    const width = typeof window !== "undefined" ? window.innerWidth : 800;
+    return { x: Math.max(16, width - 360), y: 100 };
+  });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const posStartRef = useRef({ x: 0, y: 0 });
+
+  const handleDragStart = (e) => {
+    setIsDragging(true);
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    dragStartRef.current = { x: clientX, y: clientY };
+    posStartRef.current = { ...chatPosition };
+  };
+
+  useEffect(() => {
+    const handleDragMove = (e) => {
+      if (!dragStartRef.current.x) return;
+      const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+      const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+      const dx = clientX - dragStartRef.current.x;
+      const dy = clientY - dragStartRef.current.y;
+      
+      const newX = posStartRef.current.x + dx;
+      const newY = posStartRef.current.y + dy;
+
+      const maxX = window.innerWidth - 320;
+      const maxY = window.innerHeight - 450;
+      setChatPosition({
+        x: Math.max(0, Math.min(newX, maxX)),
+        y: Math.max(0, Math.min(newY, maxY))
+      });
+    };
+
+    const handleDragEnd = () => {
+      setIsDragging(false);
+      dragStartRef.current = { x: 0, y: 0 };
+    };
+
+    if (isDragging) {
+      window.addEventListener("mousemove", handleDragMove);
+      window.addEventListener("mouseup", handleDragEnd);
+      window.addEventListener("touchmove", handleDragMove);
+      window.addEventListener("touchend", handleDragEnd);
+    }
+
+    return () => {
+      window.removeEventListener("mousemove", handleDragMove);
+      window.removeEventListener("mouseup", handleDragEnd);
+      window.removeEventListener("touchmove", handleDragMove);
+      window.removeEventListener("touchend", handleDragEnd);
+    };
+  }, [isDragging]);
 
   /* Timer */
   useEffect(() => {
@@ -146,6 +221,7 @@ export default function CallOverlay({
             <div className="absolute inset-0">
               {remoteHasVideo ? (
                 <VideoEl
+                  ref={remoteVideoRef}
                   stream={remoteStream}
                   muted={false}
                   className="h-full w-full object-cover"
@@ -216,6 +292,16 @@ export default function CallOverlay({
               >
                 <MessageSquareText size={16} />
               </button>
+              {isVideo && (
+                <button
+                  type="button"
+                  onClick={togglePiP}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition"
+                  title="Picture-in-Picture"
+                >
+                  <PictureInPicture size={15} />
+                </button>
+              )}
               {isVideo && (
                 <button
                   type="button"
@@ -295,15 +381,28 @@ export default function CallOverlay({
 
       {/* ── IN-CALL CHAT DRAWER ── */}
       {chatOpen && !incoming && (
-        <div className="absolute right-0 top-0 bottom-0 z-40 flex w-full max-w-sm flex-col bg-slate-950/90 backdrop-blur-xl border-l border-white/10 shadow-2xl">
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-            <p className="text-sm font-bold text-white">In-call chat</p>
+        <div
+          style={{
+            left: `${chatPosition.x}px`,
+            top: `${chatPosition.y}px`,
+            position: 'absolute'
+          }}
+          className="z-40 flex w-[320px] h-[450px] flex-col rounded-2xl bg-slate-950/85 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden select-none"
+        >
+          <div
+            onMouseDown={handleDragStart}
+            onTouchStart={handleDragStart}
+            className="flex items-center justify-between border-b border-white/10 px-4 py-2.5 cursor-grab active:cursor-grabbing bg-white/5 select-none shrink-0"
+          >
+            <p className="text-xs font-bold text-white select-none">In-call chat</p>
             <button
               type="button"
               onClick={() => setChatOpen(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition"
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition"
             >
-              <X size={15} />
+              <X size={14} />
             </button>
           </div>
 
@@ -331,7 +430,7 @@ export default function CallOverlay({
             <div ref={chatEndRef} />
           </div>
 
-          <form onSubmit={submitChat} className="border-t border-white/10 p-3">
+          <form onSubmit={submitChat} className="border-t border-white/10 p-3 shrink-0">
             <div className="flex items-center gap-2">
               <input
                 value={chatText}

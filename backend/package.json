@@ -1,6 +1,6 @@
 {
   "name": "anachat-backend",
-  "version": "4.5.1",
+  "version": "4.6.0",
   "type": "module",
   "main": "src/server.js",
   "scripts": {

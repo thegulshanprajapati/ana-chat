@@ -21,7 +21,9 @@ import {
   Wallpaper,
   X,
   Play,
-  Pause
+  Pause,
+  Pin,
+  PinOff
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import EmojiPicker from "emoji-picker-react";
@@ -267,7 +269,10 @@ function MessageBubble({
   selected,
   isSelectionMode = false,
   notify,
-  onHideChat
+  onHideChat,
+  isPinned = false,
+  onTogglePin,
+  onVotePoll
 }) {
   const { user } = useAuth();
   const { theme } = useTheme();
@@ -280,6 +285,36 @@ function MessageBubble({
   const [editing, setEditing] = useState(false);
   const [editDraft, setEditDraft] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+  const [poppingEmojis, setPoppingEmojis] = useState([]);
+
+  const prevReactionsRef = useRef(message?.reactions || {});
+  useEffect(() => {
+    const prev = prevReactionsRef.current || {};
+    const curr = message?.reactions || {};
+    prevReactionsRef.current = curr;
+
+    let newReaction = null;
+    for (const [reaction, count] of Object.entries(curr)) {
+      const prevCount = prev[reaction] || 0;
+      if (count > prevCount) {
+        newReaction = reaction;
+        break;
+      }
+    }
+
+    if (newReaction) {
+      const id = Math.random().toString(36).substring(2, 9);
+      const newPop = {
+        id,
+        emoji: newReaction,
+        left: Math.floor(Math.random() * 40) + 30,
+      };
+      setPoppingEmojis((prevPops) => [...prevPops, newPop]);
+      setTimeout(() => {
+        setPoppingEmojis((prevPops) => prevPops.filter((p) => p.id !== id));
+      }, 1200);
+    }
+  }, [message?.reactions]);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [decryptedMediaUrl, setDecryptedMediaUrl] = useState("");
   const [decryptingMedia, setDecryptingMedia] = useState(false);
@@ -370,6 +405,16 @@ function MessageBubble({
   const isPdf = isFile && /^application\/pdf\b/i.test(mediaMime);
   const downloadName = useMemo(() => downloadFilenameForMessage(message, mediaMime), [message?.id, mediaMime, message?.e2ee?.media?.kind]);
   const displayBody = deleted ? "This message was deleted" : (message.body || "");
+  const poll = useMemo(() => {
+    if (message.message_type === "poll" && !deleted && message.body) {
+      try {
+        return JSON.parse(message.body);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }, [message.message_type, message.body, deleted]);
   const emojiOnly = useMemo(
     () => !message.image_url && !deleted && isEmojiOnlyMessage(displayBody),
     [deleted, displayBody, message.image_url]
@@ -930,6 +975,18 @@ function MessageBubble({
                 }`}
               />
             )}
+            {poppingEmojis.map((pop) => (
+              <span
+                key={pop.id}
+                className="absolute pointer-events-none select-none text-2xl animate-float-emoji z-[60]"
+                style={{
+                  left: `${pop.left}%`,
+                  bottom: '20px',
+                }}
+              >
+                {pop.emoji}
+              </span>
+            ))}
             <div
               className={bubbleClass}
               style={mine ? undefined : { backgroundImage: "var(--bubble-in-bg)", backgroundColor: "var(--bubble-in-tint)" }}
@@ -1032,11 +1089,58 @@ function MessageBubble({
               </div>
             )}
 
-            {!editing && displayBody && (
+            {!editing && displayBody && !poll && (
               <p
                 className={`message-body break-words ${deleted ? "italic opacity-80" : ""} ${emojiOnly ? "message-body--emoji text-[28px] leading-tight tracking-tight" : "text-[14px] leading-5"}`}
                 dangerouslySetInnerHTML={{ __html: bodyHtml }}
               />
+            )}
+
+            {!editing && poll && (
+              <div className="mt-1 w-full max-w-[280px] sm:max-w-[340px] flex flex-col gap-3 p-3 rounded-xl bg-slate-500/10 dark:bg-slate-500/5 border border-slate-500/15">
+                <div>
+                  <h4 className="text-[14px] font-bold text-slate-800 dark:text-slate-200 select-text leading-tight">{poll.question}</h4>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">Select one option</span>
+                </div>
+                
+                <div className="flex flex-col gap-2">
+                  {poll.options.map((option, idx) => {
+                    const voteKeys = Object.keys(message.poll_votes || {});
+                    const totalVotes = voteKeys.length;
+                    const optionVotes = voteKeys.filter(uid => message.poll_votes[uid] === idx).length;
+                    const pct = totalVotes > 0 ? Math.round((optionVotes / totalVotes) * 100) : 0;
+                    const hasVoted = message.poll_votes && message.poll_votes[user?.id] === idx;
+
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => onVotePoll?.(message.id, idx)}
+                        className={`relative w-full text-left overflow-hidden rounded-lg border p-2 transition active:scale-[0.98] ${
+                          hasVoted 
+                            ? "border-violet-500 bg-violet-500/10 text-violet-700 dark:text-violet-300"
+                            : "border-slate-200/50 bg-white/40 dark:border-slate-800/50 dark:bg-slate-950/40 hover:bg-slate-100/60 dark:hover:bg-slate-900/60"
+                        }`}
+                      >
+                        <div 
+                          className="absolute left-0 top-0 bottom-0 bg-violet-500/15 dark:bg-violet-500/10 transition-all duration-300 rounded-l-lg"
+                          style={{ width: `${pct}%` }}
+                        />
+                        <div className="relative z-10 flex items-center justify-between text-xs font-semibold">
+                          <span className="truncate pr-4">{option}</span>
+                          <span className="text-slate-500 dark:text-slate-400 shrink-0">{pct}% ({optionVotes})</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                {Object.keys(message.poll_votes || {}).length > 0 && (
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                    Total votes: {Object.keys(message.poll_votes || {}).length}
+                  </div>
+                )}
+              </div>
             )}
 
             {message.image_url && isFile && !deleted && (
@@ -1375,11 +1479,19 @@ function MessageBubble({
                   />
                   {message.body && <MenuButton icon={<Copy size={13} />} label="Copy" onClick={handleCopy} />}
                   {canEdit && <MenuButton icon={<Pencil size={13} />} label="Edit" onClick={handleEdit} />}
-                  <MenuButton
+                   <MenuButton
                     icon={<Star size={13} />}
                     label={message.my_starred ? "Unstar" : "Star"}
                     onClick={() => {
                       onToggleStar?.(message);
+                      setMenuOpen(false);
+                    }}
+                  />
+                  <MenuButton
+                    icon={isPinned ? <PinOff size={13} /> : <Pin size={13} />}
+                    label={isPinned ? "Unpin message" : "Pin message"}
+                    onClick={() => {
+                      onTogglePin?.(message);
                       setMenuOpen(false);
                     }}
                   />
@@ -1517,6 +1629,14 @@ function MessageBubble({
                     label={message.my_starred ? "Unstar" : "Star"}
                     onClick={() => {
                       onToggleStar?.(message);
+                      setMenuOpen(false);
+                    }}
+                  />
+                  <MenuButton
+                    icon={isPinned ? <PinOff size={13} /> : <Pin size={13} />}
+                    label={isPinned ? "Unpin message" : "Pin message"}
+                    onClick={() => {
+                      onTogglePin?.(message);
                       setMenuOpen(false);
                     }}
                   />

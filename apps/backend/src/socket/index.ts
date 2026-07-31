@@ -214,6 +214,27 @@ export async function createSocketServer(server: HttpServer) {
       }
     });
 
+    socket.on("vote_poll", async ({ messageId, chatId, optionIndex }) => {
+      if (!messageId || !chatId || !userId) return;
+      const db = mongoose.connection.db;
+      if (!db) return;
+
+      try {
+        await db.collection("messages").updateOne(
+          { id: Number(messageId) },
+          { $set: { [`poll_votes.${userId}`]: optionIndex } }
+        );
+
+        io.to(`chat_${chatId}`).emit("poll_vote_update", {
+          messageId,
+          userId,
+          optionIndex
+        });
+      } catch (err: any) {
+        logger.error(err, "[Socket] Failed to vote on poll");
+      }
+    });
+
     socket.on("typing", (payload) => {
       socket.to(`user_${payload.recipientId}`).emit("typing", payload);
     });

@@ -81,9 +81,36 @@ router.get("/:chatId", requireUser, async (req, res) => {
       .limit(500)
       .toArray();
 
+    const msgIds = rows.map((r) => String(r.id));
+    const reactionsMap = {};
+    const myReactionsMap = {};
+
+    if (msgIds.length > 0) {
+      try {
+        const rxRes = await query(
+          "SELECT message_id, user_id, reaction FROM message_reactions WHERE message_id = ANY($1)",
+          [msgIds]
+        );
+        rxRes.rows.forEach((row) => {
+          const mId = row.message_id;
+          if (!reactionsMap[mId]) {
+            reactionsMap[mId] = {};
+          }
+          reactionsMap[mId][row.reaction] = (reactionsMap[mId][row.reaction] || 0) + 1;
+          if (Number(row.user_id) === Number(req.user.id)) {
+            myReactionsMap[mId] = row.reaction;
+          }
+        });
+      } catch (dbErr) {
+        console.error("Failed to load message reactions from Postgres:", dbErr.message);
+      }
+    }
+
     res.json(rows.map((message) => ({
       ...message,
-      e2ee: message.e2ee ? e2eeForUser(message.e2ee, req.user.id) : null
+      e2ee: message.e2ee ? e2eeForUser(message.e2ee, req.user.id) : null,
+      reactions: reactionsMap[String(message.id)] || {},
+      my_reaction: myReactionsMap[String(message.id)] || null
     })));
   } catch (err) {
     console.error("Failed to load messages:", err);
@@ -208,6 +235,8 @@ async function sendMessageHandler(req, res) {
     body: null,
     image_url: imageUrl,
     reply_to_message_id: replyToMessageId,
+    message_type: req.body.messageType || "text",
+    poll_votes: req.body.messageType === "poll" ? {} : undefined,
     e2ee,
     seen: false,
     created_at: new Date().toISOString(),
@@ -544,6 +573,48 @@ router.post("/:messageId/forward", requireUser, async (req, res) => {
   } catch (err) {
     console.error("Forward failed:", err);
     res.status(500).json({ message: "Failed to forward message: " + err.message });
+  }
+});
+
+// Vote on a poll message
+router.post("/:messageId/vote", requireUser, async (req, res) => {
+  const messageId = Number(req.params.messageId);
+  const { optionIndex } = req.body;
+
+  if (optionIndex === undefined) {
+    return res.status(400).json({ message: "optionIndex is required" });
+  }
+
+  try {
+    const db = await getDb();
+    const message = await db.collection("messages").findOne({ id: messageId });
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    const chat = await getChatMembership(db, message.chat_id, req.user.id);
+    if (!chat) {
+      return res.status(403).json({ message: "Not chat participant" });
+    }
+
+    await db.collection("messages").updateOne(
+      { id: messageId },
+      { $set: { [`poll_votes.${req.user.id}`]: optionIndex } }
+    );
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`chat_${message.chat_id}`).emit("poll_vote_update", {
+        messageId,
+        userId: Number(req.user.id),
+        optionIndex
+      });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Poll vote failed:", err);
+    res.status(500).json({ message: "Failed to vote: " + err.message });
   }
 });
 

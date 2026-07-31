@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Copy, ImageUp, Loader2, Paintbrush2, Search, Star, Trash2, X, Forward, Download, Lock, ShieldCheck, Sparkles, MessageSquare } from "lucide-react";
+import { Check, Copy, ImageUp, Loader2, Paintbrush2, Search, Star, Trash2, X, Forward, Download, Lock, ShieldCheck, Sparkles, MessageSquare, Pin } from "lucide-react";
 import ChatHeader from "./ChatHeader";
 import MessageThread from "./MessageThread";
 import Composer from "./Composer";
@@ -50,6 +50,8 @@ export default function ChatPane({
   onReact,
   onForward,
   onSelectToggle,
+  onTogglePin,
+  onVotePoll,
   selectedMessageIds,
   onClearSelection,
   compactMode,
@@ -90,6 +92,11 @@ export default function ChatPane({
     return (messages || []).filter((msg) => Boolean(selectedMessageIds?.[msg.id]));
   }, [messages, selectedMessageIds]);
 
+  const pinnedMessage = useMemo(() => {
+    if (!activeChat?.pinned_message_id || !messages) return null;
+    return messages.find((msg) => Number(msg.id) === Number(activeChat.pinned_message_id)) || null;
+  }, [activeChat?.pinned_message_id, messages]);
+
   const selectedCount = selectedMessages.length;
 
   const handleCopySelected = async () => {
@@ -126,6 +133,17 @@ export default function ChatPane({
   const handleForwardSelected = () => {
     if (!selectedMessages.length) return;
     onForward?.(selectedMessages);
+  };
+
+  const handleScrollToPinned = () => {
+    if (!pinnedMessage) return;
+    const element = document.getElementById(`msg-${pinnedMessage.id}`);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      element.classList.remove("reply-highlight-flash");
+      void element.offsetWidth;
+      element.classList.add("reply-highlight-flash");
+    }
   };
 
   const handleDownloadSelected = () => {
@@ -372,6 +390,38 @@ export default function ChatPane({
         />
       )}
 
+      {pinnedMessage && (
+        <div 
+          onClick={handleScrollToPinned}
+          className={`flex items-center justify-between border-b px-4 py-2 text-xs font-semibold cursor-pointer transition select-none ${
+            isDarkTheme 
+              ? "border-slate-800 bg-slate-900/60 hover:bg-slate-800/40 text-slate-200" 
+              : "border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700"
+          }`}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <Pin size={12} className="rotate-45 text-rose-500 shrink-0" />
+            <span className="text-[11px] font-bold text-rose-500 shrink-0">Pinned Message:</span>
+            <span className="truncate text-slate-500 dark:text-slate-400 font-medium">
+              {pinnedMessage.message_type === "poll" 
+                ? "📊 Poll" 
+                : (pinnedMessage.body || (pinnedMessage.image_url ? "📷 Media/Attachment" : ""))}
+            </span>
+          </div>
+          <button 
+            type="button" 
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePin?.(pinnedMessage);
+            }} 
+            className="rounded-lg p-1 hover:bg-black/5 dark:hover:bg-white/5 transition"
+            title="Unpin"
+          >
+            <X size={12} />
+          </button>
+        </div>
+      )}
+
       {isBlocked && (
         <div className="border-b border-amber-200/80 bg-amber-50/90 px-4 py-2 text-xs font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
           {blockMessage}
@@ -548,6 +598,9 @@ export default function ChatPane({
         onReact={onReact}
         onForward={onForward}
         onSelectToggle={onSelectToggle}
+        onTogglePin={onTogglePin}
+        onVotePoll={onVotePoll}
+        pinnedMessageId={activeChat?.pinned_message_id}
         selectedMessageIds={selectedMessageIds}
         notify={notify}
         onHideChat={isSelfChat ? undefined : onHideChat}

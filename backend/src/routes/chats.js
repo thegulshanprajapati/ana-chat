@@ -869,4 +869,64 @@ router.delete("/:chatId", requireUser, async (req, res) => {
   res.json({ success: true });
 });
 
+// Pin message inside a chat
+router.post("/:chatId/pin-message", requireUser, async (req, res) => {
+  const chatId = Number(req.params.chatId);
+  const { messageId } = req.body;
+  if (!chatId || !messageId) {
+    return res.status(400).json({ message: "Chat ID and Message ID are required" });
+  }
+
+  const db = await getDb();
+  const chat = await getChatMembership(db, chatId, Number(req.user.id));
+  if (!chat) return res.status(403).json({ message: "Not chat participant" });
+
+  await db.collection("chats").updateOne(
+    { id: chatId },
+    { $set: { pinned_message_id: messageId, pinned_at: new Date() } }
+  );
+
+  const participantIds = await getChatParticipantIds(db, chat);
+  const io = req.app.get("io");
+  if (io) {
+    io.to(`chat_${chatId}`).emit("chat_pin_update", {
+      chatId,
+      pinnedMessageId: messageId,
+      pinnedAt: new Date()
+    });
+  }
+
+  emitChatUpdated(req, participantIds, chatId);
+  res.json({ success: true, pinnedMessageId: messageId });
+});
+
+// Unpin message inside a chat
+router.delete("/:chatId/pin-message", requireUser, async (req, res) => {
+  const chatId = Number(req.params.chatId);
+  if (!chatId) {
+    return res.status(400).json({ message: "Chat ID is required" });
+  }
+
+  const db = await getDb();
+  const chat = await getChatMembership(db, chatId, Number(req.user.id));
+  if (!chat) return res.status(403).json({ message: "Not chat participant" });
+
+  await db.collection("chats").updateOne(
+    { id: chatId },
+    { $unset: { pinned_message_id: "", pinned_at: "" } }
+  );
+
+  const participantIds = await getChatParticipantIds(db, chat);
+  const io = req.app.get("io");
+  if (io) {
+    io.to(`chat_${chatId}`).emit("chat_pin_update", {
+      chatId,
+      pinnedMessageId: null
+    });
+  }
+
+  emitChatUpdated(req, participantIds, chatId);
+  res.json({ success: true });
+});
+
 export default router;
