@@ -39,7 +39,9 @@ export default function SettingsDrawer({
   onDisableBackup,
   onOpenHiddenVault,
   autoLockSetting,
-  setAutoLockSetting
+  setAutoLockSetting,
+  userId,
+  onOpenBackupSetup
 }) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [themeColorOpen, setThemeColorOpen] = useState(false);
@@ -311,7 +313,7 @@ export default function SettingsDrawer({
                   onChange={(e) => {
                     const val = e.target.value;
                     setAutoLockSetting?.(val);
-                    localStorage.setItem("anachat_auto_lock_setting", val);
+                    localStorage.setItem(`anachat_auto_lock_setting_${userId || "guest"}`, val);
                   }}
                   className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 outline-none"
                 >
@@ -448,6 +450,34 @@ export default function SettingsDrawer({
                     <span className="text-slate-500 dark:text-slate-400">Last Backup:</span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200">{lastBackup}</span>
                   </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/40">
+                  <div className="min-w-0">
+                    <span className="block text-xs font-semibold text-slate-800 dark:text-slate-200">☁️ Auto Cloud Backup</span>
+                    <span className="block text-[10px] text-slate-500 dark:text-slate-400 leading-normal">Automatically back up your chats securely to the cloud.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (backupStatus === "Disabled") {
+                        // Open Setup Modal
+                        onOpenBackupSetup?.();
+                      } else {
+                        // Disable
+                        onDisableBackup?.();
+                      }
+                    }}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${
+                      backupStatus !== "Disabled" ? "bg-violet-600" : "bg-slate-300 dark:bg-slate-700"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        backupStatus !== "Disabled" ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
                 </div>
 
                 <div className="space-y-2">

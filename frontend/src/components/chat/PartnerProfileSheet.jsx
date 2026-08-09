@@ -201,7 +201,7 @@ export default function PartnerProfileSheet({
     setConfirmClearOpen(false);
     try {
       await api.post(`/chats/${chatId}/clear`);
-      await clearLocalMessagesForChat(chatId).catch(() => {});
+      await clearLocalMessagesForChat(chatId, meId).catch(() => {});
       window.dispatchEvent(new Event("ana_chats_updated"));
       window.dispatchEvent(new CustomEvent("ana_active_chat_cleared", { detail: { chatId } }));
       success("Chat cleared successfully.");

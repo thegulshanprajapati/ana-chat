@@ -38,6 +38,8 @@ import HideMessageModal from "../components/common/HideMessageModal";
 import UnlockMessageModal from "../components/common/UnlockMessageModal";
 import HiddenVaultDrawer from "../components/common/HiddenVaultDrawer";
 import ChangeKeyModal from "../components/common/ChangeKeyModal";
+import BackupSetupModal from "../components/common/BackupSetupModal";
+import RestoreBackupModal from "../components/common/RestoreBackupModal";
 import { appendCallLog, patchCallLog } from "../utils/callLogs";
 import { navigateTo } from "../utils/nav";
 
@@ -175,7 +177,7 @@ export default function ChatPage() {
   const [hiddenChatsCount, setHiddenChatsCount] = useState(0);
   const [pinnedChatIds, setPinnedChatIds] = useState(() => {
     try {
-      const raw = localStorage.getItem(PINNED_CHATS_STORAGE_KEY);
+      const raw = localStorage.getItem(`ana_pinned_chats_v1_${user?.id || "guest"}`);
       const parsed = JSON.parse(raw || "[]");
       return Array.isArray(parsed) ? parsed.map((id) => Number(id)).filter(Boolean) : [];
     } catch {
@@ -201,7 +203,7 @@ export default function ChatPage() {
   const [unlockBusy, setUnlockBusy] = useState(false);
   const [hideBusy, setHideBusy] = useState(false);
   const [autoLockSetting, setAutoLockSetting] = useState(() => {
-    return localStorage.getItem("anachat_auto_lock_setting") || "app_closed";
+    return localStorage.getItem(`anachat_auto_lock_setting_${user?.id || "guest"}`) || "app_closed";
   });
   const [search, setSearch] = useState("");
   const [peopleResults, setPeopleResults] = useState([]);
@@ -214,15 +216,34 @@ export default function ChatPage() {
   const [backupStatus, setBackupStatus] = useState("Disabled");
   const [backupSize, setBackupSize] = useState("N/A");
   const [lastBackup, setLastBackup] = useState("Never");
+  const [backupSetupModalOpen, setBackupSetupModalOpen] = useState(false);
+  const [restoreBackupModalOpen, setRestoreBackupModalOpen] = useState(false);
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
+  const [lastBackupInfo, setLastBackupInfo] = useState(null);
+  const [backupSetupBusy, setBackupSetupBusy] = useState(false);
+  const [restoreBackupBusy, setRestoreBackupBusy] = useState(false);
+  const sessionBackupKeyRef = useRef(null);
 
   useEffect(() => {
     async function checkBackupStatus() {
       try {
         const { data } = await api.get("/messages/backup/status");
+        setLastBackupInfo(data);
+        setAutoBackupEnabled(Boolean(data.autoBackupEnabled));
         if (data.hasBackup) {
-          setBackupStatus("Enabled");
+          setBackupStatus(data.autoBackupEnabled ? "Enabled" : "Manual");
           setBackupSize(`${(data.lastBackupSize / 1024).toFixed(2)} KB`);
           setLastBackup(new Date(data.lastBackupAt).toLocaleString());
+          
+          // Check if local chats are empty to suggest restoration on login
+          try {
+            const localChats = await getLocalChats(user?.id);
+            if (localChats.length === 0) {
+              setRestoreBackupModalOpen(true);
+            }
+          } catch (e) {
+            console.warn("Could not check local chats for backup restore trigger:", e);
+          }
         } else {
           setBackupStatus("Disabled");
           setBackupSize("N/A");
@@ -471,13 +492,13 @@ export default function ChatPage() {
       setLoadingMessages(true);
     }, 150);
     try {
-      const localMsgs = await getLocalMessages(chatId);
+      const localMsgs = await getLocalMessages(chatId, user.id);
       let serverMsgs = [];
       try {
         const { data } = await api.get(`/messages/${chatId}`);
         const rawServerMsgs = Array.isArray(data) ? data : [];
         serverMsgs = await Promise.all(rawServerMsgs.map((item) => decryptMessageForMe(item)));
-        await Promise.all(serverMsgs.map((item) => saveLocalMessage(item).catch(() => {})));
+        await Promise.all(serverMsgs.map((item) => saveLocalMessage(item, user.id).catch(() => {})));
       } catch (err) {
         console.warn("Failed to sync server messages:", err);
       }
@@ -498,7 +519,7 @@ export default function ChatPage() {
       notify({ type: "error", message: "Unable to load messages locally." });
       return false;
     }
-  }, [decryptMessageForMe, notify]);
+  }, [decryptMessageForMe, notify, user?.id]);
 
   useEffect(() => {
     const merged = {
@@ -771,12 +792,62 @@ export default function ChatPage() {
     if (isMobile) setMobileChatOpen(true);
   }, [activeChat?.id, getChatRecipients, isMobile, socket]);
 
+  // Ref tracking a pending message scroll request from hidden search navigation
+  const pendingScrollMessageId = useRef(null);
+
+  // Navigate to a hidden message from search results:
+  // - If the message is in the current chat, scroll to it directly.
+  // - If it's in a different chat, switch to that chat first, then scroll after messages load.
+  const handleHiddenSearchNavigate = useCallback(async ({ chatId, messageId }) => {
+    if (!chatId || !messageId) return;
+
+    const scrollToMessage = (id) => {
+      const el = document.getElementById(`msg-${id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.remove("reply-highlight-flash");
+        void el.offsetWidth;
+        el.classList.add("reply-highlight-flash");
+      }
+    };
+
+    if (activeChatIdRef.current === Number(chatId)) {
+      // Already in the right chat
+      scrollToMessage(messageId);
+    } else {
+      // Switch chat, then scroll after messages are loaded
+      pendingScrollMessageId.current = Number(messageId);
+      const targetChat = chats.find(c => Number(c.id) === Number(chatId));
+      if (targetChat) {
+        await selectChat(targetChat);
+      }
+    }
+  }, [chats, selectChat]);
+
+  // Scroll to pending message once messages have loaded (after chat switch)
+  useEffect(() => {
+    if (!pendingScrollMessageId.current || loadingMessages) return;
+    const id = pendingScrollMessageId.current;
+    pendingScrollMessageId.current = null;
+    // Small delay to allow DOM to render messages
+    const t = setTimeout(() => {
+      const el = document.getElementById(`msg-${id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.remove("reply-highlight-flash");
+        void el.offsetWidth;
+        el.classList.add("reply-highlight-flash");
+      }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [messages, loadingMessages]);
+
   const loadChats = useCallback(async (showSkeleton = false) => {
     if (showSkeleton && chats.length === 0) setLoadingChats(true);
     try {
       // 1. Load chats from local IndexedDB first for optimistic/local-first speed
       try {
-        const localChats = await getLocalChats();
+        const localChats = await getLocalChats(user?.id);
         if (localChats && localChats.length > 0) {
           setChats(localChats);
         }
@@ -794,14 +865,14 @@ export default function ChatPage() {
       // 2. Save fetched/decrypted chats to local IndexedDB
       for (const chat of decryptedList) {
         try {
-          await saveLocalChat(chat);
+          await saveLocalChat(chat, user?.id);
         } catch (err) {
           console.error("Failed to save chat to local DB:", err);
         }
       }
 
       // 3. Retrieve final merged list from local IndexedDB
-      const finalChats = await getLocalChats();
+      const finalChats = await getLocalChats(user?.id);
       setChats(finalChats.length > 0 ? finalChats : decryptedList);
 
       const nextHiddenCount = Number(hiddenCountData?.count || 0);
@@ -840,7 +911,7 @@ export default function ChatPage() {
     } finally {
       setLoadingChats(false);
     }
-  }, [decryptChatPreviewForMe, isMobile, notify, selectChat]);
+  }, [decryptChatPreviewForMe, isMobile, notify, selectChat, user?.id]);
 
   const refreshActiveChatMessages = useCallback(async () => {
     if (!activeChatIdRef.current) return;
@@ -898,7 +969,7 @@ export default function ChatPage() {
 
   const handleCreateBackup = useCallback(async (pin) => {
     try {
-      const dbDump = await exportLocalDbAsJson();
+      const dbDump = await exportLocalDbAsJson(user?.id);
       const encrypted = await encryptDatabaseBackup(dbDump, pin);
       const pinHash = await hashBackupPin(pin);
 
@@ -917,7 +988,7 @@ export default function ChatPage() {
       notify({ type: "error", message: err.message || "Failed to create backup." });
       throw err;
     }
-  }, [notify]);
+  }, [notify, user?.id]);
 
   const handleRestoreBackup = useCallback(async (pin) => {
     try {
@@ -935,7 +1006,7 @@ export default function ChatPage() {
         pin
       );
 
-      await importLocalDbFromJson(decryptedDb);
+      await importLocalDbFromJson(decryptedDb, user?.id);
       
       // Reload chats and messages
       await loadChats();
@@ -948,7 +1019,7 @@ export default function ChatPage() {
       notify({ type: "error", message: err.message || "Failed to restore backup." });
       throw err;
     }
-  }, [loadChats, loadMessages, notify]);
+  }, [loadChats, loadMessages, notify, user?.id]);
 
   const handleDisableBackup = useCallback(async () => {
     try {
@@ -956,12 +1027,109 @@ export default function ChatPage() {
       setBackupStatus("Disabled");
       setBackupSize("N/A");
       setLastBackup("Never");
+      setAutoBackupEnabled(false);
+      sessionBackupKeyRef.current = null;
       notify({ type: "success", message: "Backups disabled and deleted from cloud." });
     } catch (err) {
       notify({ type: "error", message: "Failed to disable backup." });
       throw err;
     }
   }, [notify]);
+
+  const handleEnableBackupWithPin = useCallback(async (pin) => {
+    setBackupSetupBusy(true);
+    try {
+      // 1. Perform immediate backup with PIN
+      await handleCreateBackup(pin);
+
+      // 2. Set auto backup status to enabled on backend
+      await api.patch("/messages/backup/settings", { enabled: true });
+      setAutoBackupEnabled(true);
+      setBackupStatus("Enabled");
+
+      // 3. Cache the PIN in memory (or derive key) for automated background backups
+      // We will derive the PBKDF2 key and cache the CryptoKey in sessionBackupKeyRef
+      const dbDump = await exportLocalDbAsJson(user?.id);
+      const keyObj = await hashBackupPin(pin); // simple hash wrapper for reuse or store raw string in session ref
+      sessionBackupKeyRef.current = pin;
+
+      setBackupSetupModalOpen(false);
+      notify({ type: "success", message: "Auto Cloud Backup enabled successfully." });
+    } catch (err) {
+      notify({ type: "error", message: err.message || "Failed to enable auto backup." });
+    } finally {
+      setBackupSetupBusy(false);
+    }
+  }, [handleCreateBackup, notify, user?.id]);
+
+  const handleRestoreBackupWithPin = useCallback(async (pin) => {
+    setRestoreBackupBusy(true);
+    try {
+      await handleRestoreBackup(pin);
+      // Cache PIN in memory for this session so auto backup works seamlessly
+      sessionBackupKeyRef.current = pin;
+      setRestoreBackupModalOpen(false);
+    } catch (err) {
+      // Throw back so modal can increment attempts and show error msg
+      throw err;
+    } finally {
+      setRestoreBackupBusy(false);
+    }
+  }, [handleRestoreBackup]);
+
+  // Debounced auto backup scheduler
+  const autoBackupTimerRef = useRef(null);
+  const triggerAutoBackup = useCallback(() => {
+    if (!autoBackupEnabled || !sessionBackupKeyRef.current || !user?.id) return;
+    
+    if (autoBackupTimerRef.current) clearTimeout(autoBackupTimerRef.current);
+    
+    autoBackupTimerRef.current = setTimeout(async () => {
+      try {
+        console.log("[Backup] Auto-backup running in background...");
+        const dbDump = await exportLocalDbAsJson(user.id);
+        const encrypted = await encryptDatabaseBackup(dbDump, sessionBackupKeyRef.current);
+        const pinHash = await hashBackupPin(sessionBackupKeyRef.current);
+
+        const { data } = await api.post("/messages/backup", {
+          backupBlob: encrypted.ciphertext,
+          backupPinHash: pinHash,
+          salt: encrypted.salt,
+          iv: encrypted.iv
+        });
+
+        setBackupSize(`${(data.size / 1024).toFixed(2)} KB`);
+        setLastBackup(new Date(data.timestamp).toLocaleString());
+        console.log("[Backup] Auto-backup completed successfully.");
+      } catch (err) {
+        console.error("Auto backup failed in background:", err);
+      }
+    }, 5 * 60 * 1000); // 5 minutes debounce
+  }, [autoBackupEnabled, user?.id]);
+
+  const handleLogout = useCallback(async () => {
+    if (user?.id) {
+      try {
+        await clearLocalDb(user.id);
+      } catch (err) {
+        console.error("Failed to clear local db on logout:", err);
+      }
+    }
+    // Remove local storage keys for specific scopes
+    try {
+      localStorage.removeItem(`ana_pinned_chats_v1_${user?.id || "guest"}`);
+    } catch (e) {}
+
+    // Reset local UI states
+    setChats([]);
+    setMessages([]);
+    setActiveChat(null);
+    setUnlockedMessages(new Map());
+    setUnreadByChat({});
+    setPinnedChatIds([]);
+
+    logout();
+  }, [logout, user?.id]);
 
   const createChat = useCallback(async (otherUserId) => {
     try {
@@ -1120,13 +1288,13 @@ export default function ChatPage() {
       const next = typeof updater === "function" ? updater(prev) : updater;
       const normalized = Array.isArray(next) ? next.map((id) => Number(id)).filter(Boolean) : [];
       try {
-        localStorage.setItem(PINNED_CHATS_STORAGE_KEY, JSON.stringify(normalized));
+        localStorage.setItem(`ana_pinned_chats_v1_${user?.id || "guest"}`, JSON.stringify(normalized));
       } catch {
         // ignore
       }
       return normalized;
     });
-  }, []);
+  }, [user?.id]);
 
   const togglePinChat = useCallback((chatId) => {
     const id = Number(chatId);
@@ -1190,8 +1358,8 @@ export default function ChatPage() {
       onConfirm: async () => {
         try {
           await api.delete(`/chats/${id}`);
-          await clearLocalMessagesForChat(id).catch(() => {});
-          await deleteLocalChat(id).catch(() => {});
+          await clearLocalMessagesForChat(id, user?.id).catch(() => {});
+          await deleteLocalChat(id, user?.id).catch(() => {});
           notify({ type: "success", message: "Chat deleted successfully." });
           if (Number(activeChat?.id) === id) {
             setActiveChat(null);
@@ -1206,7 +1374,7 @@ export default function ChatPage() {
         }
       }
     });
-  }, [activeChat?.id, loadChats, notify]);
+  }, [activeChat?.id, loadChats, notify, user?.id]);
 
   const updateBlockStateForUser = useCallback((targetUserId, blockedByMe) => {
     if (!targetUserId) return;
@@ -1382,7 +1550,7 @@ export default function ChatPage() {
     };
 
     setMessages((prev) => [...prev, optimistic]);
-    void saveLocalMessage(optimistic).catch(err => console.error("Error saving optimistic message:", err));
+    void saveLocalMessage(optimistic, user?.id).catch(err => console.error("Error saving optimistic message:", err));
 
     setChats((prev) => {
       const next = prev.map((chat) => (
@@ -1397,7 +1565,7 @@ export default function ChatPage() {
       ));
       const sorted = sortChats(next);
       const updatedChat = sorted.find(c => c.id === activeChat.id);
-      if (updatedChat) saveLocalChat(updatedChat).catch(err => console.error("Error saving chat local:", err));
+      if (updatedChat) saveLocalChat(updatedChat, user?.id).catch(err => console.error("Error saving chat local:", err));
       return sorted;
     });
 
@@ -1429,8 +1597,8 @@ export default function ChatPage() {
         const replaced = prev.map((msg) => (msg.id === tempId ? { ...decryptedData, delivery_status: "sent" } : msg));
         const final = replaced.some((msg) => msg.id === decryptedData.id) ? replaced : [...replaced, { ...decryptedData, delivery_status: "sent" }];
         // Remove temporary message and put final E2EE message
-        deleteLocalMessage(tempId).catch(() => {});
-        saveLocalMessage({ ...decryptedData, delivery_status: "sent" }).catch(err => console.error(err));
+        deleteLocalMessage(tempId, user?.id).catch(() => {});
+        saveLocalMessage({ ...decryptedData, delivery_status: "sent" }, user?.id).catch(err => console.error(err));
         return final;
       });
       setChats((prev) => {
@@ -1446,16 +1614,19 @@ export default function ChatPage() {
         ));
         const sorted = sortChats(next);
         const updatedChat = sorted.find(c => c.id === activeChat.id);
-        if (updatedChat) saveLocalChat(updatedChat).catch(err => console.error("Error saving chat local:", err));
+        if (updatedChat) saveLocalChat(updatedChat, user?.id).catch(err => console.error("Error saving chat local:", err));
         return sorted;
       });
       setReplyToMessage(null);
+      
+      // Trigger background auto backup check
+      triggerAutoBackup();
     } catch (err) {
       setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
-      deleteLocalMessage(tempId).catch(() => {});
+      deleteLocalMessage(tempId, user?.id).catch(() => {});
       throw err;
     }
-  }, [activeChat, decryptMessageForMe, getChatRecipients, messages, replyToMessage, user?.id]);
+  }, [activeChat, decryptMessageForMe, getChatRecipients, messages, replyToMessage, user?.id, triggerAutoBackup]);
 
   const sendCallChatMessage = useCallback(async (text) => {
     const chatId = callRef.current.chatId;
@@ -1486,7 +1657,7 @@ export default function ChatPage() {
     if (!message?.id) return;
     try {
       await api.post(`/messages/${message.id}/delete-for-me`, { chatId: message.chat_id });
-      await deleteLocalMessage(message.id).catch(() => {});
+      await deleteLocalMessage(message.id, user?.id).catch(() => {});
       setMessages((prev) => prev.filter((item) => item.id !== message.id));
       notify({ type: "success", message: "Message deleted for you." });
     } catch (err) {
@@ -1495,7 +1666,7 @@ export default function ChatPage() {
         message: err.response?.data?.message || "Unable to delete message."
       });
     }
-  }, [notify]);
+  }, [notify, user?.id]);
 
   const editMessage = useCallback(async (message, nextBody) => {
     if (!message?.id) return;
@@ -1511,14 +1682,14 @@ export default function ChatPage() {
       const { data } = await api.patch(`/messages/${message.id}/edit`, { chatId, e2ee });
       const decrypted = await decryptMessageForMe({ ...message, ...(data?.message || {}), e2ee });
       applyMessagePatch(message.id, decrypted);
-      await saveLocalMessage(decrypted).catch(() => {});
+      await saveLocalMessage(decrypted, user?.id).catch(() => {});
     } catch (err) {
       notify({
         type: "error",
         message: err.response?.data?.message || "Unable to edit message."
       });
     }
-  }, [applyMessagePatch, decryptMessageForMe, getChatRecipients, notify]);
+  }, [applyMessagePatch, decryptMessageForMe, getChatRecipients, notify, user?.id]);
 
   const handleTogglePin = useCallback(async (message) => {
     if (!activeChat?.id) return;
@@ -1578,7 +1749,7 @@ export default function ChatPage() {
       };
       await api.post(`/messages/${message.id}/delete-for-everyone`, { chatId: message.chat_id });
       applyMessagePatch(message.id, patch);
-      await saveLocalMessage({ ...message, ...patch }).catch(() => {});
+      await saveLocalMessage({ ...message, ...patch }, user?.id).catch(() => {});
       await loadChats();
       notify({ type: "success", message: "Message deleted for everyone." });
     } catch (err) {
@@ -1587,7 +1758,7 @@ export default function ChatPage() {
         message: err.response?.data?.message || "Unable to delete for everyone."
       });
     }
-  }, [applyMessagePatch, notify]);
+  }, [applyMessagePatch, notify, user?.id, loadChats]);
 
   const toggleStarMessage = useCallback(async (message) => {
     if (!message?.id) return;
@@ -1792,7 +1963,7 @@ export default function ChatPage() {
     const handleChatCleared = (e) => {
       const clearedChatId = Number(e.detail?.chatId);
       if (clearedChatId) {
-        void clearLocalMessagesForChat(clearedChatId).catch(() => {});
+        void clearLocalMessagesForChat(clearedChatId, user?.id).catch(() => {});
       }
       if (clearedChatId && activeChatIdRef.current === clearedChatId) {
         setMessages([]);
@@ -1804,7 +1975,7 @@ export default function ChatPage() {
       window.removeEventListener("ana_chats_updated", handleChatsUpdated);
       window.removeEventListener("ana_active_chat_cleared", handleChatCleared);
     };
-  }, [loadChats]);
+  }, [loadChats, user?.id]);
 
   useEffect(() => {
     if (!search.trim() || search.trim().length < 2) {
@@ -2287,7 +2458,7 @@ export default function ChatPage() {
 
         // Save incoming message to local IndexedDB
         try {
-          await saveLocalMessage(decryptedMessage);
+          await saveLocalMessage(decryptedMessage, user.id);
         } catch (err) {
           console.error("Failed to save incoming message locally:", err);
         }
@@ -2308,7 +2479,7 @@ export default function ChatPage() {
             : prev;
           const sorted = sortChats(next);
           const target = sorted.find(c => c.id === decryptedMessage.chat_id);
-          if (target) saveLocalChat(target).catch(err => console.error(err));
+          if (target) saveLocalChat(target, user.id).catch(err => console.error(err));
           return sorted;
         });
 
@@ -2400,16 +2571,20 @@ export default function ChatPage() {
             ? { ...item, ...decrypted }
             : item
         )));
+        await saveLocalMessage(decrypted, user.id).catch(() => {});
       })();
     };
 
     const onMessageDeletedEveryone = (payload) => {
       if (!payload?.messageId || payload.chatId !== activeChatIdRef.current) return;
-      setMessages((prev) => prev.map((item) => (
-        String(item.id) === String(payload.messageId)
-          ? { ...item, body: null, image_url: null, e2ee: null, deleted_for_everyone: true }
-          : item
-      )));
+      setMessages((prev) => prev.map((item) => {
+        if (String(item.id) === String(payload.messageId)) {
+          const updated = { ...item, body: null, image_url: null, e2ee: null, deleted_for_everyone: true };
+          saveLocalMessage(updated, user.id).catch(() => {});
+          return updated;
+        }
+        return item;
+      }));
     };
 
     const onMessageReaction = (payload) => {
@@ -2688,11 +2863,14 @@ export default function ChatPage() {
       if (!messageId) return;
 
       setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === messageId
-            ? { ...msg, delivery_status: "delivered", delivered_at: deliveredAt }
-            : msg
-        )
+        prev.map((msg) => {
+          if (msg.id === messageId) {
+            const updated = { ...msg, delivery_status: "delivered", delivered_at: deliveredAt };
+            saveLocalMessage(updated, user.id).catch(() => {});
+            return updated;
+          }
+          return msg;
+        })
       );
     };
 
@@ -2701,11 +2879,14 @@ export default function ChatPage() {
       if (!messageId) return;
 
       setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === messageId
-            ? { ...msg, delivery_status: "read", read_at: readAt }
-            : msg
-        )
+        prev.map((msg) => {
+          if (msg.id === messageId) {
+            const updated = { ...msg, delivery_status: "read", read_at: readAt };
+            saveLocalMessage(updated, user.id).catch(() => {});
+            return updated;
+          }
+          return msg;
+        })
       );
     };
 
@@ -2714,16 +2895,19 @@ export default function ChatPage() {
       if (!messageId || !status) return;
 
       setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === messageId
-            ? {
-                ...msg,
-                delivery_status: status,
-                ...(status === "delivered" && { delivered_at: timestamp }),
-                ...(status === "read" && { read_at: timestamp })
-              }
-            : msg
-        )
+        prev.map((msg) => {
+          if (msg.id === messageId) {
+            const updated = {
+              ...msg,
+              delivery_status: status,
+              ...(status === "delivered" && { delivered_at: timestamp }),
+              ...(status === "read" && { read_at: timestamp })
+            };
+            saveLocalMessage(updated, user.id).catch(() => {});
+            return updated;
+          }
+          return msg;
+        })
       );
     };
 
@@ -2911,7 +3095,7 @@ export default function ChatPage() {
               onAdmin={() => {
                 navigateTo("admin");
               }}
-              onLogout={logout}
+              onLogout={handleLogout}
               search={search}
               onSearch={setSearch}
               chats={orderedFilteredChats}
@@ -3012,6 +3196,7 @@ export default function ChatPage() {
                 notify={notify}
                 isChatPaneLight={isChatPaneLight}
                 mobile={isMobile}
+                onHiddenSearchNavigate={handleHiddenSearchNavigate}
               />
             )}
           </div>
@@ -3057,6 +3242,8 @@ export default function ChatPage() {
         onOpenHiddenVault={() => setHiddenVaultOpen(true)}
         autoLockSetting={autoLockSetting}
         setAutoLockSetting={setAutoLockSetting}
+        userId={user?.id}
+        onOpenBackupSetup={() => setBackupSetupModalOpen(true)}
       />
 
       <CreateGroupModal
@@ -3173,6 +3360,21 @@ export default function ChatPage() {
           }
         }}
         unlockedList={Array.from(unlockedMessages.values())}
+      />
+
+      <BackupSetupModal
+        open={backupSetupModalOpen}
+        onClose={() => setBackupSetupModalOpen(false)}
+        onConfirm={handleEnableBackupWithPin}
+        busy={backupSetupBusy}
+      />
+
+      <RestoreBackupModal
+        open={restoreBackupModalOpen}
+        onClose={() => setRestoreBackupModalOpen(false)}
+        onConfirm={handleRestoreBackupWithPin}
+        busy={restoreBackupBusy}
+        lastBackupInfo={lastBackupInfo}
       />
     </div>
   );

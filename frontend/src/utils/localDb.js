@@ -1,13 +1,21 @@
-const DB_NAME = "anachat_local_v1";
+const DB_NAME_PREFIX = "anachat_local_v1_user_";
 const DB_VERSION = 1;
 
-function openLocalDb() {
+function getDbName(userId) {
+  if (!userId) {
+    throw new Error("userId is required to open local IndexedDB");
+  }
+  return `${DB_NAME_PREFIX}${userId}`;
+}
+
+function openLocalDb(userId) {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === "undefined") {
       return reject(new Error("IndexedDB is not supported on this browser"));
     }
 
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const dbName = getDbName(userId);
+    const request = indexedDB.open(dbName, DB_VERSION);
 
     request.onupgradeneeded = (event) => {
       const db = request.result;
@@ -38,8 +46,8 @@ function openLocalDb() {
   });
 }
 
-export async function saveLocalChat(chat) {
-  const db = await openLocalDb();
+export async function saveLocalChat(chat, userId) {
+  const db = await openLocalDb(userId);
   return new Promise((resolve, reject) => {
     const tx = db.transaction("chats", "readwrite");
     const store = tx.objectStore("chats");
@@ -49,8 +57,8 @@ export async function saveLocalChat(chat) {
   });
 }
 
-export async function getLocalChats() {
-  const db = await openLocalDb();
+export async function getLocalChats(userId) {
+  const db = await openLocalDb(userId);
   return new Promise((resolve, reject) => {
     const tx = db.transaction("chats", "readonly");
     const store = tx.objectStore("chats");
@@ -66,8 +74,8 @@ export async function getLocalChats() {
   });
 }
 
-export async function saveLocalMessage(msg) {
-  const db = await openLocalDb();
+export async function saveLocalMessage(msg, userId) {
+  const db = await openLocalDb(userId);
   return new Promise((resolve, reject) => {
     const tx = db.transaction("messages", "readwrite");
     const store = tx.objectStore("messages");
@@ -77,8 +85,8 @@ export async function saveLocalMessage(msg) {
   });
 }
 
-export async function getLocalMessages(chatId) {
-  const db = await openLocalDb();
+export async function getLocalMessages(chatId, userId) {
+  const db = await openLocalDb(userId);
   return new Promise((resolve, reject) => {
     const tx = db.transaction("messages", "readonly");
     const store = tx.objectStore("messages");
@@ -95,8 +103,8 @@ export async function getLocalMessages(chatId) {
   });
 }
 
-export async function deleteLocalMessage(messageId) {
-  const db = await openLocalDb();
+export async function deleteLocalMessage(messageId, userId) {
+  const db = await openLocalDb(userId);
   return new Promise((resolve, reject) => {
     const tx = db.transaction("messages", "readwrite");
     const store = tx.objectStore("messages");
@@ -106,8 +114,8 @@ export async function deleteLocalMessage(messageId) {
   });
 }
 
-export async function clearLocalDb() {
-  const db = await openLocalDb();
+export async function clearLocalDb(userId) {
+  const db = await openLocalDb(userId);
   return new Promise((resolve, reject) => {
     const tx = db.transaction(["chats", "messages", "reactions", "drafts"], "readwrite");
     tx.objectStore("chats").clear();
@@ -120,8 +128,8 @@ export async function clearLocalDb() {
 }
 
 // Export database dump for backup
-export async function exportLocalDbAsJson() {
-  const db = await openLocalDb();
+export async function exportLocalDbAsJson(userId) {
+  const db = await openLocalDb(userId);
   const tx = db.transaction(["chats", "messages", "reactions", "drafts"], "readonly");
   
   const chats = await new Promise((res) => {
@@ -141,9 +149,9 @@ export async function exportLocalDbAsJson() {
 }
 
 // Import database dump for restore
-export async function importLocalDbFromJson(jsonString) {
+export async function importLocalDbFromJson(jsonString, userId) {
   const data = JSON.parse(jsonString);
-  const db = await openLocalDb();
+  const db = await openLocalDb(userId);
   const tx = db.transaction(["chats", "messages", "reactions", "drafts"], "readwrite");
 
   if (data.chats) {
@@ -169,8 +177,8 @@ export async function importLocalDbFromJson(jsonString) {
   });
 }
 
-export async function deleteLocalChat(chatId) {
-  const db = await openLocalDb();
+export async function deleteLocalChat(chatId, userId) {
+  const db = await openLocalDb(userId);
   return new Promise((resolve, reject) => {
     const tx = db.transaction("chats", "readwrite");
     const store = tx.objectStore("chats");
@@ -180,8 +188,8 @@ export async function deleteLocalChat(chatId) {
   });
 }
 
-export async function clearLocalMessagesForChat(chatId) {
-  const db = await openLocalDb();
+export async function clearLocalMessagesForChat(chatId, userId) {
+  const db = await openLocalDb(userId);
   return new Promise((resolve, reject) => {
     const tx = db.transaction("messages", "readwrite");
     const store = tx.objectStore("messages");
@@ -200,3 +208,15 @@ export async function clearLocalMessagesForChat(chatId) {
   });
 }
 
+export async function deleteUserLocalDb(userId) {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      return reject(new Error("IndexedDB is not supported on this browser"));
+    }
+    const dbName = getDbName(userId);
+    const req = indexedDB.deleteDatabase(dbName);
+    req.onsuccess = () => resolve(true);
+    req.onerror = () => reject(req.error);
+    req.onblocked = () => resolve(true);
+  });
+}

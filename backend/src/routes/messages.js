@@ -144,24 +144,29 @@ router.get("/:chatId", requireUser, async (req, res) => {
 
 // Backup APIs
 router.post("/backup", requireUser, async (req, res) => {
-  const { backupBlob, backupPinHash, salt, iv } = req.body;
+  const { backupBlob, backupPinHash, salt, iv, version, schemaVersion } = req.body;
   if (!backupBlob || !backupPinHash || !salt || !iv) {
     return res.status(400).json({ message: "Invalid backup payload" });
   }
 
   try {
     const size = Buffer.byteLength(backupBlob, "utf8");
+    const v = Number(version || 1);
+    const sv = Number(schemaVersion || 1);
+
     await query(
-      `INSERT INTO backups (user_id, backup_blob, backup_pin_hash, salt, iv, last_backup_size)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO backups (user_id, backup_blob, backup_pin_hash, salt, iv, last_backup_size, version, schema_version)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (user_id) DO UPDATE SET
          backup_blob = EXCLUDED.backup_blob,
          backup_pin_hash = EXCLUDED.backup_pin_hash,
          salt = EXCLUDED.salt,
          iv = EXCLUDED.iv,
          last_backup_at = CURRENT_TIMESTAMP,
-         last_backup_size = EXCLUDED.last_backup_size`,
-      [Number(req.user.id), backupBlob, backupPinHash, salt, iv, size]
+         last_backup_size = EXCLUDED.last_backup_size,
+         version = EXCLUDED.version,
+         schema_version = EXCLUDED.schema_version`,
+      [Number(req.user.id), backupBlob, backupPinHash, salt, iv, size, v, sv]
     );
 
     res.json({ success: true, size, timestamp: new Date() });
@@ -172,9 +177,9 @@ router.post("/backup", requireUser, async (req, res) => {
 
 router.get("/backup/status", requireUser, async (req, res) => {
   try {
-    const dbRes = await query("SELECT last_backup_at, last_backup_size, salt, iv FROM backups WHERE user_id = $1", [Number(req.user.id)]);
+    const dbRes = await query("SELECT last_backup_at, last_backup_size, salt, iv, auto_backup_enabled FROM backups WHERE user_id = $1", [Number(req.user.id)]);
     if (dbRes.rows.length === 0) {
-      return res.json({ hasBackup: false });
+      return res.json({ hasBackup: false, autoBackupEnabled: false });
     }
     const row = dbRes.rows[0];
     res.json({
@@ -182,7 +187,8 @@ router.get("/backup/status", requireUser, async (req, res) => {
       lastBackupAt: row.last_backup_at,
       lastBackupSize: row.last_backup_size,
       salt: row.salt,
-      iv: row.iv
+      iv: row.iv,
+      autoBackupEnabled: Boolean(row.auto_backup_enabled)
     });
   } catch (err) {
     res.status(500).json({ message: "Failed to get backup status" });
@@ -213,6 +219,50 @@ router.delete("/backup", requireUser, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ message: "Failed to delete backup" });
+  }
+});
+
+// Clear backup data blob but retain settings
+router.delete("/backup/data", requireUser, async (req, res) => {
+  try {
+    await query("UPDATE backups SET backup_blob = NULL, last_backup_size = 0 WHERE user_id = $1", [Number(req.user.id)]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to delete backup data" });
+  }
+});
+
+// Update auto backup settings
+router.patch("/backup/settings", requireUser, async (req, res) => {
+  const { enabled } = req.body;
+  try {
+    // Check if backup settings exist
+    const checkRes = await query("SELECT user_id FROM backups WHERE user_id = $1", [Number(req.user.id)]);
+    if (checkRes.rows.length === 0) {
+      // Seed an empty configuration
+      await query(
+        `INSERT INTO backups (user_id, backup_blob, backup_pin_hash, salt, iv, last_backup_size, auto_backup_enabled)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [Number(req.user.id), "", "", "", "", 0, enabled === true]
+      );
+    } else {
+      await query("UPDATE backups SET auto_backup_enabled = $1 WHERE user_id = $2", [enabled === true, Number(req.user.id)]);
+    }
+    res.json({ enabled: enabled === true });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update backup settings: " + err.message });
+  }
+});
+
+router.get("/backup/settings", requireUser, async (req, res) => {
+  try {
+    const dbRes = await query("SELECT auto_backup_enabled FROM backups WHERE user_id = $1", [Number(req.user.id)]);
+    if (dbRes.rows.length === 0) {
+      return res.json({ enabled: false });
+    }
+    res.json({ enabled: Boolean(dbRes.rows[0].auto_backup_enabled) });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch backup settings" });
   }
 });
 

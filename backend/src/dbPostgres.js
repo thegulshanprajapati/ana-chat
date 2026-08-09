@@ -181,9 +181,22 @@ export async function initDb() {
         salt VARCHAR(100) NOT NULL,
         iv VARCHAR(100) NOT NULL,
         last_backup_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        last_backup_size INT DEFAULT 0
+        last_backup_size INT DEFAULT 0,
+        auto_backup_enabled BOOLEAN DEFAULT FALSE,
+        schema_version INT DEFAULT 1,
+        version INT DEFAULT 1
       );
     `);
+
+    // Backwards compatibility for backups table
+    const alterBackupQueries = [
+      `ALTER TABLE backups ADD COLUMN IF NOT EXISTS auto_backup_enabled BOOLEAN DEFAULT FALSE;`,
+      `ALTER TABLE backups ADD COLUMN IF NOT EXISTS schema_version INT DEFAULT 1;`,
+      `ALTER TABLE backups ADD COLUMN IF NOT EXISTS version INT DEFAULT 1;`
+    ];
+    for (const altQuery of alterBackupQueries) {
+      await query(altQuery).catch(() => { });
+    }
 
     await query(`
       CREATE TABLE IF NOT EXISTS admins (
@@ -353,10 +366,33 @@ async function queryMock(text, params = []) {
     return { rows: session ? [session] : [] };
   }
 
-  if (norm.startsWith("select * from backups")) {
+  if (norm.startsWith("select * from backups") || norm.includes("select last_backup_at, last_backup_size") || norm.includes("select backup_blob") || norm.includes("select auto_backup_enabled")) {
     const userId = Number(params[0]);
     const b = mockDb.backups.find(x => x.user_id === userId);
     return { rows: b ? [b] : [] };
+  }
+
+  if (norm.includes("update backups set auto_backup_enabled =") || norm.includes("update backups set auto_backup_enabled")) {
+    const userId = Number(params[1]);
+    const enabled = params[0] === true;
+    let b = mockDb.backups.find(x => x.user_id === userId);
+    if (!b) {
+      b = { user_id: userId, backup_blob: "", backup_pin_hash: "", salt: "", iv: "", last_backup_at: new Date(), last_backup_size: 0, auto_backup_enabled: enabled, schema_version: 1, version: 1 };
+      mockDb.backups.push(b);
+    } else {
+      b.auto_backup_enabled = enabled;
+    }
+    return { rows: [b] };
+  }
+
+  if (norm.includes("update backups set backup_blob = null")) {
+    const userId = Number(params[0]);
+    const b = mockDb.backups.find(x => x.user_id === userId);
+    if (b) {
+      b.backup_blob = "";
+      b.last_backup_size = 0;
+    }
+    return { rows: [] };
   }
 
   if (norm.startsWith("insert into backups") || norm.includes("on conflict (user_id)")) {
@@ -366,6 +402,8 @@ async function queryMock(text, params = []) {
     const salt = params[3];
     const iv = params[4];
     const size = params[5] || 0;
+    const schema_version = params[6] || 1;
+    const version = params[7] || 1;
 
     let b = mockDb.backups.find(x => x.user_id === userId);
     if (b) {
@@ -375,6 +413,8 @@ async function queryMock(text, params = []) {
       b.iv = iv;
       b.last_backup_at = new Date();
       b.last_backup_size = size;
+      b.schema_version = schema_version;
+      b.version = version;
     } else {
       b = {
         user_id: userId,
@@ -383,7 +423,10 @@ async function queryMock(text, params = []) {
         salt,
         iv,
         last_backup_at: new Date(),
-        last_backup_size: size
+        last_backup_size: size,
+        auto_backup_enabled: false,
+        schema_version,
+        version
       };
       mockDb.backups.push(b);
     }

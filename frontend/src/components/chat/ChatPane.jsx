@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
-import { Check, Copy, ImageUp, Loader2, Paintbrush2, Search, Star, Trash2, X, Forward, Download, Lock, ShieldCheck, Sparkles, MessageSquare, Pin } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, lazy, Suspense, useCallback } from "react";
+import { Check, Copy, ImageUp, Loader2, Paintbrush2, Search, Star, Trash2, X, Forward, Download, Lock, ShieldCheck, Sparkles, MessageSquare, Pin, KeyRound, ArrowRight } from "lucide-react";
 import ChatHeader from "./ChatHeader";
 import MessageThread from "./MessageThread";
 import Composer from "./Composer";
@@ -7,6 +7,7 @@ const PartnerProfileSheet = lazy(() => import("./PartnerProfileSheet"));
 import WatchTogetherPanel from "./WatchTogetherPanel";
 import { CHAT_BACKGROUND_PRESETS } from "../../utils/chat";
 import { navigateTo } from "../../utils/nav";
+import { api } from "../../api/client";
 
 export default function ChatPane({
   meId,
@@ -63,10 +64,19 @@ export default function ChatPane({
   chatPaneColor,
   isChatPaneLight,
   notify,
-  mobile
+  mobile,
+  onHiddenSearchNavigate
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
+  // Hidden message search state
+  const [searchTab, setSearchTab] = useState("messages"); // "messages" | "hidden"
+  const [hiddenKey, setHiddenKey] = useState("");
+  const [hiddenResults, setHiddenResults] = useState(null); // null = not searched yet
+  const [hiddenVaultMeta, setHiddenVaultMeta] = useState([]); // safe metadata list
+  const [hiddenSearchBusy, setHiddenSearchBusy] = useState(false);
+  const [hiddenSearchError, setHiddenSearchError] = useState("");
+  const hiddenKeyInputRef = useRef(null);
   const [muted, setMuted] = useState(false);
   const [watchOpen, setWatchOpen] = useState(false);
   const [backgroundOpen, setBackgroundOpen] = useState(false);
@@ -167,6 +177,10 @@ export default function ChatPane({
   useEffect(() => {
     setSearchOpen(false);
     setSearchText("");
+    setSearchTab("messages");
+    setHiddenKey("");
+    setHiddenResults(null);
+    setHiddenSearchError("");
     setMuted(false);
     setWatchOpen(Boolean(watchSession?.active));
     setBackgroundOpen(false);
@@ -175,16 +189,94 @@ export default function ChatPane({
     setReportBusy(false);
   }, [activeChat?.id, watchSession?.active]);
 
+  // Focus the correct input when tab changes or search opens
   useEffect(() => {
     if (!searchOpen) return;
-    const timer = setTimeout(() => searchInputRef.current?.focus(), 0);
+    const timer = setTimeout(() => {
+      if (searchTab === "messages") {
+        searchInputRef.current?.focus();
+      } else {
+        hiddenKeyInputRef.current?.focus();
+      }
+    }, 0);
     return () => clearTimeout(timer);
-  }, [searchOpen]);
+  }, [searchOpen, searchTab]);
 
+  // Fetch vault metadata (safe) when Hidden tab is opened so we can enrich results
+  const fetchHiddenVaultMeta = useCallback(async () => {
+    try {
+      const { data } = await api.get("/hidden-messages");
+      setHiddenVaultMeta(Array.isArray(data) ? data : []);
+    } catch {
+      // non-critical — results still work via unlockedIds
+    }
+  }, []);
+
+  useEffect(() => {
+    if (searchOpen && searchTab === "hidden") {
+      fetchHiddenVaultMeta();
+    }
+  }, [searchOpen, searchTab, fetchHiddenVaultMeta]);
+
+  // Hidden key search handler — uses existing /api/hidden-messages/unlock endpoint
+  const handleHiddenSearch = useCallback(async (e) => {
+    e?.preventDefault();
+    const trimmedKey = hiddenKey.trim();
+    if (!trimmedKey) return;
+    setHiddenSearchBusy(true);
+    setHiddenSearchError("");
+    setHiddenResults(null);
+    try {
+      const { data } = await api.post("/hidden-messages/unlock", { key: trimmedKey });
+      const ids = data.unlockedIds || [];
+      if (ids.length === 0) {
+        // Generic message — don't reveal whether records exist or not
+        setHiddenSearchError("Incorrect unlock key.");
+      } else {
+        setHiddenResults(ids);
+        // Refresh meta to make sure we have latest
+        fetchHiddenVaultMeta();
+      }
+    } catch (err) {
+      // Return generic error regardless of actual server message
+      setHiddenSearchError("Incorrect unlock key.");
+    } finally {
+      setHiddenSearchBusy(false);
+    }
+  }, [hiddenKey, fetchHiddenVaultMeta]);
+
+  // Navigate to a hidden message result — scroll if same chat, or switch chat via prop
+  const handleNavigateToHiddenResult = useCallback((entry) => {
+    if (!entry?.message_id) return;
+    const msgId = Number(entry.message_id);
+    const chatId = Number(entry.chat_id);
+
+    if (activeChat && Number(activeChat.id) === chatId) {
+      // Same chat — scroll directly
+      const el = document.getElementById(`msg-${msgId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.remove("reply-highlight-flash");
+        void el.offsetWidth;
+        el.classList.add("reply-highlight-flash");
+      } else {
+        // Try scrollApiRef if element not yet in DOM
+        scrollApiRef.current?.scrollToBottom?.("smooth");
+      }
+    } else {
+      // Different chat — delegate to parent
+      onHiddenSearchNavigate?.({ chatId, messageId: msgId });
+    }
+  }, [activeChat, onHiddenSearchNavigate]);
+
+  // Normal search: privacy rule — exclude hidden messages from full-text search
   const normalizedSearch = searchText.trim().toLowerCase();
   const visibleMessages = useMemo(() => {
     if (!normalizedSearch) return messages;
-    return messages.filter((message) => (message.body || "").toLowerCase().includes(normalizedSearch));
+    return messages.filter((message) =>
+      !message.is_hidden_message && // PRIVACY: exclude hidden messages from normal search
+      (message.body || "").toLowerCase().includes(normalizedSearch)
+    );
   }, [messages, normalizedSearch]);
   const searchResultCount = normalizedSearch ? visibleMessages.length : 0;
 
@@ -545,34 +637,219 @@ export default function ChatPane({
       )}
 
       {searchOpen && (
-        <div className="border-b border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-950 sm:px-5">
-          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 dark:border-slate-700 dark:bg-slate-900">
-            <Search size={15} className="shrink-0 text-slate-500 dark:text-slate-400" />
-            <input
-              ref={searchInputRef}
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
-              placeholder="Search messages in this chat"
-              aria-label="Search messages in this chat"
-            />
+        <div className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+          {/* Tab switcher */}
+          <div className="flex items-center gap-0 border-b border-slate-100 dark:border-slate-800/60 px-3 sm:px-5 pt-2">
             <button
               type="button"
+              id="search-tab-messages"
               onClick={() => {
-                setSearchOpen(false);
+                setSearchTab("messages");
+                setHiddenResults(null);
+                setHiddenSearchError("");
+              }}
+              className={`relative px-3 py-1.5 text-xs font-semibold transition-all duration-150 rounded-t-lg border-b-2 mr-1 ${
+                searchTab === "messages"
+                  ? "border-violet-500 text-violet-600 dark:text-violet-400 bg-violet-50/60 dark:bg-violet-950/20"
+                  : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+              }`}
+              aria-selected={searchTab === "messages"}
+            >
+              <span className="flex items-center gap-1.5">
+                <Search size={11} />
+                Messages
+              </span>
+            </button>
+            <button
+              type="button"
+              id="search-tab-hidden"
+              onClick={() => {
+                setSearchTab("hidden");
                 setSearchText("");
               }}
-              className="rounded-md p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-              aria-label="Close in-chat search"
-              title="Close search"
+              className={`relative px-3 py-1.5 text-xs font-semibold transition-all duration-150 rounded-t-lg border-b-2 ${
+                searchTab === "hidden"
+                  ? "border-violet-500 text-violet-600 dark:text-violet-400 bg-violet-50/60 dark:bg-violet-950/20"
+                  : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+              }`}
+              aria-selected={searchTab === "hidden"}
             >
-              <X size={15} />
+              <span className="flex items-center gap-1.5">
+                <KeyRound size={11} />
+                🔐 Hidden
+              </span>
             </button>
+            <div className="ml-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchOpen(false);
+                  setSearchText("");
+                  setSearchTab("messages");
+                  setHiddenKey("");
+                  setHiddenResults(null);
+                  setHiddenSearchError("");
+                }}
+                className="rounded-md p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                aria-label="Close search"
+                title="Close search"
+              >
+                <X size={15} />
+              </button>
+            </div>
           </div>
-          {normalizedSearch && (
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {searchResultCount ? `${searchResultCount} result${searchResultCount > 1 ? "s" : ""} found` : `No result for "${searchText.trim()}"`}
-            </p>
+
+          {/* Messages tab content */}
+          {searchTab === "messages" && (
+            <div className="px-3 py-2 sm:px-5">
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 dark:border-slate-700 dark:bg-slate-900">
+                <Search size={15} className="shrink-0 text-slate-500 dark:text-slate-400" />
+                <input
+                  ref={searchInputRef}
+                  value={searchText}
+                  onChange={(event) => setSearchText(event.target.value)}
+                  className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                  placeholder="Search messages in this chat..."
+                  aria-label="Search messages in this chat"
+                />
+                {searchText && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchText("")}
+                    className="rounded-md p-0.5 text-slate-400 transition hover:text-slate-600 dark:hover:text-slate-200"
+                    aria-label="Clear search"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+              {normalizedSearch && (
+                <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                  {searchResultCount
+                    ? `${searchResultCount} result${searchResultCount > 1 ? "s" : ""} found`
+                    : `No results for "${searchText.trim()}"`}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Hidden tab content */}
+          {searchTab === "hidden" && (
+            <div className="px-3 py-2 sm:px-5 space-y-2.5">
+              <form onSubmit={handleHiddenSearch} className="flex items-center gap-2">
+                <div className="flex flex-1 items-center gap-2 rounded-xl border border-violet-200 bg-white px-2.5 py-2 focus-within:border-violet-400 dark:border-violet-800/60 dark:bg-slate-900 dark:focus-within:border-violet-500 transition">
+                  <KeyRound size={14} className="shrink-0 text-violet-400 dark:text-violet-500" />
+                  <input
+                    ref={hiddenKeyInputRef}
+                    type="text"
+                    value={hiddenKey}
+                    onChange={(e) => {
+                      setHiddenKey(e.target.value);
+                      setHiddenResults(null);
+                      setHiddenSearchError("");
+                    }}
+                    className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                    placeholder="Enter secret key (PIN / Emoji / PIN+Emoji)..."
+                    aria-label="Enter secret key to search hidden messages"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  {hiddenKey && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHiddenKey("");
+                        setHiddenResults(null);
+                        setHiddenSearchError("");
+                      }}
+                      className="rounded-md p-0.5 text-slate-400 transition hover:text-slate-600 dark:hover:text-slate-200"
+                      aria-label="Clear key"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  id="hidden-search-unlock-btn"
+                  disabled={hiddenSearchBusy || !hiddenKey.trim()}
+                  className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {hiddenSearchBusy
+                    ? <Loader2 size={13} className="animate-spin" />
+                    : <Search size={13} />}
+                  Unlock
+                </button>
+              </form>
+
+              {/* Error state */}
+              {hiddenSearchError && (
+                <p className="text-xs font-semibold text-rose-500 dark:text-rose-400 flex items-center gap-1.5">
+                  <X size={11} className="shrink-0" />
+                  {hiddenSearchError}
+                </p>
+              )}
+
+              {/* Results */}
+              {hiddenResults !== null && !hiddenSearchError && (
+                <div className="space-y-2 pb-1">
+                  <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                    <Check size={12} className="shrink-0" />
+                    {hiddenResults.length} hidden message{hiddenResults.length !== 1 ? "s" : ""} found
+                  </p>
+
+                  <div className="max-h-48 overflow-y-auto space-y-1.5 pr-0.5">
+                    {hiddenResults.map((msgId) => {
+                      // Find safe metadata for this message from vault
+                      const meta = hiddenVaultMeta.find(m => Number(m.message_id) === Number(msgId));
+                      const isMedia = meta?.key_type === "emoji" || meta?.key_type === "pin_emoji";
+                      const timeLabel = meta?.created_at
+                        ? (() => {
+                            const d = new Date(meta.created_at);
+                            const now = new Date();
+                            const diffDays = Math.floor((now - d) / 86400000);
+                            if (diffDays === 0) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+                            if (diffDays === 1) return `Yesterday · ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+                            if (diffDays < 7) return `${d.toLocaleDateString([], { weekday: "short" })} · ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+                            return `${d.toLocaleDateString([], { month: "short", day: "numeric" })} · ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+                          })()
+                        : null;
+
+                      return (
+                        <button
+                          key={msgId}
+                          type="button"
+                          id={`hidden-result-${msgId}`}
+                          onClick={() => handleNavigateToHiddenResult(meta || { message_id: msgId, chat_id: activeChat?.id })}
+                          className="group w-full flex items-center justify-between gap-3 rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-2.5 text-left transition hover:border-violet-300 hover:bg-violet-100/60 active:scale-[0.98] dark:border-violet-900/40 dark:bg-violet-950/20 dark:hover:border-violet-700/60 dark:hover:bg-violet-950/40"
+                        >
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                              <Lock size={11} className="shrink-0 text-violet-500" />
+                              {/* PRIVACY: Never reveal original content — show placeholder only */}
+                              {isMedia ? "🔒 Hidden media" : "🔒 Hidden message"}
+                            </span>
+                            {(timeLabel || meta?.conversation_name) && (
+                              <span className="block truncate text-[10px] text-slate-400 dark:text-slate-500">
+                                {[timeLabel, meta?.conversation_name].filter(Boolean).join(" · ")}
+                              </span>
+                            )}
+                          </div>
+                          <ArrowRight size={13} className="shrink-0 text-violet-400 opacity-0 transition group-hover:opacity-100" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty / hint state */}
+              {hiddenResults === null && !hiddenSearchError && (
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
+                  Enter your secret key (PIN, emoji, or PIN+emoji) to find your hidden messages.
+                </p>
+              )}
+            </div>
           )}
         </div>
       )}

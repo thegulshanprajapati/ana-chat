@@ -892,7 +892,7 @@ function MessageBubble({
         const y = (canvas.height - img.height * scale) / 2;
         ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
         const wallpaperUrl = canvas.toDataURL();
-        localStorage.setItem("chatWallpaper", wallpaperUrl);
+        localStorage.setItem(`chatWallpaper_${meId}`, wallpaperUrl);
         window.location.reload();
         notify?.({ type: "success", title: "Wallpaper set", message: "Chat wallpaper updated" });
       };

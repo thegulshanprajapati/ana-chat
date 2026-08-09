@@ -265,7 +265,7 @@ export default function ChatListItem({
     setConfirmClearOpen(false);
     try {
       await api.post(`/chats/${chat.id}/clear`);
-      await clearLocalMessagesForChat(chat.id).catch(() => {});
+      await clearLocalMessagesForChat(chat.id, meId).catch(() => {});
       window.dispatchEvent(new Event("ana_chats_updated"));
       window.dispatchEvent(new CustomEvent("ana_active_chat_cleared", { detail: { chatId: chat.id } }));
       success("Chat cleared successfully.");
