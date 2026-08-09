@@ -385,6 +385,121 @@ export default function ChatPage() {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
+  const decryptMessageForMe = useCallback(async (message) => {
+    if (!message) return message;
+    const pair = await getOrCreateRsaKeyPair(user.id);
+
+    let body = typeof message.body === "string" ? message.body : null;
+    const key = message.e2ee?.key || message.e2ee?.keys?.[String(user.id)] || null;
+    if ((!body || body.length === 0) && key && message.e2ee?.text) {
+      try {
+        body = await decryptTextFromMessage({
+          e2ee: { ...message.e2ee, key },
+          privateJwk: pair.privateJwk
+        });
+      } catch {
+        body = null;
+      }
+    }
+
+    let replyBody = typeof message.reply_to_body === "string" ? message.reply_to_body : null;
+    const replyKey = message.reply_to_e2ee?.key || message.reply_to_e2ee?.keys?.[String(user.id)] || null;
+    if ((!replyBody || replyBody.length === 0) && replyKey && message.reply_to_e2ee?.text) {
+      try {
+        replyBody = await decryptTextFromMessage({
+          e2ee: { ...message.reply_to_e2ee, key: replyKey },
+          privateJwk: pair.privateJwk
+        });
+      } catch {
+        replyBody = null;
+      }
+    }
+
+    return {
+      ...message,
+      body: body != null ? body : null,
+      reply_to_body: replyBody != null ? replyBody : null
+    };
+  }, [user.id]);
+
+  const getChatRecipients = useCallback(async (chatId) => {
+    const normalizedChatId = Number(chatId);
+    if (!normalizedChatId) return [];
+
+    const now = Date.now();
+    const cached = chatRecipientsCacheRef.current.get(normalizedChatId);
+    let list = cached?.participants || [];
+
+    if (!cached || !cached.fetchedAt || now - cached.fetchedAt > RECIPIENT_CACHE_TTL_MS) {
+      const { data } = await api.get(`/chats/${normalizedChatId}/participants`);
+      list = Array.isArray(data?.participants) ? data.participants : [];
+      chatRecipientsCacheRef.current.set(normalizedChatId, { fetchedAt: now, participants: list });
+    }
+
+    const pair = await getOrCreateRsaKeyPair(user.id);
+
+    const recipients = list.map((entry) => ({
+      id: entry.id,
+      publicKey: entry.id === user.id ? pair.publicJwk : entry.publicKey
+    }));
+
+    const missing = recipients.find((entry) => !entry.publicKey);
+    if (missing) {
+      const err = new Error("Recipient has not set up encryption keys yet. Ask them to login once and retry.");
+      err.code = "E2EE_KEY_MISSING";
+      throw err;
+    }
+
+    return recipients;
+  }, [user.id]);
+
+  const decryptChatPreviewForMe = useCallback(async (chat) => {
+    if (!chat || chat.last_message_body) return chat;
+    if (!chat.last_message_e2ee?.key || !chat.last_message_e2ee?.text) return chat;
+    try {
+      const pair = await getOrCreateRsaKeyPair(user.id);
+      const preview = await decryptTextFromMessage({ e2ee: chat.last_message_e2ee, privateJwk: pair.privateJwk });
+      return { ...chat, last_message_body: preview || "" };
+    } catch {
+      return chat;
+    }
+  }, [user.id]);
+
+  const loadMessages = useCallback(async (chatId) => {
+    if (!chatId) return;
+    const timer = setTimeout(() => {
+      setLoadingMessages(true);
+    }, 150);
+    try {
+      const localMsgs = await getLocalMessages(chatId);
+      let serverMsgs = [];
+      try {
+        const { data } = await api.get(`/messages/${chatId}`);
+        const rawServerMsgs = Array.isArray(data) ? data : [];
+        serverMsgs = await Promise.all(rawServerMsgs.map((item) => decryptMessageForMe(item)));
+        await Promise.all(serverMsgs.map((item) => saveLocalMessage(item).catch(() => {})));
+      } catch (err) {
+        console.warn("Failed to sync server messages:", err);
+      }
+      const messageMap = new Map();
+      [...localMsgs, ...serverMsgs].forEach((item) => {
+        if (item?.id) messageMap.set(String(item.id), item);
+      });
+      const mergedMsgs = [...messageMap.values()].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+      clearTimeout(timer);
+      setMessages(mergedMsgs);
+      setUnreadByChat((prev) => ({ ...prev, [chatId]: 0 }));
+      setLoadingMessages(false);
+      return true;
+    } catch (err) {
+      clearTimeout(timer);
+      setMessages([]);
+      setLoadingMessages(false);
+      notify({ type: "error", message: "Unable to load messages locally." });
+      return false;
+    }
+  }, [decryptMessageForMe, notify]);
+
   useEffect(() => {
     const merged = {
       ...DEFAULT_UI_SETTINGS,
@@ -640,121 +755,6 @@ export default function ChatPage() {
   useEffect(() => {
     callRef.current = call;
   }, [call]);
-
-  const decryptMessageForMe = useCallback(async (message) => {
-    if (!message) return message;
-    const pair = await getOrCreateRsaKeyPair(user.id);
-
-    let body = typeof message.body === "string" ? message.body : null;
-    const key = message.e2ee?.key || message.e2ee?.keys?.[String(user.id)] || null;
-    if ((!body || body.length === 0) && key && message.e2ee?.text) {
-      try {
-        body = await decryptTextFromMessage({
-          e2ee: { ...message.e2ee, key },
-          privateJwk: pair.privateJwk
-        });
-      } catch {
-        body = null;
-      }
-    }
-
-    let replyBody = typeof message.reply_to_body === "string" ? message.reply_to_body : null;
-    const replyKey = message.reply_to_e2ee?.key || message.reply_to_e2ee?.keys?.[String(user.id)] || null;
-    if ((!replyBody || replyBody.length === 0) && replyKey && message.reply_to_e2ee?.text) {
-      try {
-        replyBody = await decryptTextFromMessage({
-          e2ee: { ...message.reply_to_e2ee, key: replyKey },
-          privateJwk: pair.privateJwk
-        });
-      } catch {
-        replyBody = null;
-      }
-    }
-
-    return {
-      ...message,
-      body: body != null ? body : null,
-      reply_to_body: replyBody != null ? replyBody : null
-    };
-  }, [user.id]);
-
-  const getChatRecipients = useCallback(async (chatId) => {
-    const normalizedChatId = Number(chatId);
-    if (!normalizedChatId) return [];
-
-    const now = Date.now();
-    const cached = chatRecipientsCacheRef.current.get(normalizedChatId);
-    let list = cached?.participants || [];
-
-    if (!cached || !cached.fetchedAt || now - cached.fetchedAt > RECIPIENT_CACHE_TTL_MS) {
-      const { data } = await api.get(`/chats/${normalizedChatId}/participants`);
-      list = Array.isArray(data?.participants) ? data.participants : [];
-      chatRecipientsCacheRef.current.set(normalizedChatId, { fetchedAt: now, participants: list });
-    }
-
-    const pair = await getOrCreateRsaKeyPair(user.id);
-
-    const recipients = list.map((entry) => ({
-      id: entry.id,
-      publicKey: entry.id === user.id ? pair.publicJwk : entry.publicKey
-    }));
-
-    const missing = recipients.find((entry) => !entry.publicKey);
-    if (missing) {
-      const err = new Error("Recipient has not set up encryption keys yet. Ask them to login once and retry.");
-      err.code = "E2EE_KEY_MISSING";
-      throw err;
-    }
-
-    return recipients;
-  }, [user.id]);
-
-  const decryptChatPreviewForMe = useCallback(async (chat) => {
-    if (!chat || chat.last_message_body) return chat;
-    if (!chat.last_message_e2ee?.key || !chat.last_message_e2ee?.text) return chat;
-    try {
-      const pair = await getOrCreateRsaKeyPair(user.id);
-      const preview = await decryptTextFromMessage({ e2ee: chat.last_message_e2ee, privateJwk: pair.privateJwk });
-      return { ...chat, last_message_body: preview || "" };
-    } catch {
-      return chat;
-    }
-  }, [user.id]);
-
-  const loadMessages = useCallback(async (chatId) => {
-    if (!chatId) return;
-    const timer = setTimeout(() => {
-      setLoadingMessages(true);
-    }, 150);
-    try {
-      const localMsgs = await getLocalMessages(chatId);
-      let serverMsgs = [];
-      try {
-        const { data } = await api.get(`/messages/${chatId}`);
-        const rawServerMsgs = Array.isArray(data) ? data : [];
-        serverMsgs = await Promise.all(rawServerMsgs.map((item) => decryptMessageForMe(item)));
-        await Promise.all(serverMsgs.map((item) => saveLocalMessage(item).catch(() => {})));
-      } catch (err) {
-        console.warn("Failed to sync server messages:", err);
-      }
-      const messageMap = new Map();
-      [...localMsgs, ...serverMsgs].forEach((item) => {
-        if (item?.id) messageMap.set(String(item.id), item);
-      });
-      const mergedMsgs = [...messageMap.values()].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
-      clearTimeout(timer);
-      setMessages(mergedMsgs);
-      setUnreadByChat((prev) => ({ ...prev, [chatId]: 0 }));
-      setLoadingMessages(false);
-      return true;
-    } catch (err) {
-      clearTimeout(timer);
-      setMessages([]);
-      setLoadingMessages(false);
-      notify({ type: "error", message: "Unable to load messages locally." });
-      return false;
-    }
-  }, [decryptMessageForMe, notify]);
 
   const selectChat = useCallback(async (chat) => {
     if (!chat) return;
