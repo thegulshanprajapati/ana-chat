@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MoreVertical, Settings, UserPen, LogOut, Shield, PhoneCall } from "lucide-react";
+import { MoreVertical, Settings, UserPen, LogOut, Shield, PhoneCall, Lock } from "lucide-react";
 import Avatar from "../common/Avatar";
 
 export default function SidebarHeader({
@@ -11,7 +11,8 @@ export default function SidebarHeader({
   onLogout,
   isSidebarLight = true,
   hasCustomColor = false,
-  compactMode = false
+  compactMode = false,
+  onOpenHiddenVault
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -114,6 +115,14 @@ export default function SidebarHeader({
                 }}
               />
             )}
+            <MenuButton
+              label="Hidden Messages"
+              icon={<Lock size={14} />}
+              onClick={() => {
+                setMenuOpen(false);
+                onOpenHiddenVault?.();
+              }}
+            />
             <MenuButton
               label="Logout"
               icon={<LogOut size={14} />}

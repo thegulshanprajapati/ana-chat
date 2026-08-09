@@ -34,6 +34,10 @@ import ToastStack from "../components/common/ToastStack";
 import CallOverlay from "../components/chat/CallOverlay";
 import CallLogsDrawer from "../components/chat/CallLogsDrawer";
 import CreateGroupModal from "../components/common/CreateGroupModal";
+import HideMessageModal from "../components/common/HideMessageModal";
+import UnlockMessageModal from "../components/common/UnlockMessageModal";
+import HiddenVaultDrawer from "../components/common/HiddenVaultDrawer";
+import ChangeKeyModal from "../components/common/ChangeKeyModal";
 import { appendCallLog, patchCallLog } from "../utils/callLogs";
 import { navigateTo } from "../utils/nav";
 
@@ -186,6 +190,19 @@ export default function ChatPage() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [typing, setTyping] = useState(false);
   const [typingName, setTypingName] = useState("");
+  // Per-Message Hidden Message System States
+  const [unlockedMessages, setUnlockedMessages] = useState(new Map());
+  const [hiddenVaultOpen, setHiddenVaultOpen] = useState(false);
+  const [hideModalOpen, setHideModalOpen] = useState(false);
+  const [unlockModalOpen, setUnlockModalOpen] = useState(false);
+  const [changeKeyModalOpen, setChangeKeyModalOpen] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [unlockError, setUnlockError] = useState("");
+  const [unlockBusy, setUnlockBusy] = useState(false);
+  const [hideBusy, setHideBusy] = useState(false);
+  const [autoLockSetting, setAutoLockSetting] = useState(() => {
+    return localStorage.getItem("anachat_auto_lock_setting") || "app_closed";
+  });
   const [search, setSearch] = useState("");
   const [peopleResults, setPeopleResults] = useState([]);
   const [searchingPeople, setSearchingPeople] = useState(false);
@@ -392,6 +409,175 @@ export default function ChatPage() {
       // ignore storage failures
     }
   }, [notify, user?.anaSecurityPinEnabled, user?.id]);
+
+  // Handle auto-lock visibility changes (e.g. app in background / closed)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden" && autoLockSetting === "app_closed") {
+        setUnlockedMessages(new Map());
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [autoLockSetting]);
+
+  // Handle auto-lock on active chat change (leaving chat)
+  useEffect(() => {
+    if (autoLockSetting === "leaving_chat") {
+      setUnlockedMessages(new Map());
+    }
+  }, [activeChat?.id, autoLockSetting]);
+
+  // Hide Message confirmation handler
+  const handleHideConfirm = async ({ keyType, key }) => {
+    if (!selectedMessage) return;
+    setHideBusy(true);
+    try {
+      await api.post(`/messages/${selectedMessage.id}/hide`, {
+        chatId: selectedMessage.chat_id,
+        keyType,
+        key
+      });
+      // Clear from unlocked locally
+      setUnlockedMessages((prev) => {
+        const next = new Map(prev);
+        next.delete(Number(selectedMessage.id));
+        return next;
+      });
+      notify({ type: "success", message: "Message hidden successfully!" });
+      setHideModalOpen(false);
+      // Reload message list to update masked text
+      await loadMessages(selectedMessage.chat_id);
+    } catch (err) {
+      notify({ type: "error", message: err.response?.data?.message || "Failed to hide message." });
+    } finally {
+      setHideBusy(false);
+    }
+  };
+
+  // Unlock Message confirmation handler
+  const handleUnlockConfirm = async (key) => {
+    if (!selectedMessage) return;
+    setUnlockBusy(true);
+    setUnlockError("");
+    try {
+      const { data } = await api.post(`/messages/${selectedMessage.id}/verify-key`, {
+        key,
+        chatId: selectedMessage.chat_id
+      });
+      
+      const unmasked = data.message;
+      setUnlockedMessages((prev) => {
+        const next = new Map(prev);
+        next.set(Number(unmasked.id), {
+          ...unmasked,
+          is_unlocked_message: true // flag to show Change Key / Hide Again options
+        });
+        return next;
+      });
+
+      // Handle custom auto-lock timers
+      if (autoLockSetting === "5_min" || autoLockSetting === "15_min") {
+        const durationMs = (autoLockSetting === "5_min" ? 5 : 15) * 60 * 1000;
+        setTimeout(() => {
+          setUnlockedMessages((prev) => {
+            const next = new Map(prev);
+            next.delete(Number(unmasked.id));
+            return next;
+          });
+        }, durationMs);
+      }
+
+      notify({ type: "success", message: "🔒 Message unlocked!" });
+      setUnlockModalOpen(false);
+    } catch (err) {
+      setUnlockError(err.response?.data?.message || "Incorrect unlock key");
+    } finally {
+      setUnlockBusy(false);
+    }
+  };
+
+  const [changeKeyBusy, setChangeKeyBusy] = useState(false);
+  const [changeKeyError, setChangeKeyError] = useState("");
+
+  const handleChangeKeyConfirm = async ({ oldKey, newKey, newKeyType }) => {
+    if (!selectedMessage) return;
+    setChangeKeyBusy(true);
+    setChangeKeyError("");
+    try {
+      await api.post(`/messages/${selectedMessage.id}/change-key`, {
+        oldKey,
+        newKey,
+        newKeyType,
+        chatId: selectedMessage.chat_id
+      });
+      notify({ type: "success", message: "Secret key changed successfully!" });
+      setChangeKeyModalOpen(false);
+    } catch (err) {
+      setChangeKeyError(err.response?.data?.message || "Failed to change key");
+    } finally {
+      setChangeKeyBusy(false);
+    }
+  };
+
+  // Custom events registry for hidden message actions
+  useEffect(() => {
+    const onHideMsgEvent = (e) => {
+      setSelectedMessage(e.detail);
+      setHideModalOpen(true);
+    };
+    const onUnlockMsgEvent = (e) => {
+      setSelectedMessage(e.detail);
+      setUnlockError("");
+      setUnlockModalOpen(true);
+    };
+    const onUnhideMsgEvent = async (e) => {
+      const msg = e.detail;
+      if (window.confirm("Remove protection for this message? It will be visible to everyone normally.")) {
+        try {
+          await api.post(`/messages/${msg.id}/unhide`, { chatId: msg.chat_id });
+          setUnlockedMessages((prev) => {
+            const next = new Map(prev);
+            next.delete(Number(msg.id));
+            return next;
+          });
+          await loadMessages(msg.chat_id);
+          notify({ type: "success", message: "Protection removed." });
+        } catch (err) {
+          notify({ type: "error", message: "Failed to remove protection." });
+        }
+      }
+    };
+    const onChangeKeyEvent = (e) => {
+      setSelectedMessage(e.detail);
+      setChangeKeyModalOpen(true);
+    };
+    const onRehideMsgEvent = (e) => {
+      const msg = e.detail;
+      setUnlockedMessages((prev) => {
+        const next = new Map(prev);
+        next.delete(Number(msg.id));
+        return next;
+      });
+      notify({ type: "info", message: "Message hidden again." });
+    };
+
+    window.addEventListener("anachat-hide-message", onHideMsgEvent);
+    window.addEventListener("anachat-unlock-message", onUnlockMsgEvent);
+    window.addEventListener("anachat-unhide-message", onUnhideMsgEvent);
+    window.addEventListener("anachat-change-key", onChangeKeyEvent);
+    window.addEventListener("anachat-rehide-message", onRehideMsgEvent);
+
+    return () => {
+      window.removeEventListener("anachat-hide-message", onHideMsgEvent);
+      window.removeEventListener("anachat-unlock-message", onUnlockMsgEvent);
+      window.removeEventListener("anachat-unhide-message", onUnhideMsgEvent);
+      window.removeEventListener("anachat-change-key", onChangeKeyEvent);
+      window.removeEventListener("anachat-rehide-message", onRehideMsgEvent);
+    };
+  }, [loadMessages, notify]);
 
   // Request notification permission on first load
   useEffect(() => {
@@ -2696,6 +2882,15 @@ export default function ChatPage() {
   const showSidebar = !isMobile || (activeSidebarTab === "status" && !selectedStatusFeed) || (!isChatTab || !mobileChatOpen);
   const showRightPane = !isMobile || (isChatTab && mobileChatOpen) || (activeSidebarTab === "status" && selectedStatusFeed);
 
+  const renderedMessages = useMemo(() => {
+    return messages.map((m) => {
+      if (unlockedMessages.has(Number(m.id))) {
+        return unlockedMessages.get(Number(m.id));
+      }
+      return m;
+    });
+  }, [messages, unlockedMessages]);
+
   if (!user?.id) return null;
 
   return (
@@ -2729,6 +2924,7 @@ export default function ChatPage() {
               onTogglePinChat={togglePinChat}
               onHideChat={hideChatById}
               onDeleteChat={deleteChatById}
+              onOpenHiddenVault={() => setHiddenVaultOpen(true)}
               peopleResults={peopleResults}
               searchingPeople={searchingPeople}
               onStartChat={createChat}
@@ -2765,7 +2961,7 @@ export default function ChatPage() {
                 isAdminUser={Boolean(user?.isAdmin)}
                 activeChat={activeChat}
                 partner={partner}
-                messages={messages}
+                messages={renderedMessages}
                 loadingMessages={loadingMessages}
                 typing={typing}
                 typingName={typingName}
@@ -2858,6 +3054,9 @@ export default function ChatPage() {
         onCreateBackup={handleCreateBackup}
         onRestoreBackup={handleRestoreBackup}
         onDisableBackup={handleDisableBackup}
+        onOpenHiddenVault={() => setHiddenVaultOpen(true)}
+        autoLockSetting={autoLockSetting}
+        setAutoLockSetting={setAutoLockSetting}
       />
 
       <CreateGroupModal
@@ -2924,6 +3123,57 @@ export default function ChatPage() {
           </div>
         </div>
       )}
+
+      <HideMessageModal
+        open={hideModalOpen}
+        onClose={() => setHideModalOpen(false)}
+        onConfirm={handleHideConfirm}
+        busy={hideBusy}
+      />
+
+      <UnlockMessageModal
+        open={unlockModalOpen}
+        onClose={() => setUnlockModalOpen(false)}
+        onConfirm={handleUnlockConfirm}
+        busy={unlockBusy}
+        errorMsg={unlockError}
+      />
+
+      <ChangeKeyModal
+        open={changeKeyModalOpen}
+        onClose={() => setChangeKeyModalOpen(false)}
+        onConfirm={handleChangeKeyConfirm}
+        busy={changeKeyBusy}
+        errorMsg={changeKeyError}
+      />
+
+      <HiddenVaultDrawer
+        open={hiddenVaultOpen}
+        onClose={() => setHiddenVaultOpen(false)}
+        onUnlockSuccess={(ids) => {
+          // Simply triggers updates if needed
+        }}
+        onOpenChangeKey={(msgId) => {
+          const entry = renderedMessages.find(m => Number(m.id) === Number(msgId));
+          if (entry) {
+            setSelectedMessage(entry);
+            setChangeKeyModalOpen(true);
+          }
+        }}
+        onRemoveProtection={(msgId) => {
+          if (msgId) {
+            setUnlockedMessages((prev) => {
+              const next = new Map(prev);
+              next.delete(Number(msgId));
+              return next;
+            });
+          }
+          if (activeChatIdRef.current) {
+            loadMessages(activeChatIdRef.current);
+          }
+        }}
+        unlockedList={Array.from(unlockedMessages.values())}
+      />
     </div>
   );
 }

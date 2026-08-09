@@ -36,7 +36,10 @@ export default function SettingsDrawer({
   onCreateBackup,
   onRestoreBackup,
   onDeleteBackup,
-  onDisableBackup
+  onDisableBackup,
+  onOpenHiddenVault,
+  autoLockSetting,
+  setAutoLockSetting
 }) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [themeColorOpen, setThemeColorOpen] = useState(false);
@@ -274,6 +277,51 @@ export default function SettingsDrawer({
                 </span>
                 <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">View</span>
               </button>
+            </section>
+
+            <section className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-900/70">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Hidden Messages Vault</p>
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenHiddenVault?.();
+                  onClose();
+                }}
+                className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+              >
+                <span className="flex min-w-0 items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300">
+                    <Lock size={16} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">Hidden Messages Vault</span>
+                    <span className="block truncate text-xs text-slate-500 dark:text-slate-400">View and manage locked messages.</span>
+                  </span>
+                </span>
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Open 🔐</span>
+              </button>
+
+              <div className="flex w-full items-center justify-between gap-3 rounded-lg bg-white px-3 py-2.5 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                <div className="min-w-0">
+                  <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">Auto-lock Revealed</span>
+                  <span className="block text-xs text-slate-500 dark:text-slate-400 font-normal">Lock revealed messages after timeframe.</span>
+                </div>
+                <select
+                  value={autoLockSetting}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setAutoLockSetting?.(val);
+                    localStorage.setItem("anachat_auto_lock_setting", val);
+                  }}
+                  className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 outline-none"
+                >
+                  <option value="never">Never</option>
+                  <option value="5_min">After 5 mins</option>
+                  <option value="15_min">After 15 mins</option>
+                  <option value="leaving_chat">When leaving chat</option>
+                  <option value="app_closed">When app is closed</option>
+                </select>
+              </div>
             </section>
 
             <section className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-900/70">

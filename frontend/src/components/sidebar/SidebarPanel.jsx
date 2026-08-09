@@ -131,6 +131,7 @@ export default function SidebarPanel({
   onTogglePinChat,
   onHideChat,
   onDeleteChat,
+  onOpenHiddenVault,
   peopleResults,
   searchingPeople,
   onStartChat,
@@ -706,6 +707,7 @@ export default function SidebarPanel({
           isSidebarLight={isSidebarLight}
           hasCustomColor={hasCustomSidebarColor}
           compactMode={compactMode}
+          onOpenHiddenVault={onOpenHiddenVault}
         />
 
         <div

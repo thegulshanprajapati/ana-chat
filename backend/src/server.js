@@ -16,6 +16,7 @@ import chatsRoutes from "./routes/chats.js";
 import messagesRoutes from "./routes/messages.js";
 import webhookRoutes from "./routes/webhooks.js";
 import whatsappRoutes from "./routes/whatsapp.js";
+import hiddenMessagesRouter from "./routes/hiddenMessages.js";
 import { requireUser } from "./middleware/auth.js";
 import errorHandler from "./middleware/errorHandler.js";
 import { connectDb } from "./db.js";
@@ -205,6 +206,7 @@ app.use(`${apiPrefix}/profile`, (req, _res, next) => {
 }, usersRoutes);
 app.use(`${apiPrefix}/chats`, chatsRoutes);
 app.use(`${apiPrefix}/messages`, messagesRoutes);
+app.use(`${apiPrefix}`, hiddenMessagesRouter);
 app.use(`${apiPrefix}/webhooks`, webhookRoutes);
 app.use(`${apiPrefix}/whatsapp`, whatsappRoutes);
 app.get(`${apiPrefix}/me`, requireUser, (req, res) => {

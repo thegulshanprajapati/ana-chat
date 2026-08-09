@@ -23,7 +23,10 @@ import {
   Play,
   Pause,
   Pin,
-  PinOff
+  PinOff,
+  Lock,
+  Key,
+  Trash
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import EmojiPicker from "emoji-picker-react";
@@ -429,6 +432,74 @@ function MessageBubble({
   }, [deleted, message.body, message.created_at, message.image_url, mine]);
   const canForward = !deleted && Boolean(message.body || message.image_url);
   const replyPreview = useMemo(() => replyPreviewText(message), [message]);
+
+  const renderPrivacyMenu = () => {
+    if (message.is_hidden_message) {
+      return (
+        <>
+          <MenuButton
+            icon={<Lock size={13} />}
+            label="Unlock 🔓"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("anachat-unlock-message", { detail: message }));
+              setMenuOpen(false);
+            }}
+          />
+          <MenuButton
+            icon={<EyeOff size={13} />}
+            label="Unhide (Remove Protection)"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("anachat-unhide-message", { detail: message }));
+              setMenuOpen(false);
+            }}
+          />
+        </>
+      );
+    }
+
+    if (message.is_unlocked_message) {
+      return (
+        <>
+          <MenuButton
+            icon={<Key size={13} />}
+            label="Change Key"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("anachat-change-key", { detail: message }));
+              setMenuOpen(false);
+            }}
+          />
+          <MenuButton
+            icon={<EyeOff size={13} />}
+            label="Hide Again"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("anachat-rehide-message", { detail: message }));
+              setMenuOpen(false);
+            }}
+          />
+          <MenuButton
+            icon={<Trash size={13} />}
+            label="Unhide (Remove Protection)"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("anachat-unhide-message", { detail: message }));
+              setMenuOpen(false);
+            }}
+          />
+        </>
+      );
+    }
+
+    return (
+      <MenuButton
+        icon={<Lock size={13} />}
+        label="Hide Message 🔐"
+        onClick={() => {
+          window.dispatchEvent(new CustomEvent("anachat-hide-message", { detail: message }));
+          setMenuOpen(false);
+        }}
+      />
+    );
+  };
+
   const swipe = useSwipeReply({
     enabled: !centerAligned && !deleted && typeof onReply === "function" && !editing && !menuOpen && !reactionPickerOpen,
     onReply: () => {
@@ -1461,14 +1532,7 @@ function MessageBubble({
                       setMenuOpen(false);
                     }}
                   />
-                  <MenuButton
-                    icon={<EyeOff size={13} />}
-                    label="Hide Message"
-                    onClick={() => {
-                      onDeleteLocal?.(message);
-                      setMenuOpen(false);
-                    }}
-                  />
+                  {renderPrivacyMenu()}
                   <MenuButton
                     icon={<CornerUpLeft size={13} />}
                     label="Reply"
@@ -1606,14 +1670,7 @@ function MessageBubble({
                       setMenuOpen(false);
                     }}
                   />
-                  <MenuButton
-                    icon={<EyeOff size={13} />}
-                    label="Hide Message"
-                    onClick={() => {
-                      onDeleteLocal?.(message);
-                      setMenuOpen(false);
-                    }}
-                  />
+                  {renderPrivacyMenu()}
                   <MenuButton
                     icon={<CornerUpLeft size={13} />}
                     label="Reply"

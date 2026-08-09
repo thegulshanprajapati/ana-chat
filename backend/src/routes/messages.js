@@ -71,9 +71,16 @@ router.get("/:chatId", requireUser, async (req, res) => {
       { user_id: Number(req.user.id), chat_id: chatId, hidden_at: { $ne: null } },
       { projection: { _id: 0, message_id: 1 } }
     ).toArray();
-    const hiddenIds = hiddenRows.map((row) => Number(row.message_id)).filter(Boolean);
+    const deletedForMeIds = hiddenRows.map((row) => Number(row.message_id)).filter(Boolean);
     const filter = { chat_id: chatId };
-    if (hiddenIds.length) filter.id = { $nin: hiddenIds };
+    if (deletedForMeIds.length) filter.id = { $nin: deletedForMeIds };
+
+    const userHiddenRecords = await db.collection("hidden_messages").find({
+      user_id: Number(req.user.id),
+      chat_id: chatId,
+      is_hidden: true
+    }).toArray();
+    const userHiddenMsgIds = new Set(userHiddenRecords.map((r) => Number(r.message_id)));
 
     const rows = await db.collection("messages")
       .find(filter, { projection: { _id: 0 } })
@@ -106,12 +113,29 @@ router.get("/:chatId", requireUser, async (req, res) => {
       }
     }
 
-    res.json(rows.map((message) => ({
-      ...message,
-      e2ee: message.e2ee ? e2eeForUser(message.e2ee, req.user.id) : null,
-      reactions: reactionsMap[String(message.id)] || {},
-      my_reaction: myReactionsMap[String(message.id)] || null
-    })));
+    res.json(rows.map((message) => {
+      const isHidden = userHiddenMsgIds.has(Number(message.id));
+      if (isHidden) {
+        const hasMedia = !!(message.media || message.file || message.e2ee?.media);
+        return {
+          ...message,
+          body: hasMedia ? "🔒 Hidden media" : "🔒 Hidden message",
+          is_hidden_message: true,
+          media: null,
+          file: null,
+          e2ee: null,
+          reactions: reactionsMap[String(message.id)] || {},
+          my_reaction: myReactionsMap[String(message.id)] || null
+        };
+      }
+
+      return {
+        ...message,
+        e2ee: message.e2ee ? e2eeForUser(message.e2ee, req.user.id) : null,
+        reactions: reactionsMap[String(message.id)] || {},
+        my_reaction: myReactionsMap[String(message.id)] || null
+      };
+    }));
   } catch (err) {
     console.error("Failed to load messages:", err);
     res.status(500).json({ message: "Failed to load messages" });
