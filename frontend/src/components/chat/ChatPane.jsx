@@ -272,9 +272,9 @@ export default function ChatPane({
   // Normal search: privacy rule — exclude hidden messages from full-text search
   const normalizedSearch = searchText.trim().toLowerCase();
   const visibleMessages = useMemo(() => {
-    if (!normalizedSearch) return messages;
-    return messages.filter((message) =>
-      !message.is_hidden_message && // PRIVACY: exclude hidden messages from normal search
+    const activeMessages = (messages || []).filter((m) => !m.is_hidden_message);
+    if (!normalizedSearch) return activeMessages;
+    return activeMessages.filter((message) =>
       (message.body || "").toLowerCase().includes(normalizedSearch)
     );
   }, [messages, normalizedSearch]);

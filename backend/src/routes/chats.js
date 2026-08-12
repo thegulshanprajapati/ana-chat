@@ -252,6 +252,12 @@ async function getUserChats(userId, options = {}) {
   }, { projection: { _id: 0, message_id: 1 } }).toArray();
   const hiddenMsgIds = hiddenMessageStateRows.map((row) => Number(row.message_id)).filter(Boolean);
 
+  const hiddenMessageRecords = await db.collection("hidden_messages").find({
+    user_id: me,
+    is_hidden: true
+  }, { projection: { _id: 0, message_id: 1 } }).toArray();
+  const userHiddenMsgIds = new Set(hiddenMessageRecords.map((r) => Number(r.message_id)).filter(Boolean));
+
   const matchStage = { chat_id: { $in: chatIds }, deleted_for_everyone: { $ne: true } };
   if (hiddenMsgIds.length) {
     matchStage.id = { $nin: hiddenMsgIds };
@@ -264,6 +270,7 @@ async function getUserChats(userId, options = {}) {
       {
         $group: {
           _id: "$chat_id",
+          id: { $first: "$id" },
           body: { $first: "$body" },
           image_url: { $first: "$image_url" },
           e2ee: { $first: "$e2ee" },
@@ -335,6 +342,18 @@ async function getUserChats(userId, options = {}) {
     const last = lastMessageMap.get(chatId);
     const isHidden = hiddenIds.has(chatId);
 
+    // Overwrite preview fields if the last message is a hidden message
+    let lastBody = last?.body ?? null;
+    let lastImage = last?.image_url ?? null;
+    let lastE2ee = last?.e2ee ? e2eeForUser(last.e2ee, me) : null;
+
+    if (last && userHiddenMsgIds.has(Number(last.id))) {
+      const hasMedia = !!(last.image_url || (last.e2ee && typeof last.e2ee === "object" && (last.e2ee.media || last.e2ee.text?.includes("media"))));
+      lastBody = hasMedia ? "🔒 Hidden media" : "🔒 Hidden message";
+      lastImage = null;
+      lastE2ee = null;
+    }
+
     const base = {
       id: chatId,
       user1_id: Number(chat.user1_id) || null,
@@ -349,10 +368,10 @@ async function getUserChats(userId, options = {}) {
         ? (memberCountMap.get(chatId) || 0)
         : (chatType === "self" ? 1 : 2),
       is_hidden: isHidden ? 1 : 0,
-      last_message_body: last?.body ?? null,
-      last_message_image: last?.image_url ?? null,
+      last_message_body: lastBody,
+      last_message_image: lastImage,
       last_message_created_at: last?.created_at ?? null,
-      last_message_e2ee: last?.e2ee ? e2eeForUser(last.e2ee, me) : null,
+      last_message_e2ee: lastE2ee,
       last_message_deleted_for_everyone: last?.deleted_for_everyone ? 1 : 0
     };
 

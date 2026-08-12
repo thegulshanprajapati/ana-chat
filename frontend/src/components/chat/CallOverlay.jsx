@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, forwardRef } from "react";
+import { motion } from "framer-motion";
 import {
   MessageSquareText,
   Mic,
@@ -78,20 +79,58 @@ export default function CallOverlay({
   const chatEndRef = useRef(null);
 
   const remoteVideoRef = useRef(null);
+  const mainContainerRef = useRef(null);
 
-  async function togglePiP() {
-    try {
-      if (!document.pictureInPictureElement) {
-        if (remoteVideoRef.current) {
-          await remoteVideoRef.current.requestPictureInPicture();
-        }
-      } else {
-        await document.exitPictureInPicture();
-      }
-    } catch (err) {
-      console.error("Failed to toggle Picture-in-Picture:", err);
+  const [isPip, setIsPip] = useState(false);
+  const [pipSize, setPipSize] = useState({ width: 260, height: 380 });
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStartRef = useRef({ x: 0, y: 0, w: 0, h: 0 });
+
+  const handleResizeStart = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setIsResizing(true);
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    resizeStartRef.current = {
+      x: clientX,
+      y: clientY,
+      w: pipSize.width,
+      h: pipSize.height
+    };
+  };
+
+  useEffect(() => {
+    const handleResizeMove = (e) => {
+      if (!isResizing) return;
+      const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+      const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+      const dx = clientX - resizeStartRef.current.x;
+      const dy = clientY - resizeStartRef.current.y;
+      
+      setPipSize({
+        width: Math.max(180, Math.min(600, resizeStartRef.current.w + dx)),
+        height: Math.max(240, Math.min(800, resizeStartRef.current.h + dy))
+      });
+    };
+
+    const handleResizeEnd = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      window.addEventListener("mousemove", handleResizeMove);
+      window.addEventListener("mouseup", handleResizeEnd);
+      window.addEventListener("touchmove", handleResizeMove);
+      window.addEventListener("touchend", handleResizeEnd);
     }
-  }
+    return () => {
+      window.removeEventListener("mousemove", handleResizeMove);
+      window.removeEventListener("mouseup", handleResizeEnd);
+      window.removeEventListener("touchmove", handleResizeMove);
+      window.removeEventListener("touchend", handleResizeEnd);
+    };
+  }, [isResizing]);
 
   // Draggable chat panel state
   const [chatPosition, setChatPosition] = useState(() => {
@@ -193,8 +232,28 @@ export default function CallOverlay({
   const localHasVideo = hasLiveVideoTrack(localStream);
 
   return (
-    <div
-      className="fixed inset-0 z-[90] flex flex-col bg-[#0d0d0f] overflow-hidden"
+    <motion.div
+      ref={mainContainerRef}
+      drag={isPip}
+      dragMomentum={false}
+      dragElastic={0.05}
+      dragConstraints={{
+        left: 0,
+        right: typeof window !== "undefined" ? window.innerWidth - pipSize.width : 500,
+        top: 0,
+        bottom: typeof window !== "undefined" ? window.innerHeight - pipSize.height : 500
+      }}
+      className={isPip 
+        ? "fixed z-[90] overflow-hidden rounded-3xl border-2 border-white/20 shadow-2xl bg-[#0d0d0f] flex flex-col touch-none cursor-grab active:cursor-grabbing" 
+        : "fixed inset-0 z-[90] flex flex-col bg-[#0d0d0f] overflow-hidden"
+      }
+      style={{
+        width: isPip ? `${pipSize.width}px` : "100vw",
+        height: isPip ? `${pipSize.height}px` : "100vh",
+        right: isPip ? "20px" : "0px",
+        top: isPip ? "80px" : "0px",
+        position: "fixed"
+      }}
       onMouseMove={revealControls}
       onTouchStart={revealControls}
     >
@@ -246,141 +305,210 @@ export default function CallOverlay({
 
           {/* Local PiP */}
           {isVideo && (
-            <div className="absolute bottom-28 right-4 z-20 w-[120px] sm:w-[160px] overflow-hidden rounded-2xl border-2 border-white/20 shadow-2xl shadow-black/50 sm:bottom-32 sm:right-6">
+            <motion.div
+              drag
+              dragConstraints={mainContainerRef}
+              dragElastic={0.15}
+              dragMomentum={false}
+              className="absolute bottom-28 right-4 z-20 w-[120px] sm:w-[160px] overflow-hidden rounded-2xl border-2 border-white/20 shadow-2xl shadow-black/50 sm:bottom-32 sm:right-6 touch-none cursor-grab active:cursor-grabbing"
+            >
               {localHasVideo ? (
-                <VideoEl stream={localStream} muted className="h-full w-full object-cover aspect-[3/4]" />
+                <VideoEl stream={localStream} muted className="h-full w-full object-cover aspect-[3/4] pointer-events-none" />
               ) : (
-                <div className="flex aspect-[3/4] w-full items-center justify-center bg-slate-800">
+                <div className="flex aspect-[3/4] w-full items-center justify-center bg-slate-800 pointer-events-none">
                   <VideoOff size={22} className="text-slate-400" />
                 </div>
               )}
               {isVideoChatMode && (
-                <div className="absolute inset-x-0 bottom-0 bg-black/60 py-1 text-center text-[9px] font-semibold text-rose-300">
+                <div className="absolute inset-x-0 bottom-0 bg-black/60 py-1 text-center text-[9px] font-semibold text-rose-300 pointer-events-none">
                   Mic off (chat mode)
                 </div>
               )}
               {/* You label */}
-              <div className="absolute top-1.5 left-2 text-[10px] font-bold text-white/80 drop-shadow">You</div>
+              <div className="absolute top-1.5 left-2 text-[10px] font-bold text-white/80 drop-shadow pointer-events-none">You</div>
+            </motion.div>
+          )}
+
+          {/* Top bar (only shown if not in PiP mode) */}
+          {!isPip && (
+            <div
+              className={`absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 pt-safe-top pb-4 pt-4 transition-opacity duration-500 bg-gradient-to-b from-black/60 via-black/20 to-transparent ${
+                controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Avatar name={call.peerName} src={call.peerAvatar} size={36} />
+                <div>
+                  <p className="text-sm font-bold text-white leading-tight">{call.peerName || "Unknown"}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    {live && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                    <p className="text-xs text-white/70">{statusLabel}</p>
+                    {live && <Signal size={10} className="text-emerald-400" />}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setChatOpen((v) => !v)}
+                  className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
+                    chatOpen ? "bg-white/20 text-white" : "bg-white/10 text-white/70 hover:bg-white/20"
+                  }`}
+                  title="In-call chat"
+                >
+                  <MessageSquareText size={16} />
+                </button>
+                {isVideo && (
+                  <button
+                    type="button"
+                    onClick={() => setIsPip(true)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition"
+                    title="Picture-in-Picture"
+                  >
+                    <PictureInPicture size={15} />
+                  </button>
+                )}
+                {isVideo && (
+                  <button
+                    type="button"
+                    onClick={() => setFullscreen((v) => !v)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition"
+                  >
+                    {fullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
-          {/* Top bar */}
-          <div
-            className={`absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 pt-safe-top pb-4 pt-4 transition-opacity duration-500 bg-gradient-to-b from-black/60 via-black/20 to-transparent ${
-              controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <Avatar name={call.peerName} src={call.peerAvatar} size={36} />
-              <div>
-                <p className="text-sm font-bold text-white leading-tight">{call.peerName || "Unknown"}</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  {live && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />}
-                  <p className="text-xs text-white/70">{statusLabel}</p>
-                  {live && <Signal size={10} className="text-emerald-400" />}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setChatOpen((v) => !v)}
-                className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
-                  chatOpen ? "bg-white/20 text-white" : "bg-white/10 text-white/70 hover:bg-white/20"
-                }`}
-                title="In-call chat"
+          {/* PiP Mode Overlay Controls */}
+          {isPip && (
+            <>
+              {/* Resize Handle */}
+              <div
+                onMouseDown={handleResizeStart}
+                onTouchStart={handleResizeStart}
+                className="absolute bottom-0 right-0 h-5 w-5 cursor-se-resize z-50 flex items-center justify-end p-1 select-none pointer-events-auto"
+                style={{ cursor: "nwse-resize" }}
               >
-                <MessageSquareText size={16} />
-              </button>
-              {isVideo && (
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-white/40">
+                  <path d="M10 0 L0 10 M10 4 L4 10 M10 8 L8 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </div>
+
+              {/* PiP Top Bar Controls */}
+              <div className="absolute top-2 inset-x-2 z-30 flex items-center justify-between pointer-events-auto">
                 <button
                   type="button"
-                  onClick={togglePiP}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition"
-                  title="Picture-in-Picture"
+                  onClick={() => setIsPip(false)}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl bg-black/40 hover:bg-black/60 text-white backdrop-blur transition"
+                  title="Maximize"
                 >
-                  <PictureInPicture size={15} />
+                  <Maximize2 size={14} />
                 </button>
-              )}
-              {isVideo && (
                 <button
                   type="button"
-                  onClick={() => setFullscreen((v) => !v)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition"
+                  onClick={onEnd}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-lg transition"
+                  title="End Call"
                 >
-                  {fullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                  <PhoneOff size={14} />
                 </button>
-              )}
-            </div>
-          </div>
+              </div>
+
+              {/* PiP Bottom Controls */}
+              <div className="absolute bottom-2 inset-x-2 z-30 flex items-center justify-center gap-2 pointer-events-auto">
+                <button
+                  type="button"
+                  onClick={onToggleMic}
+                  className={`flex h-8 w-8 items-center justify-center rounded-xl backdrop-blur transition ${
+                    micEnabled ? "bg-black/40 text-white hover:bg-black/60" : "bg-rose-600 text-white"
+                  }`}
+                >
+                  {micEnabled ? <Mic size={14} /> : <MicOff size={14} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={onToggleVideo}
+                  className={`flex h-8 w-8 items-center justify-center rounded-xl backdrop-blur transition ${
+                    videoEnabled ? "bg-black/40 text-white hover:bg-black/60" : "bg-rose-600 text-white"
+                  }`}
+                >
+                  {videoEnabled ? <Video size={14} /> : <VideoOff size={14} />}
+                </button>
+              </div>
+            </>
+          )}
 
           {/* Bottom controls bar */}
-          <div
-            className={`absolute inset-x-0 bottom-0 z-30 px-4 pb-6 pt-4 transition-opacity duration-500 bg-gradient-to-t from-black/70 via-black/30 to-transparent ${
-              controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
-            }`}
-          >
-            <div className="mx-auto flex max-w-lg items-center justify-center gap-3">
-              {/* Mic */}
-              <RoundControl
-                onClick={onToggleMic}
-                label={micEnabled ? "Mute" : "Unmute"}
-                disabled={isVideoChatMode}
-                active={!micEnabled}
-                icon={micEnabled ? <Mic size={20} /> : <MicOff size={20} />}
-              />
-
-              {/* Video toggle */}
-              {isVideo && (
+          {!isPip && (
+            <div
+              className={`absolute inset-x-0 bottom-0 z-30 px-4 pb-6 pt-4 transition-opacity duration-500 bg-gradient-to-t from-black/70 via-black/30 to-transparent ${
+                controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+              }`}
+            >
+              <div className="mx-auto flex max-w-lg items-center justify-center gap-3">
+                {/* Mic */}
                 <RoundControl
-                  onClick={onToggleVideo}
-                  label={videoEnabled ? "Stop video" : "Start video"}
-                  active={!videoEnabled}
-                  icon={videoEnabled ? <Video size={20} /> : <VideoOff size={20} />}
+                  onClick={onToggleMic}
+                  label={micEnabled ? "Mute" : "Unmute"}
+                  disabled={isVideoChatMode}
+                  active={!micEnabled}
+                  icon={micEnabled ? <Mic size={20} /> : <MicOff size={20} />}
                 />
-              )}
 
-              {/* Screen share */}
-              {isVideo && (
+                {/* Video toggle */}
+                {isVideo && (
+                  <RoundControl
+                    onClick={onToggleVideo}
+                    label={videoEnabled ? "Stop video" : "Start video"}
+                    active={!videoEnabled}
+                    icon={videoEnabled ? <Video size={20} /> : <VideoOff size={20} />}
+                  />
+                )}
+
+                {/* Screen share */}
+                {isVideo && (
+                  <RoundControl
+                    onClick={onToggleScreenShare}
+                    label={screenSharing ? "Stop share" : "Share screen"}
+                    active={screenSharing}
+                    icon={<MonitorUp size={20} />}
+                    accent="blue"
+                  />
+                )}
+
+                {/* Add participant */}
                 <RoundControl
-                  onClick={onToggleScreenShare}
-                  label={screenSharing ? "Stop share" : "Share screen"}
-                  active={screenSharing}
-                  icon={<MonitorUp size={20} />}
-                  accent="blue"
+                  onClick={onAddParticipant}
+                  label="Add participant"
+                  icon={<Plus size={20} />}
                 />
+
+                {/* END CALL — big red prominent button */}
+                <button
+                  type="button"
+                  onClick={onEnd}
+                  className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-600 text-white shadow-[0_8px_30px_rgba(225,29,72,0.6)] transition hover:bg-rose-500 hover:scale-105 active:scale-95"
+                  title="End call"
+                >
+                  <PhoneOff size={22} />
+                </button>
+              </div>
+
+              {/* Hint for video chat mode */}
+              {isVideoChatMode && (
+                <p className="mt-3 text-center text-[11px] text-rose-300/80">
+                  🎙️ Microphone is disabled in video chat mode
+                </p>
               )}
-
-              {/* Add participant */}
-              <RoundControl
-                onClick={onAddParticipant}
-                label="Add participant"
-                icon={<Plus size={20} />}
-              />
-
-              {/* END CALL — big red prominent button */}
-              <button
-                type="button"
-                onClick={onEnd}
-                className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-600 text-white shadow-[0_8px_30px_rgba(225,29,72,0.6)] transition hover:bg-rose-500 hover:scale-105 active:scale-95"
-                title="End call"
-              >
-                <PhoneOff size={22} />
-              </button>
             </div>
-
-            {/* Hint for video chat mode */}
-            {isVideoChatMode && (
-              <p className="mt-3 text-center text-[11px] text-rose-300/80">
-                🎙️ Microphone is disabled in video chat mode
-              </p>
-            )}
-          </div>
+          )}
         </>
       )}
 
       {/* ── IN-CALL CHAT DRAWER ── */}
-      {chatOpen && !incoming && (
+      {!isPip && chatOpen && !incoming && (
         <div
           style={{
             left: `${chatPosition.x}px`,
@@ -449,7 +577,7 @@ export default function CallOverlay({
           </form>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 

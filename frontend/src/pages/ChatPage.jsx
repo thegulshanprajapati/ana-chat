@@ -459,16 +459,8 @@ export default function ChatPage() {
   }, [user.id]);
 
   const decryptChatPreviewForMe = useCallback(async (chat) => {
-    if (!chat || chat.last_message_body) return chat;
-    if (!chat.last_message_e2ee?.key || !chat.last_message_e2ee?.text) return chat;
-    try {
-      const pair = await getOrCreateRsaKeyPair(user.id);
-      const preview = await decryptTextFromMessage({ e2ee: chat.last_message_e2ee, privateJwk: pair.privateJwk });
-      return { ...chat, last_message_body: preview || "" };
-    } catch {
-      return chat;
-    }
-  }, [user.id]);
+    return chat;
+  }, []);
 
   const loadMessages = useCallback(async (chatId) => {
     if (!chatId) return;
@@ -1549,6 +1541,93 @@ export default function ChatPage() {
     }
   }, [notify]);
 
+  const pauseToastTimer = useCallback((id) => {
+    const timer = toastTimers.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      toastTimers.current.delete(id);
+    }
+  }, []);
+
+  const sendMessageToChat = useCallback(async (chatId, body) => {
+    const targetChat = chatsRef.current.find((c) => Number(c.id) === Number(chatId));
+    if (!targetChat) return;
+
+    if (targetChat.chat_type !== "group") {
+      if (targetChat.blocked_by_me || targetChat.blocked_me) return;
+    }
+
+    const clientMessageId = createClientMessageId();
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimistic = {
+      id: tempId,
+      chat_id: targetChat.id,
+      sender_id: user.id,
+      client_message_id: clientMessageId,
+      body: body || null,
+      image_url: null,
+      message_type: "text",
+      seen: 0,
+      delivery_status: "sending",
+      created_at: new Date().toISOString(),
+      pending: true
+    };
+
+    if (activeChatIdRef.current === targetChat.id) {
+      setMessages((prev) => [...prev, optimistic]);
+    }
+    void saveLocalMessage(optimistic, user?.id).catch(err => console.error("Error saving optimistic message:", err));
+
+    setChats((prev) => {
+      const next = prev.map((chat) => (
+        chat.id === targetChat.id
+          ? {
+              ...chat,
+              last_message_at: optimistic.created_at,
+              last_message_body: body,
+              last_message_image: null
+            }
+          : chat
+      ));
+      const sorted = sortChats(next);
+      const updatedChat = sorted.find(c => c.id === targetChat.id);
+      if (updatedChat) saveLocalChat(updatedChat, user?.id).catch(err => console.error(err));
+      return sorted;
+    });
+
+    const form = new FormData();
+    form.append("chatId", String(targetChat.id));
+    form.append("clientMessageId", clientMessageId);
+    form.append("messageType", "text");
+
+    try {
+      const recipients = await getChatRecipients(targetChat.id);
+      const { e2ee } = await encryptOutgoingMessage({
+        plaintext: body || "",
+        file: null,
+        recipients
+      });
+
+      form.append("e2ee", JSON.stringify(e2ee));
+
+      const { data } = await api.post("/messages", form, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      const decryptedData = await decryptMessageForMe(data);
+
+      if (activeChatIdRef.current === targetChat.id) {
+        setMessages((prev) => {
+          const replaced = prev.map((msg) => (msg.id === tempId ? { ...decryptedData, delivery_status: "sent" } : msg));
+          return replaced;
+        });
+      }
+      deleteLocalMessage(tempId, user?.id).catch(() => {});
+      saveLocalMessage({ ...decryptedData, delivery_status: "sent" }, user?.id).catch(err => console.error(err));
+    } catch (err) {
+      console.error("Failed to send message to chat from notification:", err);
+    }
+  }, [decryptMessageForMe, getChatRecipients, user?.id]);
+
   const sendMessage = useCallback(async ({ body, media, replyToMessageId, messageType = "text" }) => {
     if (!activeChat?.id) return;
     if (activeChat.chat_type !== "group") {
@@ -2508,25 +2587,35 @@ export default function ChatPage() {
           console.error("Failed to save incoming message locally:", err);
         }
 
+        let chatExists = false;
         setChats((prev) => {
           const exists = prev.some((chat) => chat.id === decryptedMessage.chat_id);
-          const next = exists
-            ? prev.map((chat) => (
-              chat.id === decryptedMessage.chat_id
-                ? {
-                    ...chat,
-                    last_message_at: decryptedMessage.created_at,
-                    last_message_body: decryptedMessage.body,
-                    last_message_image: decryptedMessage.image_url
-                  }
-                : chat
-            ))
-            : prev;
+          chatExists = exists;
+          if (!exists) return prev;
+
+          const next = prev.map((chat) => (
+            chat.id === decryptedMessage.chat_id
+              ? {
+                  ...chat,
+                  last_message_at: decryptedMessage.created_at,
+                  last_message_body: decryptedMessage.body,
+                  last_message_image: decryptedMessage.image_url
+                }
+              : chat
+          ));
           const sorted = sortChats(next);
           const target = sorted.find(c => c.id === decryptedMessage.chat_id);
           if (target) saveLocalChat(target, user.id).catch(err => console.error(err));
           return sorted;
         });
+
+        if (!chatExists) {
+          try {
+            await loadChats();
+          } catch (loadErr) {
+            console.error("Failed to load new chat in real-time:", loadErr);
+          }
+        }
 
         if (decryptedMessage.chat_id === activeChatIdRef.current) {
           setMessages((prev) => {
@@ -2564,7 +2653,8 @@ export default function ChatPage() {
             type: "info",
             title: senderName,
             message: preview,
-            isPriority: true
+            isPriority: true,
+            chatId: decryptedMessage.chat_id
           });
         }
       })();
@@ -3323,7 +3413,12 @@ export default function ChatPage() {
 
       <CallLogsDrawer me={user} open={callLogsOpen} onClose={() => setCallLogsOpen(false)} />
 
-      <ToastStack toasts={toasts} onRemove={dismissToast} />
+      <ToastStack
+        toasts={toasts}
+        onRemove={dismissToast}
+        onReply={sendMessageToChat}
+        onPause={pauseToastTimer}
+      />
 
       {modalConfig && (
         <CustomDialogModal
