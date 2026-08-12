@@ -65,7 +65,8 @@ export default function ChatPane({
   isChatPaneLight,
   notify,
   mobile,
-  onHiddenSearchNavigate
+  onHiddenSearchNavigate,
+  socket = null
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState("");

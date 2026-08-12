@@ -3360,6 +3360,7 @@ export default function ChatPage() {
             ) : (
               <ChatPane
                 meId={user?.id}
+                socket={socket}
                 isAdminUser={Boolean(user?.isAdmin)}
                 activeChat={activeChat}
                 partner={partner}
