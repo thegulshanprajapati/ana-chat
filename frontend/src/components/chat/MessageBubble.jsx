@@ -882,7 +882,7 @@ function MessageBubble({
       const response = await fetch(src);
       const blob = await response.blob();
       const canvas = document.createElement("canvas");
-      const img = new Image();
+      const img = new window.Image();
       img.onload = () => {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;

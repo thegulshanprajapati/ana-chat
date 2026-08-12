@@ -25,8 +25,9 @@ export default class AppErrorBoundary extends React.Component {
       <div className="flex h-[100dvh] w-full items-center justify-center bg-slate-950 px-5 text-slate-100">
         <div className="w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-2xl">
           <p className="text-sm font-semibold text-slate-100">App crashed after login</p>
-          <p className="mt-1 text-xs text-slate-300">
+          <p className="mt-1 text-xs text-slate-300 font-mono break-all bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
             {message}
+            {error?.stack ? `\n\nStack:\n${error.stack.split("\n").slice(0, 3).join("\n")}` : ""}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <button
