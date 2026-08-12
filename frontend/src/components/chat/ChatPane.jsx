@@ -3,7 +3,7 @@ import { Check, Copy, ImageUp, Loader2, Paintbrush2, Search, Star, Trash2, X, Fo
 import ChatHeader from "./ChatHeader";
 import MessageThread from "./MessageThread";
 import Composer from "./Composer";
-const PartnerProfileSheet = lazy(() => import("./PartnerProfileSheet"));
+import PartnerProfileSheet from "./PartnerProfileSheet";
 import WatchTogetherPanel from "./WatchTogetherPanel";
 import { CHAT_BACKGROUND_PRESETS } from "../../utils/chat";
 import { navigateTo } from "../../utils/nav";
@@ -1004,45 +1004,43 @@ export default function ChatPane({
       />
 
       {profileOpen && (
-        <Suspense fallback={null}>
-          <PartnerProfileSheet
-            open={profileOpen}
-            onClose={() => setProfileOpen(false)}
-            partner={partner}
-            socket={socket}
-            isGroup={isGroupChat || isSelfChat}
-            memberCount={isSelfChat ? 1 : memberCount}
-            blockedByMe={blockedByMe}
-            blockedMe={blockedMe}
-            blockActionBusy={blockActionBusy}
-            onBlockUser={onBlockUser}
-            onUnblockUser={onUnblockUser}
-            onReportUser={async (payload) => {
-              if (!onReportUser || !partner?.id) return;
-              setReportBusy(true);
-              try {
-                await onReportUser({
-                  userId: partner.id,
-                  reason: payload?.reason,
-                  details: payload?.details
-                });
-                setProfileOpen(false);
-              } finally {
-                setReportBusy(false);
-              }
-            }}
-            reportBusy={reportBusy}
-            meId={meId}
-            chatId={activeChat?.id}
-            messages={messages}
-            onSearchOpen={() => {
+        <PartnerProfileSheet
+          open={profileOpen}
+          onClose={() => setProfileOpen(false)}
+          partner={partner}
+          socket={socket}
+          isGroup={isGroupChat || isSelfChat}
+          memberCount={isSelfChat ? 1 : memberCount}
+          blockedByMe={blockedByMe}
+          blockedMe={blockedMe}
+          blockActionBusy={blockActionBusy}
+          onBlockUser={onBlockUser}
+          onUnblockUser={onUnblockUser}
+          onReportUser={async (payload) => {
+            if (!onReportUser || !partner?.id) return;
+            setReportBusy(true);
+            try {
+              await onReportUser({
+                userId: partner.id,
+                reason: payload?.reason,
+                details: payload?.details
+              });
               setProfileOpen(false);
-              setSearchOpen(true);
-            }}
-            onDeleteChat={onDeleteChat}
-            theme={theme}
-          />
-        </Suspense>
+            } finally {
+              setReportBusy(false);
+            }
+          }}
+          reportBusy={reportBusy}
+          meId={meId}
+          chatId={activeChat?.id}
+          messages={messages}
+          onSearchOpen={() => {
+            setProfileOpen(false);
+            setSearchOpen(true);
+          }}
+          onDeleteChat={onDeleteChat}
+          theme={theme}
+        />
       )}
     </section>
   );
