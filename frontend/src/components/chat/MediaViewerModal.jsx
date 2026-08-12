@@ -66,7 +66,10 @@ async function extractDominantColorsFromImage({
   const response = await fetch(src, { credentials: withCredentials ? "include" : "omit" });
   if (!response.ok) throw new Error("Unable to load image");
   const blob = await response.blob();
-  const bitmap = await createImageBitmap(blob);
+
+  const createBitmap = window.createImageBitmap || window.webkitCreateImageBitmap;
+  if (!createBitmap) return [];
+  const bitmap = await createBitmap(blob);
 
   const scale = Math.min(1, Math.sqrt(maxSamples / (bitmap.width * bitmap.height)));
   const w = Math.max(1, Math.floor(bitmap.width * scale));
@@ -76,8 +79,12 @@ async function extractDominantColorsFromImage({
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) throw new Error("Canvas unavailable");
+  if (!ctx) {
+    if (typeof bitmap.close === "function") bitmap.close();
+    throw new Error("Canvas unavailable");
+  }
   ctx.drawImage(bitmap, 0, 0, w, h);
+  if (typeof bitmap.close === "function") bitmap.close();
   const { data } = ctx.getImageData(0, 0, w, h);
 
   const samples = [];

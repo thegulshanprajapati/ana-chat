@@ -57,9 +57,12 @@ export default function ExpressionDetector({ videoRef, enabled, onExpression }) 
 
     try {
       const faceApi = apiRef.current;
+      const options = typeof faceApi.TinyFaceDetectorOptions === "function"
+        ? new faceApi.TinyFaceDetectorOptions()
+        : undefined;
       const result  = await faceApi.detectSingleFace(
         video,
-        new faceApi.TinyFaceDetectorOptions()
+        options
       ).withFaceExpressions();
 
       if (!result?.expressions) return;
