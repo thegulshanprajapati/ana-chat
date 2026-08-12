@@ -4,6 +4,7 @@ import { Camera, Upload, AlertCircle, RefreshCw } from "lucide-react";
 import { validateImage } from "./ImageUtils";
 import { compressImage } from "./compressImage";
 import AvatarCropModal from "./AvatarCropModal";
+import { api } from "../../api/client";
 
 export const AvatarUploader = ({
   currentAvatarUrl,
@@ -103,7 +104,6 @@ export const AvatarUploader = ({
     return () => window.removeEventListener("paste", handlePaste);
   }, [handleFileProcess]);
 
-  // Handle crop completion & upload
   const handleCropComplete = useCallback(
     async (croppedBlob) => {
       setProcessing(true);
@@ -114,22 +114,12 @@ export const AvatarUploader = ({
       form.append("avatar", croppedBlob, "avatar.webp");
 
       try {
-        // Send post request to /api/users/profile/avatar
-        const response = await fetch("/api/users/profile/avatar", {
-          method: "POST",
+        const { data } = await api.post("/users/profile/avatar", form, {
           headers: {
-            // Let the browser set the boundary headers automatically
-            Authorization: `Bearer ${localStorage.getItem("token") || ""}` // Fallback auth header
-          },
-          body: form
+            "Content-Type": "multipart/form-data"
+          }
         });
 
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.message || "Failed to save avatar to server");
-        }
-
-        const data = await response.json();
         notify?.({
           type: "success",
           title: "Avatar saved",
@@ -143,7 +133,7 @@ export const AvatarUploader = ({
         notify?.({
           type: "error",
           title: "Upload Failed",
-          message: err.message || "Could not upload cropped profile picture."
+          message: err.response?.data?.message || err.message || "Could not upload cropped profile picture."
         });
       } finally {
         setProcessing(false);

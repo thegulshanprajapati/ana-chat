@@ -28,7 +28,12 @@ const DEFAULT_SETTINGS = {
   showOnlineStatus: true,
   enterToSend: true,
   soundEffects: true,
-  notificationsEnabled: true
+  notificationsEnabled: true,
+  theme: "dark",
+  accentColor: "#e11d48",
+  doodleStyle: "icons",
+  sidebarColor: "",
+  chatPaneColor: ""
 };
 const ALLOWED_REPORT_REASONS = new Set([
   "spam",
@@ -79,7 +84,12 @@ function parseSettings(rawValue) {
       showOnlineStatus: parsed.showOnlineStatus !== false,
       enterToSend: parsed.enterToSend !== false,
       soundEffects: parsed.soundEffects !== false,
-      notificationsEnabled: parsed.notificationsEnabled !== false
+      notificationsEnabled: parsed.notificationsEnabled !== false,
+      theme: parsed.theme || "dark",
+      accentColor: parsed.accentColor || "#e11d48",
+      doodleStyle: parsed.doodleStyle || "icons",
+      sidebarColor: parsed.sidebarColor || "",
+      chatPaneColor: parsed.chatPaneColor || ""
     };
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -448,7 +458,12 @@ router.patch("/me/settings", requireUser, async (req, res) => {
     soundEffects: typeof incoming.soundEffects === "boolean" ? incoming.soundEffects : current.soundEffects,
     notificationsEnabled: typeof incoming.notificationsEnabled === "boolean"
       ? incoming.notificationsEnabled
-      : current.notificationsEnabled
+      : current.notificationsEnabled,
+    theme: typeof incoming.theme === "string" ? incoming.theme : current.theme,
+    accentColor: typeof incoming.accentColor === "string" ? incoming.accentColor : current.accentColor,
+    doodleStyle: typeof incoming.doodleStyle === "string" ? incoming.doodleStyle : current.doodleStyle,
+    sidebarColor: typeof incoming.sidebarColor === "string" ? incoming.sidebarColor : current.sidebarColor,
+    chatPaneColor: typeof incoming.chatPaneColor === "string" ? incoming.chatPaneColor : current.chatPaneColor
   };
 
   const db = await getDb();

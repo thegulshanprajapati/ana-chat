@@ -19,7 +19,8 @@ import { api, setStoredAccessToken } from "../api/client";
 import ForgotPasswordModal from "./ForgotPasswordModal";
 import { navigateTo } from "../utils/nav";
 import { useTheme } from "../context/ThemeContext";
-import { getStoredRsaKeyPair, persistRsaKeyPair, decryptPrivateKeyBackup } from "../utils/e2ee";
+import { getStoredRsaKeyPair, persistRsaKeyPair, decryptPrivateKeyBackup, decryptDatabaseBackup, hashBackupPin } from "../utils/e2ee";
+import { importLocalDbFromJson } from "../utils/localDb";
 import CustomConfirmDialog from "./common/CustomConfirmDialog";
 
 function Field({ label, hint, error, children }) {
@@ -248,7 +249,26 @@ export default function AuthPage({ onAuthed }) {
             privateJwk,
             createdAt: Date.now()
           });
-          await alertCustom("Success", "E2EE encryption key restored successfully!");
+          try {
+            const statusRes = await api.get("/messages/backup/status");
+            if (statusRes.data && statusRes.data.hasBackup) {
+              const { data: backupData } = await api.get("/messages/backup/download");
+              const pinHash = await hashBackupPin(pin);
+              if (backupData.backupPinHash === pinHash) {
+                const decryptedDb = await decryptDatabaseBackup(
+                  backupData.backupBlob,
+                  backupData.salt,
+                  backupData.iv,
+                  pin
+                );
+                await importLocalDbFromJson(decryptedDb, userData.id);
+                sessionStorage.setItem(`anach_backup_pin_${userData.id}`, pin);
+              }
+            }
+          } catch (backupErr) {
+            console.warn("Failed to auto-restore database backup at login:", backupErr);
+          }
+          await alertCustom("Success", "E2EE encryption key and chat backup restored successfully!");
         } catch (err) {
           const message = err.response?.data?.message || err.message || "Restore failed";
           await alertCustom("Restore Failed", message);

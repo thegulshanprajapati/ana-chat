@@ -30,6 +30,8 @@ export default function SettingsDrawer({
   onSetAccentColor,
   onSetSidebarColor,
   onSetChatPaneColor,
+  sidebarColor,
+  chatPaneColor,
   backupStatus = "Disabled",
   backupSize = "N/A",
   lastBackup = "Never",
@@ -90,7 +92,14 @@ export default function SettingsDrawer({
 
   async function submit(event) {
     event.preventDefault();
-    await onSave?.(settings);
+    await onSave?.({
+      ...settings,
+      theme: theme || "dark",
+      accentColor: accentColor || "#e11d48",
+      doodleStyle: doodleStyle || "icons",
+      sidebarColor: sidebarColor || "",
+      chatPaneColor: chatPaneColor || ""
+    });
   }
 
   async function enableOrChangePin() {

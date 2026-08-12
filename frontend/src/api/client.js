@@ -9,6 +9,7 @@ import {
   log401Detected,
   dispatchAuthLogout
 } from "../utils/authLogger";
+import { secureGetItem, secureSetItem, secureRemoveItem } from "../utils/secureStorage";
 
 function runtimeBaseUrl(rawBaseUrl, fallbackPort = "5173", isApiUrl = false) {
   if (typeof window === "undefined") {
@@ -131,7 +132,7 @@ let refreshingPromise = null;
 
 function getStoredAccessToken() {
   try {
-    const token = typeof localStorage !== "undefined" ? localStorage.getItem("access_token") : null;
+    const token = secureGetItem("access_token");
     if (token) {
       logTokenFetched(token);
       logTokenHit(token);
@@ -148,8 +149,8 @@ function getStoredAccessToken() {
 
 function setStoredAccessToken(token) {
   try {
-    if (typeof localStorage !== "undefined" && token) {
-      localStorage.setItem("access_token", token);
+    if (token) {
+      secureSetItem("access_token", token);
       logTokenStored(token);
     }
   } catch {
@@ -159,10 +160,8 @@ function setStoredAccessToken(token) {
 
 function clearStoredAccessToken() {
   try {
-    if (typeof localStorage !== "undefined") {
-      localStorage.removeItem("access_token");
-      logUserLoggedOut();
-    }
+    secureRemoveItem("access_token");
+    logUserLoggedOut();
   } catch {
     console.warn("[AUTH] Failed to clear access token");
   }

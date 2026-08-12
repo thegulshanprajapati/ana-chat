@@ -2,6 +2,7 @@ const DB_NAME = "anach_e2ee";
 const DB_VERSION = 1;
 const STORE_NAME = "keys";
 const LS_PREFIX = "anach_e2ee_keys_v1:";
+import { secureGetItem, secureSetItem } from "./secureStorage";
 
 const inMemoryKeyCache = new Map();
 
@@ -77,7 +78,7 @@ async function loadStoredKeyPair(userId) {
   }
 
   if (typeof localStorage === "undefined") return null;
-  const parsed = safeJsonParse(localStorage.getItem(key));
+  const parsed = safeJsonParse(secureGetItem(key));
   if (parsed?.publicJwk && parsed?.privateJwk) return parsed;
   return null;
 }
@@ -95,9 +96,7 @@ async function persistKeyPair(userId, record) {
     // fall back to localStorage
   }
 
-  if (typeof localStorage !== "undefined") {
-    localStorage.setItem(key, JSON.stringify(record));
-  }
+  secureSetItem(key, record);
 }
 
 export async function persistRsaKeyPair(userId, record) {

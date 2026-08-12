@@ -7,7 +7,7 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import SpeedInsightsInjector from "./components/SpeedInsights";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { SocketProvider } from "./context/SocketContextNew";
-import { ThemeProvider } from "./context/ThemeContext";
+import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { ToastProvider } from "./context/ToastContext";
 import { OfflineQueueProvider } from "./context/OfflineQueueContext";
 import { ConnectionBanner } from "./components/common/SocketStatusIndicator";
@@ -18,6 +18,18 @@ import { isPathWithBase } from "./utils/nav";
 
 function UserApp() {
   const { user, reload, loading } = useAuth();
+  const { setTheme, setAccentColor, setDoodleStyle, setSidebarColor, setChatPaneColor } = useTheme();
+
+  useEffect(() => {
+    if (user?.settings) {
+      const s = user.settings;
+      if (s.theme) setTheme(s.theme);
+      if (s.accentColor) setAccentColor(s.accentColor);
+      if (s.doodleStyle) setDoodleStyle(s.doodleStyle);
+      if (s.sidebarColor !== undefined) setSidebarColor(s.sidebarColor);
+      if (s.chatPaneColor !== undefined) setChatPaneColor(s.chatPaneColor);
+    }
+  }, [user?.settings, setTheme, setAccentColor, setDoodleStyle, setSidebarColor, setChatPaneColor]);
 
   if (loading) {
     return (

@@ -28,9 +28,12 @@ export function AuthProvider({ children }) {
     dispatchAuthLogout("logout");
   }, []);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (options = {}) => {
+    const { silent = false } = options;
     const requestId = ++reloadRequestRef.current;
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     try {
       const { data } = await api.get("/auth/me");
       if (requestId !== reloadRequestRef.current) return;
@@ -63,7 +66,7 @@ export function AuthProvider({ children }) {
         setUser(null);
       }
     } finally {
-      if (requestId === reloadRequestRef.current) {
+      if (requestId === reloadRequestRef.current && !silent) {
         setLoading(false);
       }
     }

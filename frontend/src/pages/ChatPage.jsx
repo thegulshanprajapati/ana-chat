@@ -224,39 +224,6 @@ export default function ChatPage() {
   const [restoreBackupBusy, setRestoreBackupBusy] = useState(false);
   const sessionBackupKeyRef = useRef(null);
 
-  useEffect(() => {
-    async function checkBackupStatus() {
-      try {
-        const { data } = await api.get("/messages/backup/status");
-        setLastBackupInfo(data);
-        setAutoBackupEnabled(Boolean(data.autoBackupEnabled));
-        if (data.hasBackup) {
-          setBackupStatus(data.autoBackupEnabled ? "Enabled" : "Manual");
-          setBackupSize(`${(data.lastBackupSize / 1024).toFixed(2)} KB`);
-          setLastBackup(new Date(data.lastBackupAt).toLocaleString());
-          
-          // Check if local chats are empty to suggest restoration on login
-          try {
-            const localChats = await getLocalChats(user?.id);
-            if (localChats.length === 0) {
-              setRestoreBackupModalOpen(true);
-            }
-          } catch (e) {
-            console.warn("Could not check local chats for backup restore trigger:", e);
-          }
-        } else {
-          setBackupStatus("Disabled");
-          setBackupSize("N/A");
-          setLastBackup("Never");
-        }
-      } catch (err) {
-        console.error("Failed to check backup status", err);
-      }
-    }
-    if (user?.id) {
-      checkBackupStatus();
-    }
-  }, [user?.id]);
 
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [groupModalOpen, setGroupModalOpen] = useState(false);
@@ -382,13 +349,30 @@ export default function ChatPage() {
       const title = normalized.title || "Secure Chat";
       const body = normalized.message || "";
       if (body) {
-        const notification = new Notification(title, {
-          body,
-          badge: "/logo.png",
-          tag: isPriorityNotification ? "priority-notification" : undefined // Replace previous notifications
-        });
-        // Auto-close notification after 5 seconds for non-priority, 10 seconds for priority
-        setTimeout(() => notification.close(), isPriorityNotification ? 10000 : 5000);
+        try {
+          const notification = new Notification(title, {
+            body,
+            badge: "/logo.png",
+            tag: isPriorityNotification ? "priority-notification" : undefined // Replace previous notifications
+          });
+          // Auto-close notification after 5 seconds for non-priority, 10 seconds for priority
+          setTimeout(() => notification.close(), isPriorityNotification ? 10000 : 5000);
+        } catch (err) {
+          // On mobile browsers, direct Notification construction throws. Fall back to Service Worker if available.
+          if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+            navigator.serviceWorker.ready.then((registration) => {
+              registration.showNotification(title, {
+                body,
+                badge: "/logo.png",
+                tag: isPriorityNotification ? "priority-notification" : undefined
+              });
+            }).catch((swErr) => {
+              console.warn("[Notification] SW fallback failed:", swErr);
+            });
+          } else {
+            console.warn("[Notification] Constructor not supported and no SW ready.");
+          }
+        }
       }
     }
 
@@ -873,7 +857,20 @@ export default function ChatPage() {
 
       // 3. Retrieve final merged list from local IndexedDB
       const finalChats = await getLocalChats(user?.id);
-      setChats(finalChats.length > 0 ? finalChats : decryptedList);
+      const serverChatIds = new Set(decryptedList.map((c) => c.id));
+      for (const localChat of finalChats) {
+        if (!serverChatIds.has(localChat.id)) {
+          try {
+            await deleteLocalChat(localChat.id, user?.id);
+          } catch (delErr) {
+            console.error("Failed to delete hidden/deleted chat from local DB:", delErr);
+          }
+        }
+      }
+
+      // Retrieve final list again after cleanup
+      const cleanedChats = await getLocalChats(user?.id);
+      setChats(cleanedChats.length > 0 ? cleanedChats : decryptedList);
 
       const nextHiddenCount = Number(hiddenCountData?.count || 0);
       setHiddenChatsCount(nextHiddenCount);
@@ -955,7 +952,7 @@ export default function ChatPage() {
       };
       setUserSettings(merged);
       notify({ type: "success", message: "Settings saved." });
-      await reload();
+      await reload({ silent: true });
       setSettingsOpen(false);
     } catch (err) {
       notify({
@@ -1076,6 +1073,52 @@ export default function ChatPage() {
       setRestoreBackupBusy(false);
     }
   }, [handleRestoreBackup]);
+
+  useEffect(() => {
+    async function checkBackupStatus() {
+      try {
+        const cachedPin = sessionStorage.getItem(`anach_backup_pin_${user?.id}`);
+        if (cachedPin) {
+          sessionBackupKeyRef.current = cachedPin;
+        }
+
+        const { data } = await api.get("/messages/backup/status");
+        setLastBackupInfo(data);
+        setAutoBackupEnabled(Boolean(data.autoBackupEnabled));
+        if (data.hasBackup) {
+          setBackupStatus(data.autoBackupEnabled ? "Enabled" : "Manual");
+          setBackupSize(`${(data.lastBackupSize / 1024).toFixed(2)} KB`);
+          setLastBackup(new Date(data.lastBackupAt).toLocaleString());
+          
+          try {
+            const localChats = await getLocalChats(user?.id);
+            if (localChats.length === 0) {
+              if (sessionBackupKeyRef.current) {
+                try {
+                  await handleRestoreBackup(sessionBackupKeyRef.current);
+                } catch (e) {
+                  setRestoreBackupModalOpen(true);
+                }
+              } else {
+                setRestoreBackupModalOpen(true);
+              }
+            }
+          } catch (e) {
+            console.warn("Could not check local chats for backup restore trigger:", e);
+          }
+        } else {
+          setBackupStatus("Disabled");
+          setBackupSize("N/A");
+          setLastBackup("Never");
+        }
+      } catch (err) {
+        console.error("Failed to check backup status", err);
+      }
+    }
+    if (user?.id) {
+      checkBackupStatus();
+    }
+  }, [user?.id, handleRestoreBackup]);
 
   // Debounced auto backup scheduler
   const autoBackupTimerRef = useRef(null);
@@ -1233,6 +1276,7 @@ export default function ChatPage() {
           } else {
             notify({ type: "success", message: "Chat hidden with PIN." });
           }
+          await deleteLocalChat(activeChat.id, user?.id).catch(() => {});
           await unlockHiddenChatsWithPin(pin, { silent: true });
           await loadChats();
         } catch (err) {
@@ -1330,6 +1374,7 @@ export default function ChatPage() {
           const { data } = await api.post(`/chats/${id}/hide`, { pin });
           if (data?.pin_created) notify({ type: "success", message: "Chat hidden. PIN created successfully." });
           else notify({ type: "success", message: "Chat hidden with PIN." });
+          await deleteLocalChat(id, user?.id).catch(() => {});
           await unlockHiddenChatsWithPin(pin, { silent: true });
           await loadChats();
         } catch (err) {
@@ -3233,6 +3278,8 @@ export default function ChatPage() {
         onSetAccentColor={setAccentColor}
         onSetSidebarColor={setSidebarColor}
         onSetChatPaneColor={setChatPaneColor}
+        sidebarColor={sidebarColor}
+        chatPaneColor={chatPaneColor}
         backupStatus={backupStatus}
         backupSize={backupSize}
         lastBackup={lastBackup}
