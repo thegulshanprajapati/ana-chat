@@ -178,7 +178,9 @@ function publicUser(user) {
     publicKey: user.public_key || null,
     hasPrivateKeyBackup: Boolean(user.private_key_backup),
     anaSecurityPinEnabled,
-    anaSecurityPinSetAt: user.security_pin_set_at || null
+    anaSecurityPinSetAt: user.security_pin_set_at || null,
+    relationship_status: user.relationship_status || "single",
+    partner_user_id: user.partner_user_id || null
   };
 }
 

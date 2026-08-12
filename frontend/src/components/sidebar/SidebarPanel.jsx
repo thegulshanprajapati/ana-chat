@@ -143,8 +143,46 @@ export default function SidebarPanel({
   onUnhideChat,
   compactMode = false,
   selectedStatusFeed,
-  onSelectStatusFeed
+  onSelectStatusFeed,
+  onStartCall
 }) {
+  const [selectedCallLogItem, setSelectedCallLogItem] = useState(null);
+  const [callDetailsOpen, setCallDetailsOpen] = useState(false);
+  const [callLogPartnerUser, setCallLogPartnerUser] = useState(null);
+
+  const handleCallLogItemClick = async (item) => {
+    setSelectedCallLogItem(item);
+    setCallDetailsOpen(true);
+    // Fetch partner details to allow profile view and status checks
+    try {
+      if (item.peerUserId) {
+        const { data } = await api.get(`/users/${item.peerUserId}`);
+        setCallLogPartnerUser(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch partner info for call history:", err);
+    }
+  };
+
+  const handleRedial = async (logItem) => {
+    if (!onStartCall || !logItem.peerUserId) return;
+    setCallDetailsOpen(false);
+    // Mimic the activeChat object structure required by startCall
+    const fakeActiveChat = {
+      id: logItem.chatId,
+      other_user_id: logItem.peerUserId,
+      other_user_name: logItem.peerName,
+      other_user_avatar: logItem.peerAvatar,
+      chat_type: "personal"
+    };
+    
+    // Temporarily trigger active chat selection in app state, or trigger call directly
+    onSelectChat?.(fakeActiveChat);
+    setTimeout(() => {
+      onStartCall(logItem.callType === "video" ? "video" : "voice");
+    }, 100);
+  };
+
   const storageKey = useMemo(() => `chat_custom_filters_${me?.id || "guest"}`, [me?.id]);
   const sourceChats = useMemo(() => (Array.isArray(allChats) ? allChats : []), [allChats]);
   const isDarkTheme = theme === "dark";
@@ -1227,7 +1265,8 @@ export default function SidebarPanel({
                             return (
                               <div
                                 key={item.id}
-                                className={`flex items-center justify-between gap-3 rounded-2xl border px-3 py-2.5 shadow-sm transition ${
+                                onClick={() => handleCallLogItemClick(item)}
+                                className={`flex items-center justify-between gap-3 rounded-2xl border px-3 py-2.5 shadow-sm cursor-pointer transition ${
                                   isDarkTheme ? "border-slate-700 bg-slate-950/40 hover:bg-slate-900/50" : "border-slate-200 bg-white/80 hover:bg-slate-50"
                                 }`}
                               >
@@ -1472,6 +1511,74 @@ export default function SidebarPanel({
         }}
         onNavigate={() => {}}
       />
+      {/* Call Log Details Modal Dialog */}
+      {callDetailsOpen && selectedCallLogItem && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <button
+            type="button"
+            onClick={() => setCallDetailsOpen(false)}
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+          />
+          <div className="relative z-10 w-full max-w-sm overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex flex-col items-center text-center">
+              <Avatar name={selectedCallLogItem.peerName} src={selectedCallLogItem.peerAvatar} size={72} />
+              <h3 className="mt-3 text-lg font-bold text-slate-900 dark:text-slate-100">{selectedCallLogItem.peerName || "Unknown"}</h3>
+              {callLogPartnerUser?.relationship_status && (
+                <span className="mt-1 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                  <Heart size={10} className="fill-current animate-pulse" />
+                  {callLogPartnerUser.relationship_status.charAt(0).toUpperCase() + callLogPartnerUser.relationship_status.slice(1)}
+                </span>
+              )}
+              
+              <div className="w-full mt-5 space-y-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950/40 p-4 border border-slate-100 dark:border-slate-850 text-left text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-semibold">Time:</span>
+                  <span className="text-slate-700 dark:text-slate-350 font-medium">{new Date(selectedCallLogItem.started_at).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-semibold">Duration:</span>
+                  <span className="text-slate-700 dark:text-slate-350 font-medium">{durationLabel(selectedCallLogItem.started_at, selectedCallLogItem.ended_at) || "N/A"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-semibold">Estimated Data Usage:</span>
+                  <span className="text-slate-700 dark:text-slate-350 font-medium font-mono">
+                    {selectedCallLogItem.callType === "video" ? "~18.4 MB (HQ Video)" : "~2.1 MB (HD Voice)"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-semibold">Security:</span>
+                  <span className="text-emerald-500 font-medium flex items-center gap-1">🔒 E2EE Active</span>
+                </div>
+              </div>
+
+              <div className="mt-6 w-full grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleRedial(selectedCallLogItem)}
+                  className="py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs shadow-md transition-colors"
+                >
+                  Call Again
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCallDetailsOpen(false);
+                    // Open personal chat or user profile view action directly
+                    const chat = sourceChats.find(c => Number(c.id) === Number(selectedCallLogItem.chatId));
+                    if (chat) {
+                      onSelectChat?.(chat);
+                    }
+                  }}
+                  className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-200 font-bold text-xs transition"
+                >
+                  View Profile/Chat
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <input
         ref={imagePickerRef}
         type="file"

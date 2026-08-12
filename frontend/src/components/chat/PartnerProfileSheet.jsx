@@ -429,6 +429,25 @@ export default function PartnerProfileSheet({
               {username}
             </p>
 
+            {/* Relationship badge */}
+            <div className="mt-3 flex flex-col items-center gap-1">
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold select-none ${
+                partner?.relationship_status === "relationship" 
+                  ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                  : partner?.relationship_status === "married"
+                  ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                  : partner?.relationship_status === "complicated"
+                  ? "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+              }`}>
+                <Heart size={12} className={partner?.relationship_status === "relationship" || partner?.relationship_status === "married" ? "fill-current animate-pulse" : ""} />
+                Status: {partner?.relationship_status ? partner.relationship_status.charAt(0).toUpperCase() + partner.relationship_status.slice(1) : "Single"}
+              </span>
+              {partner?.partner_user_id && (
+                <span className="text-[10px] text-slate-400">Partner ID: {partner.partner_user_id}</span>
+              )}
+            </div>
+
             {/* Action Buttons (Search) */}
             <div className="mt-6 flex justify-center">
               <button

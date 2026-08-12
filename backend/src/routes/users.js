@@ -229,13 +229,15 @@ router.patch("/me", requireUser, avatarUpload, async (req, res) => {
   const aboutProvided = Object.prototype.hasOwnProperty.call(req.body || {}, "about");
   const aboutBio = aboutProvided ? (req.body.about || "").toString().trim().slice(0, 500) : null;
   const password = req.body.password ? (req.body.password || "").toString().trim() : null;
+  const relationshipStatus = req.body.relationship_status || null;
+  const partnerUserId = req.body.partner_user_id || null;
 
   if (!name) return res.status(400).json({ message: "Name is required" });
   if (!email) return res.status(400).json({ message: "Email is required" });
   if (!mobile) return res.status(400).json({ message: "Mobile is required" });
 
   const db = await getDb();
-  const current = await db.collection("users").findOne({ id: userId }, { projection: { id: 1, name: 1, email: 1, mobile: 1, avatar_url: 1, about_bio: 1 } });
+  const current = await db.collection("users").findOne({ id: userId }, { projection: { id: 1, name: 1, email: 1, mobile: 1, avatar_url: 1, about_bio: 1, relationship_status: 1, partner_user_id: 1 } });
   if (!current) return res.status(404).json({ message: "User not found" });
 
   const conflict = await db.collection("users").findOne({ id: { $ne: userId }, $or: [{ email }, { mobile }] });
@@ -271,6 +273,8 @@ router.patch("/me", requireUser, avatarUpload, async (req, res) => {
       ...(mobile && mobile === (process.env.SUPER_ADMIN || "").toString().trim() ? { is_admin: true } : {}),
       about_bio: aboutBio !== null ? aboutBio : current.about_bio,
       avatar_url: avatarUrl,
+      ...(relationshipStatus ? { relationship_status: relationshipStatus } : {}),
+      ...(partnerUserId !== null ? { partner_user_id: partnerUserId === "" ? null : Number(partnerUserId) } : {}),
       ...(password ? {
         password_hash: await bcrypt.hash(password, 10),
         generated_password_plain: null

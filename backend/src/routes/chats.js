@@ -348,7 +348,7 @@ async function getUserChats(userId, options = {}) {
     let lastE2ee = last?.e2ee ? e2eeForUser(last.e2ee, me) : null;
 
     if (last && userHiddenMsgIds.has(Number(last.id))) {
-      const hasMedia = !!(last.image_url || (last.e2ee && typeof last.e2ee === "object" && (last.e2ee.media || last.e2ee.text?.includes("media"))));
+      const hasMedia = !!(last.image_url || (last.e2ee && typeof last.e2ee === "object" && last.e2ee.media && Object.keys(last.e2ee.media).length > 0));
       lastBody = hasMedia ? "🔒 Hidden media" : "🔒 Hidden message";
       lastImage = null;
       lastE2ee = null;

@@ -3256,6 +3256,7 @@ export default function ChatPage() {
               compactMode={userSettings.compactMode}
               selectedStatusFeed={selectedStatusFeed}
               onSelectStatusFeed={setSelectedStatusFeed}
+              onStartCall={startCall}
             />
           </div>
         )}

@@ -189,6 +189,89 @@ export default function ChatPane({
     setReportBusy(false);
   }, [activeChat?.id, watchSession?.active]);
 
+  // Couple & Mood Floating Emojis States
+  const [floatingEmojis, setFloatingEmojis] = useState([]);
+  const isCouple = partner?.relationship_status === "relationship" || partner?.relationship_status === "married";
+
+  const triggerEmojiExplosion = (emoji) => {
+    const newEmojis = [];
+    const count = 30;
+    for (let i = 0; i < count; i++) {
+      newEmojis.push({
+        id: `explode-${Date.now()}-${Math.random()}`,
+        emoji,
+        left: Math.random() * 80 + 10, // percentage 10% - 90%
+        delay: Math.random() * 0.4,
+        size: Math.random() * 24 + 18,
+        duration: Math.random() * 1.5 + 1.2,
+        explode: true
+      });
+    }
+    setFloatingEmojis((prev) => [...prev, ...newEmojis]);
+  };
+
+  const handleFloatingClick = (item) => {
+    // Boom effect! Remove clicked item, explode 30 particles of it all over the pane
+    setFloatingEmojis((prev) => prev.filter((x) => x.id !== item.id));
+    triggerEmojiExplosion(item.emoji);
+  };
+
+  // Generate floating emojis automatically for couples, or mock expression trigger
+  useEffect(() => {
+    if (!activeChat?.id) return;
+    const interval = setInterval(() => {
+      // If couple, periodically float hearts
+      if (isCouple) {
+        setFloatingEmojis((prev) => [
+          ...prev.slice(-40),
+          {
+            id: `heart-${Date.now()}-${Math.random()}`,
+            emoji: "❤️",
+            left: Math.random() * 80 + 10,
+            delay: 0,
+            size: Math.random() * 16 + 12,
+            duration: Math.random() * 3 + 2.5
+          }
+        ]);
+      }
+    }, 4500);
+
+    return () => clearInterval(interval);
+  }, [activeChat?.id, isCouple]);
+
+  // Simulate Expression Mood Recognition when new message is received or typed
+  useEffect(() => {
+    if (!messages.length) return;
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg || lastMsg.pending) return;
+
+    // Quick sentiment parser to simulate expression recognition from face/message text
+    const text = (lastMsg.body || "").toLowerCase();
+    let detectedEmoji = null;
+    if (text.includes("angry") || text.includes("gussa") || text.includes("hate") || text.includes("😠") || text.includes("😡")) {
+      detectedEmoji = "😡";
+    } else if (text.includes("happy") || text.includes("khush") || text.includes("smile") || text.includes("😊") || text.includes("😀")) {
+      detectedEmoji = "😊";
+    } else if (text.includes("love") || text.includes("pyar") || text.includes("sweet") || text.includes("❤️") || text.includes("😘")) {
+      detectedEmoji = "💖";
+    } else if (text.includes("sad") || text.includes("ro") || text.includes("cry") || text.includes("😭") || text.includes("😢")) {
+      detectedEmoji = "😢";
+    }
+
+    if (detectedEmoji) {
+      // Spawn floating mood emojis reflecting the sentiment
+      const newMoods = Array.from({ length: 4 }).map((_, idx) => ({
+        id: `mood-${Date.now()}-${idx}-${Math.random()}`,
+        emoji: detectedEmoji,
+        left: Math.random() * 70 + 15,
+        delay: idx * 0.3,
+        size: Math.random() * 18 + 14,
+        duration: Math.random() * 4 + 3
+      }));
+      setFloatingEmojis((prev) => [...prev, ...newMoods]);
+    }
+  }, [messages]);
+
   // Focus the correct input when tab changes or search opens
   useEffect(() => {
     if (!searchOpen) return;
@@ -853,6 +936,31 @@ export default function ChatPane({
           )}
         </div>
       )}
+
+      {/* Floating Emojis Layer */}
+      <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden">
+        {floatingEmojis.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => handleFloatingClick(item)}
+            className="absolute pointer-events-auto select-none cursor-pointer hover:scale-125 transition-transform animate-float"
+            style={{
+              left: `${item.left}%`,
+              fontSize: `${item.size}px`,
+              animationDelay: `${item.delay}s`,
+              animationDuration: `${item.duration}s`,
+              bottom: item.explode ? "50%" : "-10%",
+              animationName: item.explode ? "explodeUp" : "floatUp",
+              animationFillMode: "forwards",
+              "--dx": item.explode ? `${(Math.random() - 0.5) * 400}px` : undefined,
+              "--dy": item.explode ? `${(Math.random() - 0.7) * 450}px` : undefined
+            }}
+          >
+            {item.emoji}
+          </button>
+        ))}
+      </div>
 
       <MessageThread
         chatId={activeChat?.id}

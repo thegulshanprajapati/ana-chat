@@ -9,6 +9,8 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
   const [mobile, setMobile] = useState("");
   const [about, setAbout] = useState("");
   const [password, setPassword] = useState("");
+  const [relationshipStatus, setRelationshipStatus] = useState("single");
+  const [partnerUserId, setPartnerUserId] = useState("");
   const [saving, setSaving] = useState(false);
   const [showGeneratedPassword, setShowGeneratedPassword] = useState(false);
 
@@ -19,6 +21,8 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
     setMobile(me?.mobile || "");
     setAbout((me?.about_bio || "").slice(0, 500));
     setPassword("");
+    setRelationshipStatus(me?.relationship_status || "single");
+    setPartnerUserId(me?.partner_user_id != null ? String(me.partner_user_id) : "");
     setShowGeneratedPassword(false);
   }, [open, me]);
 
@@ -31,6 +35,8 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
       form.append("email", email.trim());
       form.append("mobile", mobile.trim());
       form.append("about", about.trim());
+      form.append("relationship_status", relationshipStatus);
+      form.append("partner_user_id", partnerUserId.trim());
       if (password.trim()) form.append("password", password.trim());
 
       const { data } = await api.patch("/users/me", form, {
@@ -167,6 +173,42 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
                   placeholder="Write something about yourself..."
                   aria-label="About or bio"
                 />
+              </div>
+            </div>
+
+            {/* Relationship Card */}
+            <div className="bg-white/80 dark:bg-slate-900/30 backdrop-blur-md border border-slate-200/40 dark:border-white/5 rounded-2xl p-5 space-y-4 shadow-sm">
+              <label className="text-[12px] font-bold text-slate-500 dark:text-[var(--panel-muted)] flex items-center gap-1.5 uppercase tracking-wider">
+                <Heart size={13} className="text-rose-500 fill-rose-500" /> Relationship Info
+              </label>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">Status</label>
+                <select
+                  value={relationshipStatus}
+                  onChange={(e) => setRelationshipStatus(e.target.value)}
+                  className="w-full rounded-xl bg-slate-100/50 dark:bg-slate-950/40 border border-slate-200 dark:border-white/10 text-[var(--panel-text)] px-3.5 py-2.5 text-sm outline-none transition focus:border-violet-500 dark:focus:border-violet-500"
+                >
+                  <option value="single">Single 🤍</option>
+                  <option value="relationship">In a Relationship ❤️</option>
+                  <option value="married">Married 💍</option>
+                  <option value="complicated">It's Complicated 💔</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">Partner User ID (Optional)</label>
+                <input
+                  type="number"
+                  placeholder="e.g. 1234"
+                  value={partnerUserId}
+                  onChange={(e) => setPartnerUserId(e.target.value)}
+                  className="w-full rounded-xl bg-slate-100/50 dark:bg-slate-950/40 border border-slate-200 dark:border-white/10 text-[var(--panel-text)] px-3.5 py-2.5 text-sm outline-none transition focus:border-violet-500 dark:focus:border-violet-500"
+                  aria-label="Partner User ID"
+                />
+                <p className="text-[9px] text-slate-400 leading-normal">
+                  Link with your partner's ID to enable romantic themes and floating emojis in personal chats.
+                </p>
               </div>
             </div>
 
