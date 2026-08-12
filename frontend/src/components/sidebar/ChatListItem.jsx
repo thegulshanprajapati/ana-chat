@@ -77,7 +77,10 @@ export default function ChatListItem({
   compactMode = false,
   showOnlineStatus = true,
   customDark = false,
-  nowMs = 0
+  nowMs = 0,
+  isBulkMode = false,
+  isSelected = false,
+  onToggleSelect
 }) {
   const { success, error: showToastError } = useToast();
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
@@ -478,10 +481,20 @@ export default function ChatListItem({
       <div
         role="button"
         tabIndex={0}
-        onClick={() => onClick?.(chat)}
+        onClick={(event) => {
+          if (isBulkMode) {
+            onToggleSelect?.(chat.id);
+            return;
+          }
+          onClick?.(chat);
+        }}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
+            if (isBulkMode) {
+              onToggleSelect?.(chat.id);
+              return;
+            }
             onClick?.(chat);
           }
         }}
@@ -522,6 +535,17 @@ export default function ChatListItem({
         {active && <span className={`absolute left-0 ${compactMode ? "top-2.5 h-9" : "top-3 h-10"} w-1 rounded-r-full bg-accent`} aria-hidden />}
 
         <div className={`flex items-center ${compactMode ? "gap-2.5" : "gap-3"}`}>
+          {isBulkMode && (
+            <div className="shrink-0 flex items-center justify-center pr-1">
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => onToggleSelect?.(chat.id)}
+                className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-violet-600 focus:ring-violet-500 cursor-pointer"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          )}
           <span className="relative">
             <Avatar name={chat.other_user_name} src={chat.other_user_avatar} size={compactMode ? 42 : 48} />
             {showOnlineStatus && online && (

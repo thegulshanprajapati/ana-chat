@@ -1270,6 +1270,8 @@ export default function ChatPage() {
           }
           await deleteLocalChat(activeChat.id, user?.id).catch(() => {});
           await unlockHiddenChatsWithPin(pin, { silent: true });
+          setActiveChat(null);
+          setMessages([]);
           await loadChats();
         } catch (err) {
           notify({
@@ -1368,6 +1370,10 @@ export default function ChatPage() {
           else notify({ type: "success", message: "Chat hidden with PIN." });
           await deleteLocalChat(id, user?.id).catch(() => {});
           await unlockHiddenChatsWithPin(pin, { silent: true });
+          if (Number(activeChat?.id) === id) {
+            setActiveChat(null);
+            setMessages([]);
+          }
           await loadChats();
         } catch (err) {
           notify({
@@ -1377,7 +1383,7 @@ export default function ChatPage() {
         }
       }
     });
-  }, [loadChats, notify, unlockHiddenChatsWithPin]);
+  }, [loadChats, notify, unlockHiddenChatsWithPin, activeChat?.id, user?.id]);
 
   const deleteChatById = useCallback(async (chatId) => {
     const id = Number(chatId);

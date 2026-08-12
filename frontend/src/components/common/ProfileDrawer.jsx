@@ -11,8 +11,25 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
   const [password, setPassword] = useState("");
   const [relationshipStatus, setRelationshipStatus] = useState("single");
   const [partnerUserId, setPartnerUserId] = useState("");
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [actionBusy, setActionBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showGeneratedPassword, setShowGeneratedPassword] = useState(false);
+
+  const fetchPendingRequests = async () => {
+    try {
+      const { data } = await api.get("/users/relationship-request/pending");
+      setPendingRequests(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error("Failed to fetch pending requests:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      fetchPendingRequests();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -25,6 +42,84 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
     setPartnerUserId(me?.partner_user_id != null ? String(me.partner_user_id) : "");
     setShowGeneratedPassword(false);
   }, [open, me]);
+
+  const handleCopyOwnId = async () => {
+    try {
+      await navigator.clipboard.writeText(String(me?.id));
+      notify?.({ type: "success", message: "User ID copied!" });
+    } catch {
+      notify?.({ type: "error", message: "Failed to copy User ID." });
+    }
+  };
+
+  const handleSendRequest = async () => {
+    const targetId = Number(partnerUserId.trim());
+    if (isNaN(targetId)) return;
+    setActionBusy(true);
+    try {
+      await api.post("/users/relationship-request", { partnerId: targetId });
+      notify?.({ type: "success", title: "Request Sent", message: "Relationship request sent successfully!" });
+      setPartnerUserId("");
+    } catch (err) {
+      notify?.({
+        type: "error",
+        title: "Request Failed",
+        message: err.response?.data?.message || "Could not send partnership request."
+      });
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleAcceptRequest = async (requesterId) => {
+    setActionBusy(true);
+    try {
+      await api.post("/users/relationship-request/accept", { requesterId });
+      notify?.({ type: "success", title: "Accepted!", message: "Partnership linked successfully!" });
+      await fetchPendingRequests();
+      onSaved?.(null); 
+    } catch (err) {
+      notify?.({
+        type: "error",
+        title: "Failed",
+        message: err.response?.data?.message || "Could not accept request."
+      });
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleDeclineRequest = async (requesterId) => {
+    setActionBusy(true);
+    try {
+      await api.post("/users/relationship-request/decline", { requesterId });
+      notify?.({ type: "info", message: "Request declined." });
+      await fetchPendingRequests();
+    } catch (err) {
+      notify?.({
+        type: "error",
+        message: "Failed to decline request."
+      });
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleUnlinkPartner = async () => {
+    setActionBusy(true);
+    try {
+      await api.post("/users/relationship-request/unlink");
+      notify?.({ type: "info", message: "Partnership unlinked successfully." });
+      onSaved?.(null); 
+    } catch (err) {
+      notify?.({
+        type: "error",
+        message: "Could not unlink partnership."
+      });
+    } finally {
+      setActionBusy(false);
+    }
+  };
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -110,6 +205,13 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
                 }}
                 notify={notify}
               />
+              <div 
+                onClick={handleCopyOwnId}
+                className="mt-3 cursor-pointer select-none rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200/40 dark:border-white/5 px-3 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:text-[var(--accent)] transition-all font-semibold"
+                title="Click to copy your User ID"
+              >
+                Your ID: <span className="font-mono text-[var(--accent)] font-bold">{me?.id || "N/A"}</span> 📋
+              </div>
             </div>
 
             {/* Inputs Card */}
@@ -179,37 +281,97 @@ export default function ProfileDrawer({ open, me, onClose, onSaved, notify }) {
             {/* Relationship Card */}
             <div className="bg-white/80 dark:bg-slate-900/30 backdrop-blur-md border border-slate-200/40 dark:border-white/5 rounded-2xl p-5 space-y-4 shadow-sm">
               <label className="text-[12px] font-bold text-slate-500 dark:text-[var(--panel-muted)] flex items-center gap-1.5 uppercase tracking-wider">
-                <Heart size={13} className="text-rose-500 fill-rose-500" /> Relationship Info
+                <Heart size={13} className="text-rose-500 fill-rose-500 animate-pulse" /> Relationship Info
               </label>
 
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">Status</label>
-                <select
-                  value={relationshipStatus}
-                  onChange={(e) => setRelationshipStatus(e.target.value)}
-                  className="w-full rounded-xl bg-slate-100/50 dark:bg-slate-950/40 border border-slate-200 dark:border-white/10 text-[var(--panel-text)] px-3.5 py-2.5 text-sm outline-none transition focus:border-violet-500 dark:focus:border-violet-500"
-                >
-                  <option value="single">Single 🤍</option>
-                  <option value="relationship">In a Relationship ❤️</option>
-                  <option value="married">Married 💍</option>
-                  <option value="complicated">It's Complicated 💔</option>
-                </select>
+              {/* Display current relationship status */}
+              <div className="rounded-xl bg-slate-50 dark:bg-slate-950/40 p-3.5 border border-slate-100 dark:border-slate-850 space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400 font-semibold">Your Status:</span>
+                  <span className="font-bold text-slate-700 dark:text-slate-200 capitalize">
+                    {me?.relationship_status || "Single"}
+                  </span>
+                </div>
+                {me?.partner_user_id && (
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400 font-semibold">Partner ID:</span>
+                    <span className="font-mono font-bold text-slate-700 dark:text-slate-200">{me.partner_user_id}</span>
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">Partner User ID (Optional)</label>
-                <input
-                  type="number"
-                  placeholder="e.g. 1234"
-                  value={partnerUserId}
-                  onChange={(e) => setPartnerUserId(e.target.value)}
-                  className="w-full rounded-xl bg-slate-100/50 dark:bg-slate-950/40 border border-slate-200 dark:border-white/10 text-[var(--panel-text)] px-3.5 py-2.5 text-sm outline-none transition focus:border-violet-500 dark:focus:border-violet-500"
-                  aria-label="Partner User ID"
-                />
-                <p className="text-[9px] text-slate-400 leading-normal">
-                  Link with your partner's ID to enable romantic themes and floating emojis in personal chats.
-                </p>
-              </div>
+              {/* Link relationship section */}
+              {me?.partner_user_id ? (
+                /* Already Linked: option to Unlink */
+                <button
+                  type="button"
+                  onClick={handleUnlinkPartner}
+                  disabled={actionBusy}
+                  className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-md transition disabled:opacity-50"
+                >
+                  {actionBusy ? "Unlinking..." : "Unlink / Break Partnership 💔"}
+                </button>
+              ) : (
+                /* Unlinked: option to send request */
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">Send Partnership Request (Partner's ID)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        placeholder="e.g. 1234"
+                        value={partnerUserId}
+                        onChange={(e) => setPartnerUserId(e.target.value)}
+                        className="flex-1 min-w-0 rounded-xl bg-slate-100/50 dark:bg-slate-950/40 border border-slate-200 dark:border-white/10 text-[var(--panel-text)] px-3 py-2 text-xs outline-none transition focus:border-violet-500 dark:focus:border-violet-500"
+                        aria-label="Partner User ID"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSendRequest}
+                        disabled={actionBusy || !partnerUserId.trim()}
+                        className="py-2 px-3.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-xs shadow-md transition disabled:opacity-50"
+                      >
+                        {actionBusy ? "Sending..." : "Send ❤️"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Pending Requests section */}
+              {pendingRequests.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-slate-200/40 dark:border-white/5">
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Pending Partnership Requests</p>
+                  <div className="space-y-2">
+                    {pendingRequests.map((req) => (
+                      <div key={req.requester_id} className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-800 text-xs">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{req.requester_name || "Someone"}</p>
+                          <p className="text-[10px] text-slate-400">ID: {req.requester_id}</p>
+                        </div>
+                        <div className="flex gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleAcceptRequest(req.requester_id)}
+                            disabled={actionBusy}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[10px] shadow transition"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeclineRequest(req.requester_id)}
+                            disabled={actionBusy}
+                            className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-[10px] shadow transition"
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Security / Password Card */}

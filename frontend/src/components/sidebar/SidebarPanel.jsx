@@ -18,7 +18,10 @@ import {
   X,
   Heart,
   Archive,
-  Loader2
+  Loader2,
+  Pin,
+  Trash2,
+  MessageSquare
 } from "lucide-react";
 import SidebarHeader from "./SidebarHeader";
 import ChatListItem from "./ChatListItem";
@@ -149,6 +152,100 @@ export default function SidebarPanel({
   const [selectedCallLogItem, setSelectedCallLogItem] = useState(null);
   const [callDetailsOpen, setCallDetailsOpen] = useState(false);
   const [callLogPartnerUser, setCallLogPartnerUser] = useState(null);
+
+  // Bulk Mode Selection States and Helpers
+  const [isBulkMode, setIsBulkMode] = useState(false);
+  const [bulkSelectedIds, setBulkSelectedIds] = useState({});
+
+  const handleCancelBulkMode = () => {
+    setIsBulkMode(false);
+    setBulkSelectedIds({});
+  };
+
+  const handleToggleSelect = (chatId) => {
+    setBulkSelectedIds(prev => ({
+      ...prev,
+      [chatId]: !prev[chatId]
+    }));
+  };
+
+  const handleSelectAllChats = () => {
+    const next = {};
+    filteredChats.forEach(c => {
+      next[c.id] = true;
+    });
+    setBulkSelectedIds(next);
+  };
+
+  const handleBulkPin = async () => {
+    const selectedIds = Object.keys(bulkSelectedIds).filter(id => bulkSelectedIds[id]).map(Number);
+    if (selectedIds.length === 0) return;
+    for (const id of selectedIds) {
+      await onTogglePinChat?.(id);
+    }
+    handleCancelBulkMode();
+  };
+
+  const handleBulkArchive = () => {
+    const selectedIds = Object.keys(bulkSelectedIds).filter(id => bulkSelectedIds[id]).map(Number);
+    if (selectedIds.length === 0) return;
+    try {
+      const key = `ana_archived_chats_${me?.id || "guest"}`;
+      const list = JSON.parse(localStorage.getItem(key) || "[]");
+      let next = [...list];
+      selectedIds.forEach(id => {
+        if (next.includes(id)) {
+          next = next.filter(x => x !== id);
+        } else {
+          next.push(id);
+        }
+      });
+      localStorage.setItem(key, JSON.stringify(next));
+      window.dispatchEvent(new Event("ana_chats_updated"));
+    } catch (e) {
+      console.error("Bulk archive failed:", e);
+    }
+    handleCancelBulkMode();
+  };
+
+  const handleBulkMarkRead = async () => {
+    const selectedIds = Object.keys(bulkSelectedIds).filter(id => bulkSelectedIds[id]).map(Number);
+    if (selectedIds.length === 0) return;
+    try {
+      for (const id of selectedIds) {
+        await api.post(`/chats/${id}/seen`).catch(() => {});
+      }
+      window.dispatchEvent(new Event("ana_chats_updated"));
+    } catch (e) {
+      console.error("Bulk mark read failed:", e);
+    }
+    handleCancelBulkMode();
+  };
+
+  const handleBulkDelete = () => {
+    const selectedIds = Object.keys(bulkSelectedIds).filter(id => bulkSelectedIds[id]).map(Number);
+    if (selectedIds.length === 0) return;
+    
+    if (window.confirm(`Are you sure you want to delete the ${selectedIds.length} selected chats?`)) {
+      Promise.all(selectedIds.map(async (id) => {
+        try {
+          const target = sourceChats.find((c) => Number(c.id) === id);
+          if (target?.chat_type === "self") return;
+          await api.delete(`/chats/${id}`);
+          await clearLocalMessagesForChat(id, me?.id).catch(() => {});
+          await deleteLocalChat(id, me?.id).catch(() => {});
+        } catch (e) {
+          console.error("Failed to delete chat in bulk:", id, e);
+        }
+      })).then(() => {
+        window.dispatchEvent(new Event("ana_chats_updated"));
+        if (selectedIds.includes(Number(activeChatId))) {
+          onSelectChat?.(null);
+        }
+        handleCancelBulkMode();
+      });
+    }
+  };
 
   const handleCallLogItemClick = async (item) => {
     setSelectedCallLogItem(item);
@@ -746,7 +843,64 @@ export default function SidebarPanel({
           hasCustomColor={hasCustomSidebarColor}
           compactMode={compactMode}
           onOpenHiddenVault={onOpenHiddenVault}
+          isBulkMode={isBulkMode}
+          onToggleBulkMode={() => setIsBulkMode(!isBulkMode)}
+          onSelectAllChats={handleSelectAllChats}
+          onClearBulkSelection={handleCancelBulkMode}
         />
+
+        {isBulkMode && (
+          <div className="flex items-center justify-between bg-violet-600 dark:bg-violet-700 text-white px-4 py-3 shadow-md animate-in slide-in-from-top duration-200">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={handleCancelBulkMode}
+                className="p-1 hover:bg-white/15 rounded-lg transition"
+                title="Cancel selection"
+              >
+                <X size={18} />
+              </button>
+              <span className="text-sm font-bold truncate">
+                {Object.values(bulkSelectedIds).filter(Boolean).length} selected
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleBulkPin}
+                className="p-1.5 hover:bg-white/15 rounded-lg transition"
+                title="Toggle Pin"
+              >
+                <Pin size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkArchive}
+                className="p-1.5 hover:bg-white/15 rounded-lg transition"
+                title="Toggle Archive"
+              >
+                <Archive size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkMarkRead}
+                className="p-1.5 hover:bg-white/15 rounded-lg transition"
+                title="Mark Read"
+              >
+                <MessageSquare size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkDelete}
+                className="p-1.5 hover:bg-rose-500/30 text-rose-200 hover:text-white rounded-lg transition"
+                title="Delete Selected Chats"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </div>
+        )}
 
         <div
           className={`${compactMode ? "px-3 pt-2" : "px-4 pt-2.5"}`}
@@ -1031,6 +1185,9 @@ export default function SidebarPanel({
                         showOnlineStatus={showOnlineStatus}
                         customDark={customSidebarDark}
                         nowMs={nowMs}
+                        isBulkMode={isBulkMode}
+                        isSelected={Boolean(bulkSelectedIds[chat.id])}
+                        onToggleSelect={handleToggleSelect}
                       />
                     ))}
                   </div>

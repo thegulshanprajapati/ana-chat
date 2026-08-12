@@ -835,4 +835,112 @@ router.get("/statuses", requireUser, async (req, res) => {
   return res.json(Object.values(grouped));
 });
 
+router.post("/relationship-request", requireUser, async (req, res) => {
+  const db = await getDb();
+  const partnerId = Number(req.body.partnerId);
+  const meId = req.user.id;
+
+  if (isNaN(partnerId)) {
+    return res.status(400).json({ message: "Invalid partner ID" });
+  }
+
+  if (partnerId === meId) {
+    return res.status(400).json({ message: "You cannot partner with yourself" });
+  }
+
+  // Check if partner exists
+  const partner = await db.collection("users").findOne({ id: partnerId });
+  if (!partner) {
+    return res.status(404).json({ message: "Partner User ID not found" });
+  }
+
+  // Save request
+  await db.collection("relationship_requests").updateOne(
+    { requester_id: meId, recipient_id: partnerId },
+    { $set: { status: "pending", requester_name: req.user.name, created_at: new Date().toISOString() } },
+    { upsert: true }
+  );
+
+  // Real-time socket notify
+  const io = req.app.get("io");
+  if (io) {
+    io.to(`user-${partnerId}`).emit("relationship_request_received", {
+      requesterId: meId,
+      requesterName: req.user.name
+    });
+  }
+
+  res.json({ success: true, message: "Relationship request sent!" });
+});
+
+router.get("/relationship-request/pending", requireUser, async (req, res) => {
+  const db = await getDb();
+  const meId = req.user.id;
+  const requests = await db.collection("relationship_requests").find({ recipient_id: meId, status: "pending" }).toArray();
+  res.json(requests);
+});
+
+router.post("/relationship-request/accept", requireUser, async (req, res) => {
+  const db = await getDb();
+  const requesterId = Number(req.body.requesterId);
+  const meId = req.user.id;
+
+  const reqObj = await db.collection("relationship_requests").findOne({ requester_id: requesterId, recipient_id: meId, status: "pending" });
+  if (!reqObj) {
+    return res.status(404).json({ message: "No pending request found" });
+  }
+
+  await db.collection("relationship_requests").updateOne(
+    { requester_id: requesterId, recipient_id: meId },
+    { $set: { status: "accepted", accepted_at: new Date().toISOString() } }
+  );
+
+  await db.collection("users").updateOne(
+    { id: meId },
+    { $set: { relationship_status: "relationship", partner_user_id: requesterId } }
+  );
+  await db.collection("users").updateOne(
+    { id: requesterId },
+    { $set: { relationship_status: "relationship", partner_user_id: meId } }
+  );
+
+  // Real-time socket notify
+  const io = req.app.get("io");
+  if (io) {
+    io.to(`user-${requesterId}`).emit("relationship_request_accepted", {
+      partnerId: meId,
+      partnerName: req.user.name
+    });
+  }
+
+  res.json({ success: true, message: "Relationship request accepted!" });
+});
+
+router.post("/relationship-request/decline", requireUser, async (req, res) => {
+  const db = await getDb();
+  const requesterId = Number(req.body.requesterId);
+  const meId = req.user.id;
+
+  await db.collection("relationship_requests").deleteOne({ requester_id: requesterId, recipient_id: meId });
+  res.json({ success: true });
+});
+
+router.post("/relationship-request/unlink", requireUser, async (req, res) => {
+  const db = await getDb();
+  const meId = req.user.id;
+  const current = await db.collection("users").findOne({ id: meId });
+  if (current && current.partner_user_id) {
+    const partnerId = current.partner_user_id;
+    await db.collection("users").updateOne({ id: meId }, { $set: { relationship_status: "single", partner_user_id: null } });
+    await db.collection("users").updateOne({ id: partnerId }, { $set: { relationship_status: "single", partner_user_id: null } });
+    await db.collection("relationship_requests").deleteMany({
+      $or: [
+        { requester_id: meId, recipient_id: partnerId },
+        { requester_id: partnerId, recipient_id: meId }
+      ]
+    });
+  }
+  res.json({ success: true });
+});
+
 export default router;

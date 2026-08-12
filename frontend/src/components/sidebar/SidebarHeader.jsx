@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MoreVertical, Settings, UserPen, LogOut, Shield, PhoneCall, Lock } from "lucide-react";
+import { MoreVertical, Settings, UserPen, LogOut, Shield, PhoneCall, Lock, CheckSquare, Square } from "lucide-react";
 import Avatar from "../common/Avatar";
 
 export default function SidebarHeader({
@@ -12,7 +12,11 @@ export default function SidebarHeader({
   isSidebarLight = true,
   hasCustomColor = false,
   compactMode = false,
-  onOpenHiddenVault
+  onOpenHiddenVault,
+  isBulkMode = false,
+  onToggleBulkMode,
+  onSelectAllChats,
+  onClearBulkSelection
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -123,6 +127,35 @@ export default function SidebarHeader({
                 onOpenHiddenVault?.();
               }}
             />
+            {!isBulkMode ? (
+              <MenuButton
+                label="Select Chats"
+                icon={<CheckSquare size={14} />}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onToggleBulkMode?.();
+                }}
+              />
+            ) : (
+              <>
+                <MenuButton
+                  label="Select All"
+                  icon={<CheckSquare size={14} />}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onSelectAllChats?.();
+                  }}
+                />
+                <MenuButton
+                  label="Cancel Selection"
+                  icon={<Square size={14} />}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onClearBulkSelection?.();
+                  }}
+                />
+              </>
+            )}
             <MenuButton
               label="Logout"
               icon={<LogOut size={14} />}
