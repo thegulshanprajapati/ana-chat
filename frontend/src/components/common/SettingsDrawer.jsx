@@ -5,6 +5,7 @@ import ThemeDoodleModal from "./ThemeDoodleModal";
 import KeyboardShortcutsModal from "./KeyboardShortcutsModal";
 import WhatsAppModal from "./WhatsAppModal";
 import { api } from "../../api/client";
+import RelationshipSection from "../profile/RelationshipSection";
 
 const DEFAULT_SETTINGS = {
   compactMode: true,
@@ -304,6 +305,11 @@ export default function SettingsDrawer({
                 checked={Boolean(settings.autoReactionsEnabled)}
                 onChange={(value) => updateSetting("autoReactionsEnabled", value)}
               />
+            </section>
+
+            <section className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-900/70">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Relationship & Partner Link</p>
+              <RelationshipSection me={{ id: userId }} />
             </section>
 
             <section className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-900/70">

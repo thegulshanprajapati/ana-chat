@@ -1008,6 +1008,7 @@ export default function ChatPane({
             open={profileOpen}
             onClose={() => setProfileOpen(false)}
             partner={partner}
+            socket={socket}
             isGroup={isGroupChat || isSelfChat}
             memberCount={isSelfChat ? 1 : memberCount}
             blockedByMe={blockedByMe}

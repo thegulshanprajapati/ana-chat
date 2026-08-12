@@ -848,10 +848,21 @@ router.post("/relationship-request", requireUser, async (req, res) => {
     return res.status(400).json({ message: "You cannot partner with yourself" });
   }
 
-  // Check if partner exists
+  // Strict Exclusivity Check 1: Is requester already linked or in a relationship?
+  const requester = await db.collection("users").findOne({ id: meId });
+  if (requester?.partner_user_id || requester?.relationship_status === "relationship" || requester?.relationship_status === "in_relationship" || requester?.relationship_status === "married") {
+    return res.status(400).json({ message: "You are already linked to a partner. Unlink your existing partner first before sending a new request." });
+  }
+
+  // Check if target partner exists
   const partner = await db.collection("users").findOne({ id: partnerId });
   if (!partner) {
     return res.status(404).json({ message: "Partner User ID not found" });
+  }
+
+  // Strict Exclusivity Check 2: Is recipient already linked to someone else?
+  if (partner?.partner_user_id || partner?.relationship_status === "relationship" || partner?.relationship_status === "in_relationship" || partner?.relationship_status === "married") {
+    return res.status(400).json({ message: "This user is already in a relationship with someone else and cannot accept new partner requests." });
   }
 
   // Save request
@@ -890,6 +901,14 @@ router.post("/relationship-request/accept", requireUser, async (req, res) => {
     return res.status(404).json({ message: "No pending request found" });
   }
 
+  // Double Check Exclusivity at acceptance time
+  const meUser = await db.collection("users").findOne({ id: meId });
+  const requesterUser = await db.collection("users").findOne({ id: requesterId });
+
+  if (meUser?.partner_user_id || requesterUser?.partner_user_id) {
+    return res.status(400).json({ message: "One of the users is already linked to another partner." });
+  }
+
   await db.collection("relationship_requests").updateOne(
     { requester_id: requesterId, recipient_id: meId },
     { $set: { status: "accepted", accepted_at: new Date().toISOString() } }
@@ -897,11 +916,11 @@ router.post("/relationship-request/accept", requireUser, async (req, res) => {
 
   await db.collection("users").updateOne(
     { id: meId },
-    { $set: { relationship_status: "relationship", partner_user_id: requesterId } }
+    { $set: { relationship_status: "in_relationship", partner_user_id: requesterId } }
   );
   await db.collection("users").updateOne(
     { id: requesterId },
-    { $set: { relationship_status: "relationship", partner_user_id: meId } }
+    { $set: { relationship_status: "in_relationship", partner_user_id: meId } }
   );
 
   // Real-time socket notify

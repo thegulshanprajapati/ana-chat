@@ -632,6 +632,40 @@ export async function initSocket(httpServer) {
       });
     });
 
+    /* ─── Ephemeral Couple Secret Room (Transient — ZERO DB Persistence) ─── */
+    socket.on("couple_secret:join", ({ targetUserId }) => {
+      const targetId = Number(targetUserId);
+      if (targetId) {
+        io.to(userRoom(targetId)).emit("couple_secret:join", { senderId: userId });
+      }
+    });
+
+    socket.on("couple_secret:message", ({ targetUserId, text, timestamp }) => {
+      const targetId = Number(targetUserId);
+      if (!targetId || !text) return;
+      io.to(userRoom(targetId)).emit("couple_secret:message", {
+        senderId: userId,
+        text,
+        timestamp: timestamp || new Date().toISOString()
+      });
+    });
+
+    socket.on("couple_secret:reaction", ({ targetUserId, type }) => {
+      const targetId = Number(targetUserId);
+      if (!targetId || !type) return;
+      io.to(userRoom(targetId)).emit("couple_secret:reaction", {
+        senderId: userId,
+        type
+      });
+    });
+
+    socket.on("couple_secret:leave", ({ targetUserId }) => {
+      const targetId = Number(targetUserId);
+      if (targetId) {
+        io.to(userRoom(targetId)).emit("couple_secret:leave", { senderId: userId });
+      }
+    });
+
     socket.on("call_reject", ({ toUserId, reason, chatId }) => {
       const targetId = Number(toUserId);
       if (!targetId) return;

@@ -14,6 +14,7 @@ import CustomConfirmDialog from "../common/CustomConfirmDialog";
 import { useToast } from "../../context/ToastContext";
 import { clearLocalMessagesForChat } from "../../utils/localDb";
 import RelationshipSection from "../profile/RelationshipSection";
+import CoupleSecretRoomModal from "./CoupleSecretRoomModal";
 
 const REPORT_REASONS = [
   { id: "spam", label: "Spam" },
@@ -80,11 +81,13 @@ export default function PartnerProfileSheet({
   messages = [],
   onSearchOpen,
   onDeleteChat,
-  theme = "dark"
+  theme = "dark",
+  socket = null
 }) {
   const { success, error: showToastError } = useToast();
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [secretRoomOpen, setSecretRoomOpen] = useState(false);
   const [reason, setReason] = useState("spam");
   const [details, setDetails] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -431,23 +434,38 @@ export default function PartnerProfileSheet({
             </p>
 
             {/* Relationship badge */}
-            <div className="mt-3 flex flex-col items-center gap-1">
+            <div className="mt-3 flex flex-col items-center gap-1.5">
               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold select-none ${
-                partner?.relationship_status === "relationship" 
+                (partner?.relationship_status === "relationship" || partner?.relationship_status === "in_relationship") 
                   ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
                   : partner?.relationship_status === "married"
                   ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
-                  : partner?.relationship_status === "complicated"
-                  ? "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+                  : partner?.relationship_status === "engaged"
+                  ? "bg-violet-500/10 text-violet-400 border border-violet-500/20"
+                  : partner?.relationship_status === "single"
+                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                   : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
               }`}>
-                <Heart size={12} className={partner?.relationship_status === "relationship" || partner?.relationship_status === "married" ? "fill-current animate-pulse" : ""} />
-                Status: {partner?.relationship_status ? partner.relationship_status.charAt(0).toUpperCase() + partner.relationship_status.slice(1) : "Single"}
+                <Heart size={12} className={(partner?.relationship_status === "relationship" || partner?.relationship_status === "in_relationship" || partner?.relationship_status === "married") ? "fill-current animate-pulse text-rose-500" : ""} />
+                Status: {partner?.relationship_status 
+                  ? (partner.relationship_status === "in_relationship" ? "In a Relationship" : partner.relationship_status.charAt(0).toUpperCase() + partner.relationship_status.slice(1))
+                  : "Not set"}
               </span>
               {partner?.partner_user_id && (
-                <span className="text-[10px] text-slate-400">Partner ID: {partner.partner_user_id}</span>
+                <span className="text-[10px] text-slate-400">Linked Partner ID: {partner.partner_user_id}</span>
               )}
             </div>
+
+            {/* Couple Secret Room launcher button (if linked) */}
+            {partner?.id && (
+              <button
+                type="button"
+                onClick={() => setSecretRoomOpen(true)}
+                className="mt-4 flex items-center justify-center gap-2 px-4 py-2 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-[0_4px_20px_rgba(244,63,94,0.35)] transition active:scale-95"
+              >
+                <Lock size={13} /> Open Ephemeral Secret Room 🔐
+              </button>
+            )}
 
             {/* Action Buttons (Search) */}
             <div className="mt-6 flex justify-center">
@@ -627,13 +645,6 @@ export default function PartnerProfileSheet({
           <div className={`divide-y ${
             isDark ? "bg-[var(--panel-bg)] divide-white/5 border-b border-white/5" : "bg-[#ffffff] divide-slate-100 border-b border-slate-200"
           }`}>
-            {/* Relationship Section */}
-            {!isGroup && partner && (
-              <div className="p-4 border-b border-white/5">
-                <RelationshipSection me={{ id: meId }} />
-              </div>
-            )}
-
             {/* Starred Messages */}
             <div className={`flex items-center gap-5 px-6 py-4 cursor-pointer transition-colors ${
               isDark ? "hover:bg-[var(--accent-soft-10)] text-[#e9edef]" : "hover:bg-slate-50 text-slate-800"
@@ -858,6 +869,15 @@ export default function PartnerProfileSheet({
             open={profilePhotoOpen && Boolean(profilePhotoSrc)}
             onClose={() => setProfilePhotoOpen(false)}
             square
+          />
+
+          {/* Ephemeral Couple Secret Room Modal */}
+          <CoupleSecretRoomModal
+            open={secretRoomOpen}
+            onClose={() => setSecretRoomOpen(false)}
+            me={{ id: meId }}
+            partner={partner}
+            socket={socket}
           />
         </div>
       </aside>
