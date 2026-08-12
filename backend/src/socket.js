@@ -644,6 +644,35 @@ export async function initSocket(httpServer) {
       });
     });
 
+    /* ─── In-call reactions (transient — NOT persisted to DB) ─── */
+    const ALLOWED_REACTIONS = new Set([
+      "❤️","💕","🥰","😍","😘","😂","🤣","😡","😢",
+      "😮","👏","🔥","🎉","👍","✨"
+    ]);
+    const reactionRateLimiter = new Map(); // socketId → lastMs
+    socket.on("call:reaction", ({ type, targetUserId }) => {
+      // Validate emoji
+      if (!ALLOWED_REACTIONS.has(type)) return;
+
+      // Rate-limit: max 2 per second per sender
+      const now = Date.now();
+      const last = reactionRateLimiter.get(socket.id) || 0;
+      if (now - last < 500) return; // 500ms between reactions
+      reactionRateLimiter.set(socket.id, now);
+
+      const targetId = Number(targetUserId);
+      if (!targetId || targetId === userId) return;
+
+      // Forward to target peer — transient, no DB write
+      io.to(userRoom(targetId)).emit("call:reaction", {
+        type,
+        senderId: userId,
+        timestamp: now
+      });
+    });
+
+
+
     socket.on("watch_session_set", async ({ chatId, sourceUrl, title }) => {
       const normalizedChatId = Number(chatId);
       const normalizedSourceUrl = normalizeWatchUrl(sourceUrl);

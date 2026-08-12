@@ -40,8 +40,12 @@ import HiddenVaultDrawer from "../components/common/HiddenVaultDrawer";
 import ChangeKeyModal from "../components/common/ChangeKeyModal";
 import BackupSetupModal from "../components/common/BackupSetupModal";
 import RestoreBackupModal from "../components/common/RestoreBackupModal";
-import { appendCallLog, patchCallLog } from "../utils/callLogs";
+import { appendCallLog, patchCallLog, getCallLogs } from "../utils/callLogs";
 import { navigateTo } from "../utils/nav";
+import useCallStats from "../hooks/useCallStats";
+import CallSummary from "../components/chat/CallSummary";
+import { ENABLE_CALL_SUMMARY } from "../utils/featureFlags";
+
 
 const IDLE_CALL = {
   phase: "idle",
@@ -302,12 +306,49 @@ export default function ChatPage() {
   const [call, setCall] = useState(IDLE_CALL);
   const [localCallStream, setLocalCallStream] = useState(null);
   const [remoteCallStream, setRemoteCallStream] = useState(null);
+  const [peerConn, setPeerConn] = useState(null); // reactive shadow of peerRef.current
   const [watchSessions, setWatchSessions] = useState({});
   const [callChatMessages, setCallChatMessages] = useState([]);
+
+  const [callMoments, setCallMoments] = useState([]);
+  const [callSummary, setCallSummary] = useState(null);
+  const [callSummaryOpen, setCallSummaryOpen] = useState(false);
+
+  // Relationship data (for couple mode in CallOverlay)
+  const [relationshipData, setRelationshipData] = useState(null);
+  useEffect(() => {
+    if (!user?.id) return;
+    api.get("/users/relationship/status")
+      .then(({ data }) => setRelationshipData(data))
+      .catch(() => {}); // silently fail
+  }, [user?.id]);
+
 
   const activeChatIdRef = useRef(null);
   const callRef = useRef(IDLE_CALL);
   const callLogIdRef = useRef(null);
+  const callSnapshotRef = useRef(null); // captures call data before reset
+
+  // Poll real WebRTC stats during active call and patch call log
+  const callStats = useCallStats(peerConn, call.phase === "active");
+
+  // Patch call log whenever stats update
+  useEffect(() => {
+    if (!callStats || call.phase !== "active") return;
+    const logId = callRef.current?.logId || callLogIdRef.current;
+    if (!logId) return;
+    patchCallLog(user.id, logId, {
+      bytesSent:         callStats.bytesSent,
+      bytesReceived:     callStats.bytesReceived,
+      networkType:       callStats.networkType,
+      callQuality:       callStats.callQuality,
+      reconnectCount:    callStats.reconnectCount,
+      interruptionCount: callStats.interruptionCount,
+    });
+  }, [callStats, call.phase, user?.id]);
+
+
+
   const chatsRef = useRef([]);
   const peerRef = useRef(null);
   const incomingOfferRef = useRef(null);
@@ -2193,6 +2234,7 @@ export default function ChatPage() {
     cameraTrackRef.current = null;
     setLocalCallStream(null);
     setRemoteCallStream(null);
+    setPeerConn(null);
     setCall(IDLE_CALL);
     setCallChatMessages([]);
   }, []);
@@ -2207,12 +2249,46 @@ export default function ChatPage() {
       });
     }
     finalizeActiveCallLog(reason === "ended" ? "ended" : reason, reason);
+
+    // Capture snapshot for CallSummary before resetting
+    if (ENABLE_CALL_SUMMARY && current.phase === "active") {
+      const logId     = callRef.current?.logId || callLogIdRef.current;
+      const logs      = logId ? getCallLogs(user.id) : [];
+      const latestLog = logs.find((l) => l.id === logId) || {};
+
+      const startMs  = current.startedAt ? new Date(current.startedAt).getTime() : NaN;
+      const now      = Date.now();
+      const totalSec = Number.isFinite(startMs) ? Math.round((now - startMs) / 1000) : 0;
+      const mins     = Math.floor(totalSec / 60);
+      const secs     = totalSec % 60;
+      const durationStr = totalSec > 0 ? `${mins}m ${String(secs).padStart(2, "0")}s` : null;
+
+      callSnapshotRef.current = {
+        peerName:         current.peerName  || "Unknown",
+        peerAvatar:       current.peerAvatar || null,
+        callType:         current.callType  || "voice",
+        duration:         durationStr,
+        bytesSent:        latestLog.bytesSent        ?? null,
+        bytesReceived:    latestLog.bytesReceived    ?? null,
+        networkType:      latestLog.networkType      ?? null,
+        callQuality:      latestLog.callQuality      ?? null,
+        moments:          callMoments,
+        chatId:           current.chatId,
+        peerUserId:       current.peerUserId,
+      };
+      setCallSummary(callSnapshotRef.current);
+      setCallSummaryOpen(true);
+    }
+
     resetCallState();
-  }, [finalizeActiveCallLog, resetCallState, socket]);
+    setCallMoments([]);
+  }, [finalizeActiveCallLog, resetCallState, socket, user?.id, callMoments]);
+
 
   const createPeerConnection = useCallback((targetUserId, chatId, callType) => {
     const connection = new RTCPeerConnection(RTC_CONFIG);
     peerRef.current = connection;
+    setPeerConn(connection);
 
     const remoteMedia = new MediaStream();
     remoteStreamRef.current = remoteMedia;
@@ -2649,7 +2725,7 @@ export default function ChatPage() {
           }));
         }
 
-        if (decryptedMessage.sender_id !== user.id) {
+        if (decryptedMessage.sender_id !== user.id && decryptedMessage.chat_id !== activeChatIdRef.current) {
           const sourceChat = chatsRef.current.find((item) => Number(item.id) === Number(decryptedMessage.chat_id));
           const senderName = sourceChat?.other_user_name || "New message";
           const preview = decryptedMessage.body
@@ -3416,7 +3492,44 @@ export default function ChatPage() {
         micEnabled={Boolean(call.micEnabled)}
         videoEnabled={Boolean(call.videoEnabled)}
         screenSharing={Boolean(call.screenSharing)}
+        socket={socket}
+        peerConnection={peerRef.current}
+        myName={user?.name || ""}
+        myPartnerId={relationshipData?.partnerId || null}
+        coupleModeOn={relationshipData?.coupleModeEnabled || false}
+        callEffectsEnabled={relationshipData?.callEffectsEnabled !== false}
+        autoReactionsEnabled={relationshipData?.autoReactionsEnabled || false}
+        onMoment={(moment) => setCallMoments((prev) => [...prev, moment])}
       />
+
+      {/* Post-call summary */}
+      {ENABLE_CALL_SUMMARY && (
+        <CallSummary
+          open={callSummaryOpen}
+          callSnapshot={callSummary}
+          onClose={() => setCallSummaryOpen(false)}
+          onCallAgain={(callType) => {
+            setCallSummaryOpen(false);
+            if (callSummary?.chatId) {
+              const targetChat = chats.find((c) => c.id === callSummary.chatId);
+              if (targetChat) {
+                setActiveChat(targetChat);
+                setTimeout(() => startCall(callType), 100);
+              }
+            }
+          }}
+          onMessage={() => {
+            setCallSummaryOpen(false);
+            if (callSummary?.chatId) {
+              const targetChat = chats.find((c) => c.id === callSummary.chatId);
+              if (targetChat) setActiveChat(targetChat);
+            }
+          }}
+          onViewDetails={() => setCallSummaryOpen(false)}
+          onViewProfile={() => setCallSummaryOpen(false)}
+        />
+      )}
+
 
       <CallLogsDrawer me={user} open={callLogsOpen} onClose={() => setCallLogsOpen(false)} />
 

@@ -51,6 +51,15 @@ export function appendCallLog(userId, entry) {
   const item = {
     id,
     created_at: now,
+    // Analytics fields — default null, populated by useCallStats hook.
+    // NEVER fabricate these values; show "Unavailable" in UI when null.
+    bytesSent: null,
+    bytesReceived: null,
+    networkType: null,
+    callQuality: null,
+    reconnectCount: null,
+    interruptionCount: null,
+    moments: null,
     ...entry
   };
   const next = [item, ...list].slice(0, MAX_ITEMS);

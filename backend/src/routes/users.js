@@ -943,4 +943,156 @@ router.post("/relationship-request/unlink", requireUser, async (req, res) => {
   res.json({ success: true });
 });
 
+/* ─── GET /users/relationship/status — own relationship data + partner info ─── */
+router.get("/relationship/status", requireUser, async (req, res) => {
+  try {
+    const db = await getDb();
+    const meId = req.user.id;
+
+    const me = await db.collection("users").findOne(
+      { id: meId },
+      { projection: { _id: 0, relationship_status: 1, relationship_visibility: 1,
+                      partner_user_id: 1, couple_mode_enabled: 1, together_since: 1,
+                      call_effects_enabled: 1, auto_reactions_enabled: 1 } }
+    );
+
+    let partnerInfo = null;
+    if (me?.partner_user_id) {
+      const partner = await db.collection("users").findOne(
+        { id: Number(me.partner_user_id) },
+        { projection: { _id: 0, id: 1, name: 1, avatar_url: 1, relationship_status: 1 } }
+      );
+      if (partner) partnerInfo = partner;
+    }
+
+    // Pending requests
+    const pending = await db.collection("relationship_requests").find({
+      $or: [
+        { requester_id: meId, status: "pending" },
+        { recipient_id: meId, status: "pending" }
+      ]
+    }).toArray();
+
+    res.json({
+      relationshipStatus: me?.relationship_status || null,
+      relationshipVisibility: me?.relationship_visibility || "contacts",
+      partnerId: me?.partner_user_id || null,
+      coupleModeEnabled: me?.couple_mode_enabled || false,
+      togetherSince: me?.together_since || null,
+      callEffectsEnabled: me?.call_effects_enabled !== false,
+      autoReactionsEnabled: me?.auto_reactions_enabled || false,
+      partner: partnerInfo,
+      pendingRequests: pending || []
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to load relationship status" });
+  }
+});
+
+/* ─── POST /users/relationship/status — update relationship status ─── */
+router.post("/relationship/status", requireUser, async (req, res) => {
+  try {
+    const db   = await getDb();
+    const meId = req.user.id;
+    const {
+      relationshipStatus,
+      relationshipVisibility,
+      coupleModeEnabled,
+      togetherSince,
+      callEffectsEnabled,
+      autoReactionsEnabled
+    } = req.body;
+
+    const VALID_STATUSES = new Set([
+      "single", "in_relationship", "engaged", "married",
+      "prefer_not_say", "relationship", null, ""
+    ]);
+    const VALID_VIS = new Set(["everyone", "contacts", "nobody"]);
+
+    const update = {};
+    if (relationshipStatus !== undefined) {
+      if (!VALID_STATUSES.has(relationshipStatus)) {
+        return res.status(400).json({ message: "Invalid relationship status" });
+      }
+      update.relationship_status = relationshipStatus || null;
+    }
+    if (relationshipVisibility !== undefined) {
+      if (!VALID_VIS.has(relationshipVisibility)) {
+        return res.status(400).json({ message: "Invalid visibility value" });
+      }
+      update.relationship_visibility = relationshipVisibility;
+    }
+    if (coupleModeEnabled !== undefined) update.couple_mode_enabled = Boolean(coupleModeEnabled);
+    if (togetherSince !== undefined) update.together_since = togetherSince || null;
+    if (callEffectsEnabled !== undefined) update.call_effects_enabled = Boolean(callEffectsEnabled);
+    if (autoReactionsEnabled !== undefined) update.auto_reactions_enabled = Boolean(autoReactionsEnabled);
+
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ message: "No fields to update" });
+    }
+
+    await db.collection("users").updateOne({ id: meId }, { $set: update });
+    res.json({ success: true, updated: update });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update relationship status" });
+  }
+});
+
+/* ─── GET /users/:id/profile — public profile with privacy settings ─── */
+router.get("/:id/profile", requireUser, async (req, res) => {
+  try {
+    const db         = await getDb();
+    const targetId   = Number(req.params.id);
+    const requesterId = req.user.id;
+
+    if (!targetId) return res.status(400).json({ message: "Invalid user ID" });
+
+    const target = await db.collection("users").findOne(
+      { id: targetId },
+      { projection: {
+          _id: 0, id: 1, name: 1, avatar_url: 1, status: 1,
+          relationship_status: 1, relationship_visibility: 1,
+          partner_user_id: 1, couple_mode_enabled: 1, together_since: 1
+        }
+      }
+    );
+    if (!target) return res.status(404).json({ message: "User not found" });
+
+    // Respect privacy settings
+    const vis = target.relationship_visibility || "contacts";
+    let showRelationship = false;
+    if (vis === "everyone") {
+      showRelationship = true;
+    } else if (vis === "contacts") {
+      // Check if requester shares a chat with target
+      const chat = await db.collection("chats").findOne({
+        chat_type: "direct",
+        $or: [
+          { user1_id: requesterId, user2_id: targetId },
+          { user1_id: targetId,   user2_id: requesterId }
+        ]
+      });
+      showRelationship = Boolean(chat);
+    }
+
+    const profile = {
+      id:           target.id,
+      name:         target.name,
+      avatar_url:   target.avatar_url,
+      status:       target.status || "offline",
+      relationship: showRelationship ? {
+        status:         target.relationship_status  || null,
+        partnerId:      target.partner_user_id      || null,
+        coupleModeOn:   target.couple_mode_enabled  || false,
+        togetherSince:  target.together_since        || null,
+      } : null
+    };
+
+    res.json(profile);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to load profile" });
+  }
+});
+
 export default router;
+

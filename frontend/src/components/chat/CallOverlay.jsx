@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, forwardRef } from "react";
-import { motion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useRef, useState, forwardRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageSquareText,
   Mic,
@@ -16,9 +16,17 @@ import {
   Signal,
   Maximize2,
   Minimize2,
-  PictureInPicture
+  PictureInPicture,
+  Smile
 } from "lucide-react";
 import Avatar from "../common/Avatar";
+import ReactionTray from "./ReactionTray";
+import FloatingReactionLayer from "./FloatingReactionLayer";
+import CoupleModeController, { checkIsCouple } from "./CoupleModeController";
+import CallMomentButton from "./CallMomentButton";
+import ExpressionDetector from "./ExpressionDetector";
+import { pickReactionForExpression } from "../../utils/expressionReactionEngine";
+import { ENABLE_REACTIONS, ENABLE_CALL_MOMENTS, ENABLE_COUPLE_MODE, ENABLE_EXPRESSIONS } from "../../utils/featureFlags";
 
 /* ─── helpers ─── */
 function hasLiveVideoTrack(stream) {
@@ -61,6 +69,15 @@ export default function CallOverlay({
   micEnabled = true,
   videoEnabled = true,
   screenSharing = false,
+  /* NEW — optional props wired from ChatPage */
+  socket = null,
+  myPartnerId = null,
+  myName = "",
+  coupleModeOn = false,
+  callEffectsEnabled = true,
+  autoReactionsEnabled = false,
+  peerConnection = null,
+  onMoment = null,
 }) {
   const idle = !call || call.phase === "idle";
   const isVideo = call?.callType === "video";
@@ -78,8 +95,68 @@ export default function CallOverlay({
   const hideTimer = useRef(null);
   const chatEndRef = useRef(null);
 
+  // ── Reaction state ──
+  const [reactionTrayOpen, setReactionTrayOpen] = useState(false);
+  const [floatingReactions, setFloatingReactions] = useState([]);
+  const [lastEmoji, setLastEmoji] = useState(null);
+  const localVideoRef = useRef(null); // for expression detection
+
+  // ── Moments state ──
+  const [moments, setMoments] = useState([]);
+
+  // ── isCouple (derived) ──
+  const isCouple = ENABLE_COUPLE_MODE && checkIsCouple(
+    call?.peerUserId, myPartnerId, coupleModeOn
+  );
+
   const remoteVideoRef = useRef(null);
   const mainContainerRef = useRef(null);
+
+  // ── Reaction socket listener ──
+  useEffect(() => {
+    if (!socket || !ENABLE_REACTIONS || !callEffectsEnabled) return;
+    const handler = (data) => {
+      const id = `r-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      setFloatingReactions((prev) => [
+        ...prev,
+        { id, emoji: data.type, mine: false, isCouple }
+      ]);
+    };
+    socket.on("call:reaction", handler);
+    return () => socket.off("call:reaction", handler);
+  }, [socket, callEffectsEnabled, isCouple]);
+
+  // ── Send reaction via socket ──
+  const handleSendReaction = useCallback((emoji) => {
+    setLastEmoji(emoji);
+    const id = `r-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    // Show locally immediately
+    setFloatingReactions((prev) => [
+      ...prev,
+      { id, emoji, mine: true, isCouple }
+    ]);
+    // Broadcast to peer
+    if (socket && call?.peerUserId) {
+      socket.emit("call:reaction", {
+        type: emoji,
+        targetUserId: call.peerUserId
+      });
+    }
+  }, [socket, call?.peerUserId, isCouple]);
+
+  // ── Auto-reactions from expression detector ──
+  const handleExpression = useCallback((expressionType) => {
+    if (!autoReactionsEnabled || !callEffectsEnabled) return;
+    const emoji = pickReactionForExpression(expressionType);
+    if (emoji) handleSendReaction(emoji);
+  }, [autoReactionsEnabled, callEffectsEnabled, handleSendReaction]);
+
+  // ── Moment handler ──
+  const handleMoment = useCallback((moment) => {
+    const enriched = { ...moment, reaction: lastEmoji || moment.reaction };
+    setMoments((prev) => [...prev, enriched]);
+    onMoment?.(enriched);
+  }, [lastEmoji, onMoment]);
 
   const [isPip, setIsPip] = useState(false);
   const [pipSize, setPipSize] = useState({ width: 260, height: 380 });
@@ -346,6 +423,20 @@ export default function CallOverlay({
                     {live && <Signal size={10} className="text-emerald-400" />}
                   </div>
                 </div>
+                {/* ── Couple Mode Badge ── */}
+                {ENABLE_COUPLE_MODE && live && (
+                  <AnimatePresence>
+                    {isCouple && (
+                      <CoupleModeController
+                        peerUserId={call?.peerUserId}
+                        myPartnerId={myPartnerId}
+                        coupleModeOn={coupleModeOn}
+                        myName={myName}
+                        peerName={call?.peerName}
+                      />
+                    )}
+                  </AnimatePresence>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -379,6 +470,24 @@ export default function CallOverlay({
                 )}
               </div>
             </div>
+          )}
+
+          {/* ── Floating Reaction Layer ── */}
+          {ENABLE_REACTIONS && callEffectsEnabled && live && !isPip && (
+            <FloatingReactionLayer
+              reactions={floatingReactions}
+              onReactionClick={(_id, _emoji) => {}}
+              isCouple={isCouple}
+            />
+          )}
+
+          {/* ── Opt-in Expression Detector ── */}
+          {ENABLE_EXPRESSIONS && isVideo && live && (
+            <ExpressionDetector
+              videoRef={localVideoRef}
+              enabled={autoReactionsEnabled && callEffectsEnabled}
+              onExpression={handleExpression}
+            />
           )}
 
           {/* PiP Mode Overlay Controls */}
@@ -447,6 +556,15 @@ export default function CallOverlay({
                 controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
               }`}
             >
+              {/* ── Reaction Tray (above controls) ── */}
+              {ENABLE_REACTIONS && callEffectsEnabled && live && (
+                <ReactionTray
+                  open={reactionTrayOpen}
+                  onClose={() => setReactionTrayOpen(false)}
+                  onReact={handleSendReaction}
+                />
+              )}
+
               <div className="mx-auto flex max-w-lg items-center justify-center gap-3">
                 {/* Mic */}
                 <RoundControl
@@ -478,10 +596,29 @@ export default function CallOverlay({
                   />
                 )}
 
+                {/* ── Reactions Button ── */}
+                {ENABLE_REACTIONS && callEffectsEnabled && live && (
+                  <RoundControl
+                    onClick={() => setReactionTrayOpen((v) => !v)}
+                    label="Reactions"
+                    active={reactionTrayOpen}
+                    icon={<Smile size={20} />}
+                    accent="violet"
+                  />
+                )}
+
+                {/* ── Moment Button ── */}
+                {ENABLE_CALL_MOMENTS && live && (
+                  <CallMomentButton
+                    onMoment={handleMoment}
+                    lastEmoji={lastEmoji}
+                  />
+                )}
+
                 {/* Add participant */}
                 <RoundControl
                   onClick={onAddParticipant}
-                  label="Add participant"
+                  label="Add"
                   icon={<Plus size={20} />}
                 />
 

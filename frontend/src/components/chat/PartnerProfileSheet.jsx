@@ -13,6 +13,7 @@ import { mediaSrc, isVideoMedia } from "../../utils/chat";
 import CustomConfirmDialog from "../common/CustomConfirmDialog";
 import { useToast } from "../../context/ToastContext";
 import { clearLocalMessagesForChat } from "../../utils/localDb";
+import RelationshipSection from "../profile/RelationshipSection";
 
 const REPORT_REASONS = [
   { id: "spam", label: "Spam" },
@@ -626,6 +627,13 @@ export default function PartnerProfileSheet({
           <div className={`divide-y ${
             isDark ? "bg-[var(--panel-bg)] divide-white/5 border-b border-white/5" : "bg-[#ffffff] divide-slate-100 border-b border-slate-200"
           }`}>
+            {/* Relationship Section */}
+            {!isGroup && partner && (
+              <div className="p-4 border-b border-white/5">
+                <RelationshipSection me={{ id: meId }} />
+              </div>
+            )}
+
             {/* Starred Messages */}
             <div className={`flex items-center gap-5 px-6 py-4 cursor-pointer transition-colors ${
               isDark ? "hover:bg-[var(--accent-soft-10)] text-[#e9edef]" : "hover:bg-slate-50 text-slate-800"

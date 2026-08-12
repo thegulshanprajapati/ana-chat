@@ -291,6 +291,22 @@ export default function SettingsDrawer({
             </section>
 
             <section className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-900/70">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Calls & Effects</p>
+              <ToggleRow
+                label="Call effects & reactions"
+                description="Enable floating emoji reactions during active calls."
+                checked={settings.callEffectsEnabled !== false}
+                onChange={(value) => updateSetting("callEffectsEnabled", value)}
+              />
+              <ToggleRow
+                label="Auto expression reactions"
+                description="Automatically react based on facial expression detection (local-only, off by default)."
+                checked={Boolean(settings.autoReactionsEnabled)}
+                onChange={(value) => updateSetting("autoReactionsEnabled", value)}
+              />
+            </section>
+
+            <section className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-900/70">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Hidden Messages Vault</p>
               <button
                 type="button"

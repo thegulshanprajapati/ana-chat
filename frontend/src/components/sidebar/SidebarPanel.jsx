@@ -24,6 +24,7 @@ import {
   MessageSquare
 } from "lucide-react";
 import SidebarHeader from "./SidebarHeader";
+import DetailedCallHistoryModal from "../chat/DetailedCallHistoryModal";
 import ChatListItem from "./ChatListItem";
 import ChatListSkeleton from "./ChatListSkeleton";
 import Avatar from "../common/Avatar";
@@ -152,6 +153,7 @@ export default function SidebarPanel({
   const [selectedCallLogItem, setSelectedCallLogItem] = useState(null);
   const [callDetailsOpen, setCallDetailsOpen] = useState(false);
   const [callLogPartnerUser, setCallLogPartnerUser] = useState(null);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   // Bulk Mode Selection States and Helpers
   const [isBulkMode, setIsBulkMode] = useState(false);
@@ -1708,32 +1710,56 @@ export default function SidebarPanel({
                 </div>
               </div>
 
-              <div className="mt-6 w-full grid grid-cols-2 gap-3">
+              <div className="mt-6 w-full flex flex-col gap-2">
                 <button
                   type="button"
                   onClick={() => handleRedial(selectedCallLogItem)}
-                  className="py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs shadow-md transition-colors"
+                  className="w-full py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs shadow-md transition-colors"
                 >
                   Call Again
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCallDetailsOpen(false);
-                    // Open personal chat or user profile view action directly
-                    const chat = sourceChats.find(c => Number(c.id) === Number(selectedCallLogItem.chatId));
-                    if (chat) {
-                      onSelectChat?.(chat);
-                    }
-                  }}
-                  className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-200 font-bold text-xs transition"
-                >
-                  View Profile/Chat
-                </button>
+                <div className="w-full grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCallDetailsOpen(false);
+                      setHistoryModalOpen(true);
+                    }}
+                    className="py-2 px-3 border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-200 font-bold text-[11px] rounded-xl transition"
+                  >
+                    View History
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCallDetailsOpen(false);
+                      const chat = sourceChats.find(c => Number(c.id) === Number(selectedCallLogItem.chatId));
+                      if (chat) {
+                        onSelectChat?.(chat);
+                      }
+                    }}
+                    className="py-2 px-3 border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-200 font-bold text-[11px] rounded-xl transition"
+                  >
+                    View Chat
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Detailed Call History Modal */}
+      {historyModalOpen && selectedCallLogItem && (
+        <DetailedCallHistoryModal
+          open={historyModalOpen}
+          onClose={() => setHistoryModalOpen(false)}
+          me={me}
+          peerUserId={selectedCallLogItem.peerUserId}
+          peerName={selectedCallLogItem.peerName}
+          peerAvatar={selectedCallLogItem.peerAvatar}
+          onStartCall={onStartCall}
+        />
       )}
 
       <input

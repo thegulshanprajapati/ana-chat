@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, PhoneCall } from "lucide-react";
+import { ArrowLeft, PhoneCall, PhoneIncoming, PhoneOutgoing, PhoneMissed, Video } from "lucide-react";
 import Avatar from "../common/Avatar";
 import { clearCallLogs, getCallLogs } from "../../utils/callLogs";
 import { formatDayLabel, formatTime } from "../../utils/time";
+import CallDetailsSheet from "../chat/CallDetailsSheet";
+import DetailedCallHistoryModal from "../chat/DetailedCallHistoryModal";
 
 function groupByDay(items) {
   const groups = new Map();
@@ -16,7 +18,7 @@ function groupByDay(items) {
 
 function durationLabel(start, end) {
   const s = start ? new Date(start).getTime() : NaN;
-  const e = end ? new Date(end).getTime() : NaN;
+  const e = end   ? new Date(end).getTime()   : NaN;
   if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) return "";
   const total = Math.round((e - s) / 1000);
   const mins = Math.floor(total / 60);
@@ -27,21 +29,37 @@ function durationLabel(start, end) {
 
 function callStatusLabel(item) {
   const status = (item?.status || "").toString();
-  if (status === "missed") return "Missed";
-  if (status === "rejected") return "Declined";
-  if (status === "busy") return "Busy";
-  if (status === "no_answer") return "No answer";
-  if (status === "connection_lost") return "Disconnected";
-  if (status === "ended") return "Ended";
-  if (status === "active") return "Active";
-  if (status === "incoming") return "Incoming";
-  if (status === "outgoing") return "Outgoing";
+  if (status === "missed")           return "Missed";
+  if (status === "rejected")         return "Declined";
+  if (status === "busy")             return "Busy";
+  if (status === "no_answer")        return "No answer";
+  if (status === "connection_lost")  return "Disconnected";
+  if (status === "ended")            return "Ended";
+  if (status === "active")           return "Active";
+  if (status === "incoming")         return "Incoming";
+  if (status === "outgoing")         return "Outgoing";
   return status ? status : "Call";
 }
 
-export default function CallsPanel({ me, userId, mobile = false, onBack }) {
+function statusColor(item) {
+  const s = (item?.status || "").toString();
+  if (s === "missed")  return "text-rose-500 dark:text-rose-400";
+  if (s === "rejected") return "text-rose-400";
+  return "text-slate-500 dark:text-slate-400";
+}
+
+function DirectionIcon({ item, size = 14 }) {
+  const s = (item?.status || "").toString();
+  if (s === "missed") return <PhoneMissed size={size} className="text-rose-500 dark:text-rose-400 shrink-0" />;
+  if (item?.direction === "incoming") return <PhoneIncoming size={size} className="text-emerald-500 dark:text-emerald-400 shrink-0" />;
+  return <PhoneOutgoing size={size} className="text-slate-400 shrink-0" />;
+}
+
+export default function CallsPanel({ me, userId, mobile = false, onBack, onStartCall }) {
   const resolvedUserId = userId || me?.id || null;
-  const [callLogs, setCallLogs] = useState(() => getCallLogs(resolvedUserId));
+  const [callLogs, setCallLogs]   = useState(() => getCallLogs(resolvedUserId));
+  const [selectedLog, setSelectedLog] = useState(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   useEffect(() => {
     function sync() {
@@ -56,6 +74,18 @@ export default function CallsPanel({ me, userId, mobile = false, onBack }) {
   }, [resolvedUserId]);
 
   const grouped = useMemo(() => groupByDay(callLogs), [callLogs]);
+
+  // Handler: Call Again from details sheet
+  const handleCallAgain = (callType) => {
+    setSelectedLog(null);
+    if (selectedLog && onStartCall) {
+      onStartCall(selectedLog.peerUserId, callType, {
+        peerName:   selectedLog.peerName,
+        peerAvatar: selectedLog.peerAvatar,
+        chatId:     selectedLog.chatId
+      });
+    }
+  };
 
   return (
     <section className="glass-bar flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-none shadow-[0_22px_70px_rgb(0_0_0_/_0.28)] sm:rounded-lg">
@@ -106,25 +136,57 @@ export default function CallsPanel({ me, userId, mobile = false, onBack }) {
                   {day}
                 </p>
                 <div className="space-y-2">
-                  {items.map((item) => (
-                    <div
-                      key={item.id || `${item.started_at || item.created_at}-${item.peerUserId || ""}`}
-                      className="flex items-center gap-3 rounded-2xl border border-slate-200/70 bg-white/60 p-3 shadow-sm dark:border-white/10 dark:bg-slate-950/30"
-                    >
-                      <Avatar name={item.peerName || "User"} src={item.peerAvatar} size={44} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                          {item.peerName || "Unknown"}
+                  {items.map((item) => {
+                    const dur = durationLabel(item.started_at, item.ended_at);
+                    const isVideo = item.callType === "video";
+                    return (
+                      <button
+                        key={item.id || `${item.started_at || item.created_at}-${item.peerUserId || ""}`}
+                        type="button"
+                        onClick={() => setSelectedLog(item)}
+                        className="
+                          w-full flex items-center gap-3 rounded-2xl
+                          border border-slate-200/70 bg-white/60 p-3 shadow-sm
+                          dark:border-white/10 dark:bg-slate-950/30
+                          hover:bg-slate-50 dark:hover:bg-white/5
+                          active:scale-[0.985] transition-all duration-150
+                          text-left cursor-pointer
+                          focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50
+                        "
+                        aria-label={`Call details: ${item.peerName || "Unknown"}, ${callStatusLabel(item)}`}
+                      >
+                        {/* Avatar with call type badge */}
+                        <div className="relative shrink-0">
+                          <Avatar name={item.peerName || "User"} src={item.peerAvatar} size={44} />
+                          <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 flex items-center justify-center rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10">
+                            {isVideo
+                              ? <Video size={9} className="text-violet-500" />
+                              : <PhoneCall size={9} className="text-emerald-500" />}
+                          </div>
+                        </div>
+
+                        {/* Info */}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                            {item.peerName || "Unknown"}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <DirectionIcon item={item} size={11} />
+                            <p className={`truncate text-xs ${statusColor(item)}`}>
+                              {callStatusLabel(item)}
+                              {item.callType ? ` · ${item.callType}` : ""}
+                              {dur ? ` · ${dur}` : ""}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Time */}
+                        <p className="shrink-0 text-[11px] text-slate-400 dark:text-slate-500">
+                          {formatTime(item.started_at || item.created_at) || ""}
                         </p>
-                        <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
-                          {callStatusLabel(item)}{item.callType ? ` • ${item.callType}` : ""}{durationLabel(item.started_at, item.ended_at) ? ` • ${durationLabel(item.started_at, item.ended_at)}` : ""}
-                        </p>
-                      </div>
-                      <p className="shrink-0 text-[11px] text-slate-400 dark:text-slate-500">
-                        {formatTime(item.started_at || item.created_at) || ""}
-                      </p>
-                    </div>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
             ))}
@@ -137,6 +199,44 @@ export default function CallsPanel({ me, userId, mobile = false, onBack }) {
           </div>
         )}
       </div>
+
+      {/* Call Details Sheet */}
+      <CallDetailsSheet
+        open={Boolean(selectedLog)}
+        onClose={() => setSelectedLog(null)}
+        callLog={selectedLog}
+        me={me}
+        onCallAgain={handleCallAgain}
+        onViewHistory={() => {
+          setSelectedLog(null);
+          setHistoryOpen(true);
+        }}
+        onViewProfile={() => {
+          // Profile viewing is handled by the parent (ChatPage)
+          // just close the sheet for now — parent can wire this up
+          setSelectedLog(null);
+        }}
+      />
+
+      {/* Detailed Call History Modal */}
+      <DetailedCallHistoryModal
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        me={me}
+        peerUserId={selectedLog?.peerUserId}
+        peerName={selectedLog?.peerName}
+        peerAvatar={selectedLog?.peerAvatar}
+        onStartCall={(callType) => {
+          setHistoryOpen(false);
+          if (selectedLog && onStartCall) {
+            onStartCall(selectedLog.peerUserId, callType, {
+              peerName:   selectedLog.peerName,
+              peerAvatar: selectedLog.peerAvatar,
+              chatId:     selectedLog.chatId
+            });
+          }
+        }}
+      />
     </section>
   );
 }
