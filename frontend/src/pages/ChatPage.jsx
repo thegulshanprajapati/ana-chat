@@ -2286,11 +2286,13 @@ export default function ChatPage() {
 
 
   const createPeerConnection = useCallback((targetUserId, chatId, callType) => {
-    const connection = new RTCPeerConnection(RTC_CONFIG);
+    const PeerCtor = window.RTCPeerConnection || window.webkitRTCPeerConnection;
+    const connection = new PeerCtor(RTC_CONFIG);
     peerRef.current = connection;
     setPeerConn(connection);
 
-    const remoteMedia = new MediaStream();
+    const MediaStreamCtor = window.MediaStream || window.webkitMediaStream;
+    const remoteMedia = new MediaStreamCtor();
     remoteStreamRef.current = remoteMedia;
     setRemoteCallStream(remoteMedia);
 
@@ -2526,7 +2528,8 @@ export default function ChatPage() {
         ...localStreamRef.current.getAudioTracks(),
         ...(cameraTrack ? [cameraTrack] : [])
       ];
-      setLocalCallStream(new MediaStream(previewTracks));
+      const MediaStreamCtor = window.MediaStream || window.webkitMediaStream;
+      setLocalCallStream(new MediaStreamCtor(previewTracks));
     }
 
     setCall((prev) => ({
