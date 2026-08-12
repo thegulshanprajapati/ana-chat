@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Copy, Eye, EyeOff, X, User, Mail, Phone, Info, Lock } from "lucide-react";
+import { Copy, Eye, EyeOff, X, User, Mail, Phone, Info, Lock, Heart } from "lucide-react";
 import { api } from "../../api/client";
 import AvatarUploader from "../profile/AvatarUploader";
 
