@@ -359,29 +359,6 @@ export default function ChatPage() {
     };
   }, [fetchRelationshipStatus, notify, socket]);
 
-  const handleAcceptRelationshipRequest = useCallback(async (requesterId) => {
-    try {
-      await api.post("/users/relationship-request/accept", { requesterId });
-      notify({ type: "success", message: "Relationship request accepted! 💑" });
-      fetchRelationshipStatus();
-      await reload();
-      await loadChats();
-    } catch (err) {
-      notify({ type: "error", message: err.response?.data?.message || "Failed to accept request" });
-    }
-  }, [fetchRelationshipStatus, loadChats, notify, reload]);
-
-  const handleDeclineRelationshipRequest = useCallback(async (requesterId) => {
-    try {
-      await api.post("/users/relationship-request/decline", { requesterId });
-      notify({ type: "info", message: "Relationship request declined" });
-      fetchRelationshipStatus();
-    } catch (err) {
-      notify({ type: "error", message: "Failed to decline request" });
-    }
-  }, [fetchRelationshipStatus, notify]);
-
-
   const activeChatIdRef = useRef(null);
   const callRef = useRef(IDLE_CALL);
   const callLogIdRef = useRef(null);
@@ -1005,6 +982,28 @@ export default function ChatPage() {
       setLoadingChats(false);
     }
   }, [decryptChatPreviewForMe, isMobile, notify, selectChat, user?.id]);
+
+  const handleAcceptRelationshipRequest = useCallback(async (requesterId) => {
+    try {
+      await api.post("/users/relationship-request/accept", { requesterId });
+      notify({ type: "success", message: "Relationship request accepted! 💑" });
+      fetchRelationshipStatus();
+      await reload();
+      await loadChats();
+    } catch (err) {
+      notify({ type: "error", message: err.response?.data?.message || "Failed to accept request" });
+    }
+  }, [fetchRelationshipStatus, loadChats, notify, reload]);
+
+  const handleDeclineRelationshipRequest = useCallback(async (requesterId) => {
+    try {
+      await api.post("/users/relationship-request/decline", { requesterId });
+      notify({ type: "info", message: "Relationship request declined" });
+      fetchRelationshipStatus();
+    } catch (err) {
+      notify({ type: "error", message: "Failed to decline request" });
+    }
+  }, [fetchRelationshipStatus, notify]);
 
   const refreshActiveChatMessages = useCallback(async () => {
     if (!activeChatIdRef.current) return;
