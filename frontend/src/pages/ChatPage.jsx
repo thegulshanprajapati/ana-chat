@@ -472,7 +472,7 @@ export default function ChatPage() {
   }, []);
 
   const decryptMessageForMe = useCallback(async (message) => {
-    if (!message) return message;
+    if (!message || !user?.id) return message;
     const pair = await getOrCreateRsaKeyPair(user.id);
 
     let body = typeof message.body === "string" ? message.body : null;
@@ -506,11 +506,11 @@ export default function ChatPage() {
       body: body != null ? body : null,
       reply_to_body: replyBody != null ? replyBody : null
     };
-  }, [user.id]);
+  }, [user?.id]);
 
   const getChatRecipients = useCallback(async (chatId) => {
     const normalizedChatId = Number(chatId);
-    if (!normalizedChatId) return [];
+    if (!normalizedChatId || !user?.id) return [];
 
     const now = Date.now();
     const cached = chatRecipientsCacheRef.current.get(normalizedChatId);
@@ -537,14 +537,14 @@ export default function ChatPage() {
     }
 
     return recipients;
-  }, [user.id]);
+  }, [user?.id]);
 
   const decryptChatPreviewForMe = useCallback(async (chat) => {
     return chat;
   }, []);
 
   const loadMessages = useCallback(async (chatId) => {
-    if (!chatId) return;
+    if (!chatId || !user?.id) return;
     const timer = setTimeout(() => {
       setLoadingMessages(true);
     }, 150);
