@@ -80,7 +80,8 @@ export default function ChatListItem({
   nowMs = 0,
   isBulkMode = false,
   isSelected = false,
-  onToggleSelect
+  onToggleSelect,
+  hasPendingRelationshipRequest = false
 }) {
   const { success, error: showToastError } = useToast();
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
@@ -548,6 +549,14 @@ export default function ChatListItem({
           )}
           <span className="relative">
             <Avatar name={chat.other_user_name} src={chat.other_user_avatar} size={compactMode ? 42 : 48} />
+            {hasPendingRelationshipRequest && (
+              <span 
+                className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-rose-500 text-white shadow-md dark:border-slate-900 animate-pulse"
+                title="Relationship request pending"
+              >
+                <Heart size={10} className="fill-current text-white" />
+              </span>
+            )}
             {showOnlineStatus && online && (
               <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500 dark:border-slate-900" aria-hidden />
             )}

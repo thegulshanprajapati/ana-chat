@@ -316,14 +316,70 @@ export default function ChatPage() {
   const [callSummary, setCallSummary] = useState(null);
   const [callSummaryOpen, setCallSummaryOpen] = useState(false);
 
-  // Relationship data (for couple mode in CallOverlay)
+  // Relationship data & Pending requests
   const [relationshipData, setRelationshipData] = useState(null);
-  useEffect(() => {
+
+  const fetchRelationshipStatus = useCallback(() => {
     if (!user?.id) return;
     api.get("/users/relationship/status")
       .then(({ data }) => setRelationshipData(data))
-      .catch(() => {}); // silently fail
+      .catch(() => {});
   }, [user?.id]);
+
+  useEffect(() => {
+    fetchRelationshipStatus();
+  }, [fetchRelationshipStatus]);
+
+  // Listen to socket for real-time relationship request notifications
+  useEffect(() => {
+    if (!socket) return;
+    const handleReqReceived = (data) => {
+      fetchRelationshipStatus();
+      notify({
+        type: "info",
+        title: "Relationship Request 💖",
+        message: `${data.requesterName || "Someone"} sent you a relationship request!`
+      });
+    };
+    const handleReqAccepted = (data) => {
+      fetchRelationshipStatus();
+      notify({
+        type: "success",
+        title: "Request Accepted! 💑",
+        message: `${data.partnerName || "Your partner"} accepted your relationship request!`
+      });
+    };
+
+    socket.on("relationship_request_received", handleReqReceived);
+    socket.on("relationship_request_accepted", handleReqAccepted);
+
+    return () => {
+      socket.off("relationship_request_received", handleReqReceived);
+      socket.off("relationship_request_accepted", handleReqAccepted);
+    };
+  }, [fetchRelationshipStatus, notify, socket]);
+
+  const handleAcceptRelationshipRequest = useCallback(async (requesterId) => {
+    try {
+      await api.post("/users/relationship-request/accept", { requesterId });
+      notify({ type: "success", message: "Relationship request accepted! 💑" });
+      fetchRelationshipStatus();
+      await reload();
+      await loadChats();
+    } catch (err) {
+      notify({ type: "error", message: err.response?.data?.message || "Failed to accept request" });
+    }
+  }, [fetchRelationshipStatus, loadChats, notify, reload]);
+
+  const handleDeclineRelationshipRequest = useCallback(async (requesterId) => {
+    try {
+      await api.post("/users/relationship-request/decline", { requesterId });
+      notify({ type: "info", message: "Relationship request declined" });
+      fetchRelationshipStatus();
+    } catch (err) {
+      notify({ type: "error", message: "Failed to decline request" });
+    }
+  }, [fetchRelationshipStatus, notify]);
 
 
   const activeChatIdRef = useRef(null);
@@ -3349,6 +3405,7 @@ export default function ChatPage() {
               selectedStatusFeed={selectedStatusFeed}
               onSelectStatusFeed={setSelectedStatusFeed}
               onStartCall={startCall}
+              pendingRelationshipRequests={relationshipData?.pendingRequests || []}
             />
           </div>
         )}
@@ -3374,6 +3431,9 @@ export default function ChatPage() {
                 isAdminUser={Boolean(user?.isAdmin)}
                 activeChat={activeChat}
                 partner={partner}
+                pendingRelationshipRequests={relationshipData?.pendingRequests || []}
+                onAcceptRelationshipRequest={handleAcceptRelationshipRequest}
+                onDeclineRelationshipRequest={handleDeclineRelationshipRequest}
                 messages={renderedMessages}
                 loadingMessages={loadingMessages}
                 typing={typing}
@@ -3480,7 +3540,6 @@ export default function ChatPage() {
       <CreateGroupModal
         open={groupModalOpen}
         users={groupUsers}
-        loading={groupUsersLoading}
         creating={groupCreating}
         onClose={() => setGroupModalOpen(false)}
         onCreate={createGroup}

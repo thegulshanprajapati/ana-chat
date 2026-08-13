@@ -146,9 +146,10 @@ export default function SidebarPanel({
   hiddenChatsUnlocked = false,
   onUnhideChat,
   compactMode = false,
-  selectedStatusFeed,
+  selectedStatusFeed = null,
   onSelectStatusFeed,
-  onStartCall
+  onStartCall,
+  pendingRelationshipRequests = []
 }) {
   const [selectedCallLogItem, setSelectedCallLogItem] = useState(null);
   const [callDetailsOpen, setCallDetailsOpen] = useState(false);
@@ -1172,26 +1173,32 @@ export default function SidebarPanel({
                   <ChatListSkeleton />
                 ) : filteredChats.length ? (
                   <div className="space-y-1.5">
-                    {filteredChats.map((chat) => (
-                      <ChatListItem
-                        key={chat.id}
-                        chat={chat}
-                        active={chat.id === activeChatId}
-                        unreadCount={unreadByChat[chat.id] || 0}
-                        onClick={onSelectChat}
-                        pinned={Array.isArray(pinnedChatIds) ? pinnedChatIds.includes(chat.id) : false}
-                        onTogglePin={onTogglePinChat}
-                        onHide={onHideChat}
-                        onDelete={onDeleteChat}
-                        compactMode={compactMode}
-                        showOnlineStatus={showOnlineStatus}
-                        customDark={customSidebarDark}
-                        nowMs={nowMs}
-                        isBulkMode={isBulkMode}
-                        isSelected={Boolean(bulkSelectedIds[chat.id])}
-                        onToggleSelect={handleToggleSelect}
-                      />
-                    ))}
+                    {filteredChats.map((chat) => {
+                      const hasPendingReq = (pendingRelationshipRequests || []).some(
+                        (r) => String(r.requester_id) === String(chat.other_user_id)
+                      );
+                      return (
+                        <ChatListItem
+                          key={chat.id}
+                          chat={chat}
+                          active={chat.id === activeChatId}
+                          unreadCount={unreadByChat[chat.id] || 0}
+                          onClick={onSelectChat}
+                          pinned={Array.isArray(pinnedChatIds) ? pinnedChatIds.includes(chat.id) : false}
+                          onTogglePin={onTogglePinChat}
+                          onHide={onHideChat}
+                          onDelete={onDeleteChat}
+                          compactMode={compactMode}
+                          showOnlineStatus={showOnlineStatus}
+                          customDark={customSidebarDark}
+                          nowMs={nowMs}
+                          isBulkMode={isBulkMode}
+                          isSelected={Boolean(bulkSelectedIds[chat.id])}
+                          onToggleSelect={handleToggleSelect}
+                          hasPendingRelationshipRequest={hasPendingReq}
+                        />
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className={`px-3 py-2 text-sm ${sidebarLabelClass}`}>No chats in this filter.</p>

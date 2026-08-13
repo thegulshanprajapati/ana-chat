@@ -10,6 +10,9 @@ import { navigateTo } from "../../utils/nav";
 import { api } from "../../api/client";
 
 export default function ChatPane({
+  pendingRelationshipRequests = [],
+  onAcceptRelationshipRequest,
+  onDeclineRelationshipRequest,
   meId,
   isAdminUser = false,
   activeChat,
@@ -612,6 +615,40 @@ export default function ChatPane({
           {blockMessage}
         </div>
       )}
+
+      {/* Relationship Request Banner inside active chat */}
+      {(() => {
+        const pendingReq = (pendingRelationshipRequests || []).find(
+          (r) => String(r.requester_id) === String(partner?.id)
+        );
+        if (!pendingReq) return null;
+        return (
+          <div className="border-b border-rose-200/80 bg-rose-50/90 dark:border-rose-500/30 dark:bg-rose-950/40 px-4 py-2.5 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-rose-700 dark:text-rose-300 font-semibold min-w-0">
+              <Heart size={15} className="fill-rose-500 text-rose-500 animate-pulse shrink-0" />
+              <span className="truncate">
+                {partner?.name || "This user"} sent you a relationship request!
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => onAcceptRelationshipRequest?.(pendingReq.requester_id)}
+                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg shadow-sm transition active:scale-95 text-[11px]"
+              >
+                Accept 💖
+              </button>
+              <button
+                type="button"
+                onClick={() => onDeclineRelationshipRequest?.(pendingReq.requester_id)}
+                className="px-3 py-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-lg transition active:scale-95 text-[11px]"
+              >
+                Decline
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {watchOpen && (
         <div className={`border-b px-3 py-3 sm:px-5 ${
