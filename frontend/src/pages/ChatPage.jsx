@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, API_BASE_URL } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContextNew";
@@ -3503,8 +3503,8 @@ export default function ChatPage() {
         myName={user?.name || ""}
         myPartnerId={relationshipData?.partnerId || null}
         coupleModeOn={relationshipData?.coupleModeEnabled || false}
-        callEffectsEnabled={uiSettings.callEffectsEnabled !== false}
-        autoReactionsEnabled={Boolean(uiSettings.autoReactionsEnabled)}
+        callEffectsEnabled={userSettings.callEffectsEnabled !== false}
+        autoReactionsEnabled={Boolean(userSettings.autoReactionsEnabled)}
         onMoment={(moment) => setCallMoments((prev) => [...prev, moment])}
       />
 
