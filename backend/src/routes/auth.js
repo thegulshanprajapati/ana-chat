@@ -2,7 +2,7 @@ import express from "express";
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { OAuth2Client } from "google-auth-library";
-import { getDb, getNextSequence } from "../db.js";
+import { getDb, getNextSequence, getNextCustomUserId } from "../db.js";
 import { clearAuthCookies, createSessionForUser, getActiveSessions, isKnownDeviceForRequest, revokeSessionById, revokeSessionByRefreshToken, revokeAllUserSessions, rotateRefreshSession, setAuthCookies } from "../services/session.js";
 import { wipeUserChats } from "../services/userData.js";
 import { signAdminToken, verifyToken } from "../services/tokens.js";
@@ -112,7 +112,7 @@ async function ensureChatUserForAdmin(db, admin) {
   }
   if (!mobile) mobile = await uniqueAdminMobile(db, admin.id);
   const passwordHash = await bcrypt.hash(generatedPassword(), 10);
-  const userId = await getNextSequence("users");
+  const userId = await getNextCustomUserId();
   const now = new Date();
 
   await db.collection("users").insertOne({
@@ -243,7 +243,7 @@ router.post("/signup", async (req, res) => {
   if (existingUser) return res.status(400).json({ message: "User already exists" });
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const userId = await getNextSequence("users");
+  const userId = await getNextCustomUserId();
   const now = new Date();
 
   await db.collection("users").insertOne({
@@ -321,7 +321,7 @@ router.post("/google", async (req, res) => {
     const appPassword = generatedPassword();
     const passwordHash = await bcrypt.hash(appPassword, 10);
     const mobile = await uniqueGoogleMobile(googleSub);
-    const userId = await getNextSequence("users");
+  const userId = await getNextCustomUserId();
     const now = new Date();
 
     await db.collection("users").insertOne({

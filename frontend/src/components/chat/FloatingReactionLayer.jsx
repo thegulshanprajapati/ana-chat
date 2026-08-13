@@ -95,22 +95,23 @@ function Explosion({ emoji, x, y, onDone }) {
   return (
     <>
       {particles.map((p, i) => {
-        const angle  = (i / particles.length) * 360;
+        const angle  = (i / particles.length) * 360 + (Math.random() - 0.5) * 20;
         const rad    = (angle * Math.PI) / 180;
-        const dist   = 50 + Math.random() * 40;
+        const dist   = 120 + Math.random() * 160; // Expanded burst distance for full screen coverage
         const tx     = Math.round(Math.cos(rad) * dist);
         const ty     = Math.round(Math.sin(rad) * dist);
         return (
           <div
             key={i}
-            className="pointer-events-none fixed z-[70]"
+            className="pointer-events-none fixed z-[100]"
             style={{
               left: x + EMOJI_SIZE / 2,
               top:  y + EMOJI_SIZE / 2,
-              fontSize: 24,
+              fontSize: 32,
               "--tx": `${tx}px`,
               "--ty": `${ty}px`,
-              animation: `explodeParticle 0.65s ease-out ${i * 40}ms forwards`,
+              animation: `explodeParticle 0.85s cubic-bezier(0.16, 1, 0.3, 1) ${i * 30}ms forwards`,
+              filter: "drop-shadow(0 4px 14px rgba(244, 63, 94, 0.5))"
             }}
           >
             {p}

@@ -14,7 +14,7 @@ const DEFAULT_SETTINGS = {
   soundEffects: true,
   notificationsEnabled: true,
   callEffectsEnabled: true,
-  autoReactionsEnabled: false
+  autoReactionsEnabled: true
 };
 
 export default function SettingsDrawer({
@@ -306,8 +306,8 @@ export default function SettingsDrawer({
               />
               <ToggleRow
                 label="Auto expression reactions"
-                description="Automatically react based on facial expression detection (local-only, off by default)."
-                checked={Boolean(settings.autoReactionsEnabled)}
+                description="Automatically react based on facial expression detection (local-only, on by default)."
+                checked={settings.autoReactionsEnabled !== false}
                 onChange={(value) => {
                   updateSetting("autoReactionsEnabled", value);
                   onSave?.({ ...settings, autoReactionsEnabled: value });

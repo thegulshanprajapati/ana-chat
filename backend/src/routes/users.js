@@ -837,20 +837,21 @@ router.get("/statuses", requireUser, async (req, res) => {
 
 router.post("/relationship-request", requireUser, async (req, res) => {
   const db = await getDb();
-  const partnerId = Number(req.body.partnerId);
+  const rawPartnerId = (req.body.partnerId || "").toString().trim();
+  const partnerId = !isNaN(Number(rawPartnerId)) && rawPartnerId !== "" ? Number(rawPartnerId) : rawPartnerId;
   const meId = req.user.id;
 
-  if (isNaN(partnerId)) {
+  if (!partnerId) {
     return res.status(400).json({ message: "Invalid partner ID" });
   }
 
-  if (partnerId === meId) {
+  if (partnerId === meId || String(partnerId) === String(meId)) {
     return res.status(400).json({ message: "You cannot partner with yourself" });
   }
 
-  // Strict Exclusivity Check 1: Is requester already linked or in a relationship?
+  // Strict Exclusivity Check 1: Is requester already linked?
   const requester = await db.collection("users").findOne({ id: meId });
-  if (requester?.partner_user_id || requester?.relationship_status === "relationship" || requester?.relationship_status === "in_relationship" || requester?.relationship_status === "married") {
+  if (requester?.partner_user_id) {
     return res.status(400).json({ message: "You are already linked to a partner. Unlink your existing partner first before sending a new request." });
   }
 
@@ -861,7 +862,7 @@ router.post("/relationship-request", requireUser, async (req, res) => {
   }
 
   // Strict Exclusivity Check 2: Is recipient already linked to someone else?
-  if (partner?.partner_user_id || partner?.relationship_status === "relationship" || partner?.relationship_status === "in_relationship" || partner?.relationship_status === "married") {
+  if (partner?.partner_user_id) {
     return res.status(400).json({ message: "This user is already in a relationship with someone else and cannot accept new partner requests." });
   }
 
@@ -893,7 +894,8 @@ router.get("/relationship-request/pending", requireUser, async (req, res) => {
 
 router.post("/relationship-request/accept", requireUser, async (req, res) => {
   const db = await getDb();
-  const requesterId = Number(req.body.requesterId);
+  const rawReqId = (req.body.requesterId || "").toString().trim();
+  const requesterId = !isNaN(Number(rawReqId)) && rawReqId !== "" ? Number(rawReqId) : rawReqId;
   const meId = req.user.id;
 
   const reqObj = await db.collection("relationship_requests").findOne({ requester_id: requesterId, recipient_id: meId, status: "pending" });
@@ -937,7 +939,8 @@ router.post("/relationship-request/accept", requireUser, async (req, res) => {
 
 router.post("/relationship-request/decline", requireUser, async (req, res) => {
   const db = await getDb();
-  const requesterId = Number(req.body.requesterId);
+  const rawReqId = (req.body.requesterId || "").toString().trim();
+  const requesterId = !isNaN(Number(rawReqId)) && rawReqId !== "" ? Number(rawReqId) : rawReqId;
   const meId = req.user.id;
 
   await db.collection("relationship_requests").deleteOne({ requester_id: requesterId, recipient_id: meId });
@@ -948,14 +951,23 @@ router.post("/relationship-request/unlink", requireUser, async (req, res) => {
   const db = await getDb();
   const meId = req.user.id;
   const current = await db.collection("users").findOne({ id: meId });
-  if (current && current.partner_user_id) {
+  if (current) {
     const partnerId = current.partner_user_id;
-    await db.collection("users").updateOne({ id: meId }, { $set: { relationship_status: "single", partner_user_id: null } });
-    await db.collection("users").updateOne({ id: partnerId }, { $set: { relationship_status: "single", partner_user_id: null } });
+    await db.collection("users").updateOne({ id: meId }, { $set: { relationship_status: "single", partner_user_id: null, couple_mode_enabled: false } });
+    if (partnerId) {
+      await db.collection("users").updateOne({ id: partnerId }, { $set: { relationship_status: "single", partner_user_id: null, couple_mode_enabled: false } });
+      await db.collection("relationship_requests").deleteMany({
+        $or: [
+          { requester_id: meId, recipient_id: partnerId },
+          { requester_id: partnerId, recipient_id: meId }
+        ]
+      });
+    }
+    // Also delete any dangling requests for meId
     await db.collection("relationship_requests").deleteMany({
       $or: [
-        { requester_id: meId, recipient_id: partnerId },
-        { requester_id: partnerId, recipient_id: meId }
+        { requester_id: meId },
+        { recipient_id: meId }
       ]
     });
   }
@@ -977,8 +989,9 @@ router.get("/relationship/status", requireUser, async (req, res) => {
 
     let partnerInfo = null;
     if (me?.partner_user_id) {
+      const pid = me.partner_user_id;
       const partner = await db.collection("users").findOne(
-        { id: Number(me.partner_user_id) },
+        { $or: [{ id: pid }, { id: !isNaN(Number(pid)) ? Number(pid) : pid }, { id: String(pid) }] },
         { projection: { _id: 0, id: 1, name: 1, avatar_url: 1, relationship_status: 1 } }
       );
       if (partner) partnerInfo = partner;

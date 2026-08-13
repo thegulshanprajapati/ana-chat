@@ -681,45 +681,74 @@ input[type="range"].audio-seekbar::-moz-range-progress {
 
 @keyframes floatUp {
   0% {
-    transform: translateY(110vh) scale(0.6) rotate(0deg);
+    transform: translateY(105vh) scale(0.6) rotate(-15deg);
     opacity: 0;
+    filter: drop-shadow(0 0 8px rgba(255, 105, 180, 0.4));
   }
-  10% {
-    opacity: 0.95;
-    transform: translateY(90vh) scale(1.1) rotate(5deg);
+  15% {
+    opacity: 1;
+    transform: translateY(80vh) scale(1.4) rotate(10deg);
+    filter: drop-shadow(0 0 16px rgba(255, 105, 180, 0.8));
   }
   50% {
-    transform: translateY(50vh) scale(1.2) rotate(-10deg);
+    transform: translateY(45vh) scale(1.2) rotate(-8deg);
   }
-  90% {
-    opacity: 0.95;
+  85% {
+    opacity: 0.9;
   }
   100% {
-    transform: translateY(-20vh) scale(0.8) rotate(15deg);
+    transform: translateY(-20vh) scale(0.7) rotate(20deg);
     opacity: 0;
+    filter: drop-shadow(0 0 2px rgba(255, 105, 180, 0));
   }
 }
 
 @keyframes explodeUp {
   0% {
-    transform: translate(0, 50vh) scale(0.2) rotate(0deg);
+    transform: translate(0, 0) scale(0.2) rotate(0deg);
     opacity: 0;
+    filter: brightness(2) drop-shadow(0 0 20px rgba(244, 63, 94, 0.9));
   }
-  15% {
+  20% {
     opacity: 1;
-    transform: translate(var(--dx, 20px), var(--dy, -80px)) scale(1.3) rotate(45deg);
+    transform: translate(var(--dx, 50px), var(--dy, -120px)) scale(1.6) rotate(30deg);
+    filter: brightness(1.3) drop-shadow(0 0 25px rgba(244, 63, 94, 0.9));
   }
-  70% {
+  75% {
     opacity: 0.95;
+    transform: translate(calc(var(--dx, 50px) * 1.8), calc(var(--dy, -120px) * 1.8)) scale(1.2) rotate(120deg);
   }
   100% {
-    transform: translate(calc(var(--dx, 20px) * 2.8), calc(var(--dy, -80px) * 2.8)) scale(0.6) rotate(180deg);
+    transform: translate(calc(var(--dx, 50px) * 2.5), calc(var(--dy, -120px) * 2.5)) scale(0.3) rotate(360deg);
     opacity: 0;
+    filter: brightness(0.8) drop-shadow(0 0 0px transparent);
+  }
+}
+
+@keyframes fullScreenBlast {
+  0% {
+    transform: translate(-50%, -50%) scale(0.1) rotate(0deg);
+    opacity: 1;
+    filter: brightness(2.5) drop-shadow(0 0 30px rgba(244, 63, 94, 1));
+  }
+  50% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--bx, 0px)), calc(-50% + var(--by, 0px))) scale(1.8) rotate(180deg);
+    filter: brightness(1.5) drop-shadow(0 0 40px rgba(244, 63, 94, 0.8));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--bx, 0px) * 1.6), calc(-50% + var(--by, 0px) * 1.6)) scale(0.2) rotate(360deg);
+    filter: brightness(0.8);
   }
 }
 
 .animate-float {
   animation-iteration-count: infinite;
-  animation-timing-function: ease-in-out;
+  animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.animate-blast-particle {
+  animation: fullScreenBlast 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 

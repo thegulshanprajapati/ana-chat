@@ -64,11 +64,11 @@ export default function RelationshipSection({ me }) {
   };
 
   const sendPartnerRequest = async () => {
-    const id = parseInt(partnerInput.trim(), 10);
-    if (!id) return showToast("Enter a valid User ID", "error");
+    const val = partnerInput.trim();
+    if (!val) return showToast("Enter a valid User ID", "error");
     setSendingReq(true);
     try {
-      await api.post("/users/relationship-request", { partnerId: id });
+      await api.post("/users/relationship-request", { partnerId: val });
       setPartnerInput("");
       showToast("Partner request sent!", "success");
     } catch (err) {
@@ -220,10 +220,10 @@ export default function RelationshipSection({ me }) {
               </p>
               <div className="flex gap-2">
                 <input
-                  type="number"
+                  type="text"
                   value={partnerInput}
                   onChange={(e) => setPartnerInput(e.target.value)}
-                  placeholder="Partner's User ID"
+                  placeholder="e.g. ANA-1001-X7K9"
                   className="flex-1 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:border-violet-500/60"
                 />
                 <button

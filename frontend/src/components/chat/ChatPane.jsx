@@ -196,15 +196,24 @@ export default function ChatPane({
 
   const triggerEmojiExplosion = (emoji) => {
     const newEmojis = [];
-    const count = 30;
+    const count = 60; // Massively increased particle count for full-screen explosion
+    const screenWidth = typeof window !== "undefined" ? window.innerWidth : 800;
+    const screenHeight = typeof window !== "undefined" ? window.innerHeight : 600;
+
     for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      const distance = Math.random() * Math.min(screenWidth, screenHeight) * 0.45 + 100;
+      const bx = Math.cos(angle) * distance;
+      const by = Math.sin(angle) * distance;
+
       newEmojis.push({
-        id: `explode-${Date.now()}-${Math.random()}`,
+        id: `blast-${Date.now()}-${i}-${Math.random()}`,
         emoji,
-        left: Math.random() * 80 + 10, // percentage 10% - 90%
-        delay: Math.random() * 0.4,
-        size: Math.random() * 24 + 18,
-        duration: Math.random() * 1.5 + 1.2,
+        bx,
+        by,
+        delay: Math.random() * 0.25,
+        size: Math.random() * 32 + 24, // Bigger 3D-styled animated emojis
+        duration: Math.random() * 1.2 + 1.2,
         explode: true
       });
     }
@@ -938,25 +947,39 @@ export default function ChatPane({
         </div>
       )}
 
-      {/* Floating Emojis Layer */}
-      <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden">
+      {/* Full-Screen Floating & Exploding Emojis Layer */}
+      <div className="fixed inset-0 z-[100] pointer-events-none overflow-hidden">
         {floatingEmojis.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => handleFloatingClick(item)}
-            className="absolute pointer-events-auto select-none cursor-pointer hover:scale-125 transition-transform animate-float"
-            style={{
-              left: `${item.left}%`,
-              fontSize: `${item.size}px`,
-              animationDelay: `${item.delay}s`,
-              animationDuration: `${item.duration}s`,
-              bottom: item.explode ? "50%" : "-10%",
-              animationName: item.explode ? "explodeUp" : "floatUp",
-              animationFillMode: "forwards",
-              "--dx": item.explode ? `${(Math.random() - 0.5) * 400}px` : undefined,
-              "--dy": item.explode ? `${(Math.random() - 0.7) * 450}px` : undefined
-            }}
+            className={`absolute pointer-events-auto select-none cursor-pointer transition-transform ${
+              item.explode ? "animate-blast-particle" : "animate-float hover:scale-125"
+            }`}
+            style={
+              item.explode
+                ? {
+                    left: "50%",
+                    top: "50%",
+                    fontSize: `${item.size}px`,
+                    animationDelay: `${item.delay}s`,
+                    animationDuration: `${item.duration}s`,
+                    "--bx": `${item.bx}px`,
+                    "--by": `${item.by}px`,
+                    filter: "drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35))"
+                  }
+                : {
+                    left: `${item.left}%`,
+                    fontSize: `${item.size}px`,
+                    animationDelay: `${item.delay}s`,
+                    animationDuration: `${item.duration}s`,
+                    bottom: "-10%",
+                    animationName: "floatUp",
+                    animationFillMode: "forwards",
+                    filter: "drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2))"
+                  }
+            }
           >
             {item.emoji}
           </button>

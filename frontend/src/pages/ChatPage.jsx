@@ -78,7 +78,7 @@ const DEFAULT_UI_SETTINGS = {
   soundEffects: true,
   notificationsEnabled: true,
   callEffectsEnabled: true,
-  autoReactionsEnabled: false
+  autoReactionsEnabled: true
 };
 const CHAT_PIN_PATTERN = /^\d{4,8}$/;
 const RECIPIENT_CACHE_TTL_MS = 2 * 60 * 1000;
@@ -3509,7 +3509,7 @@ export default function ChatPage() {
         myPartnerId={relationshipData?.partnerId || null}
         coupleModeOn={relationshipData?.coupleModeEnabled || false}
         callEffectsEnabled={userSettings.callEffectsEnabled !== false}
-        autoReactionsEnabled={Boolean(userSettings.autoReactionsEnabled)}
+        autoReactionsEnabled={userSettings.autoReactionsEnabled !== false}
         onMoment={(moment) => setCallMoments((prev) => [...prev, moment])}
       />
 

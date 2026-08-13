@@ -456,8 +456,8 @@ export default function PartnerProfileSheet({
               )}
             </div>
 
-            {/* Couple Secret Room launcher button (if linked) */}
-            {partner?.id && (
+            {/* Couple Secret Room launcher button (only if linked couple) */}
+            {Boolean(partner?.id && meId && String(partner.partner_user_id) === String(meId)) && (
               <button
                 type="button"
                 onClick={() => setSecretRoomOpen(true)}

@@ -48,6 +48,16 @@ export async function getNextSequence(name) {
   return doc.seq;
 }
 
+export async function getNextCustomUserId() {
+  const seq = await getNextSequence("custom_users");
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let randomTag = "";
+  for (let i = 0; i < 4; i++) {
+    randomTag += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `ANA-${seq}${randomTag}`;
+}
+
 export async function closeDb() {
   if (client) {
     await client.close();
