@@ -111,7 +111,7 @@ export default function CoupleSecretRoomModal({
 
     const msgObj = {
       id: `sec-${Date.now()}-${Math.random()}`,
-      senderId: me.id,
+      senderId: me?.id || "guest",
       text,
       timestamp: new Date().toISOString(),
     };
