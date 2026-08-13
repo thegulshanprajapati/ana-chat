@@ -393,13 +393,18 @@ export default function ChatPage() {
       const body = normalized.message || "";
       if (body) {
         try {
-          const notification = new Notification(title, {
-            body,
-            badge: "/logo.png",
-            tag: isPriorityNotification ? "priority-notification" : undefined // Replace previous notifications
-          });
-          // Auto-close notification after 5 seconds for non-priority, 10 seconds for priority
-          setTimeout(() => notification.close(), isPriorityNotification ? 10000 : 5000);
+          if (typeof window !== "undefined" && typeof window.Notification === "function") {
+            const notification = new window.Notification(title, {
+              body,
+              badge: "/logo.png",
+              tag: isPriorityNotification ? "priority-notification" : undefined
+            });
+            setTimeout(() => {
+              try { notification.close(); } catch {}
+            }, isPriorityNotification ? 10000 : 5000);
+          } else {
+            throw new Error("Notification constructor not supported");
+          }
         } catch (err) {
           // On mobile browsers, direct Notification construction throws. Fall back to Service Worker if available.
           if (navigator.serviceWorker && navigator.serviceWorker.ready) {

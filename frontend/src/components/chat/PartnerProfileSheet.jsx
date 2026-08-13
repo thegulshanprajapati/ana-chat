@@ -3,7 +3,7 @@ import {
   X, Search, Star, Bell, Clock, Heart, 
   Trash2, Flag, UserMinus, UserCheck, Folder, Download, 
   Trash, Ban, ThumbsDown, Pencil, ChevronDown, Check,
-  FileText, ExternalLink, Play
+  FileText, ExternalLink, Play, Lock
 } from "lucide-react";
 import Avatar, { avatarUrl } from "../common/Avatar";
 import PhotoViewer from "../common/PhotoViewer";
@@ -447,7 +447,7 @@ export default function PartnerProfileSheet({
                   : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
               }`}>
                 <Heart size={12} className={(partner?.relationship_status === "relationship" || partner?.relationship_status === "in_relationship" || partner?.relationship_status === "married") ? "fill-current animate-pulse text-rose-500" : ""} />
-                Status: {partner?.relationship_status 
+                Status: {partner?.relationship_status && typeof partner.relationship_status === "string"
                   ? (partner.relationship_status === "in_relationship" ? "In a Relationship" : partner.relationship_status.charAt(0).toUpperCase() + partner.relationship_status.slice(1))
                   : "Not set"}
               </span>
