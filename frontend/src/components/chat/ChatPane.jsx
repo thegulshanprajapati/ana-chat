@@ -192,7 +192,7 @@ export default function ChatPane({
 
   // Couple & Mood Floating Emojis States
   const [floatingEmojis, setFloatingEmojis] = useState([]);
-  const isCouple = partner?.relationship_status === "relationship" || partner?.relationship_status === "married";
+  const isCouple = partner?.relationship_status === "relationship" || partner?.relationship_status === "in_relationship" || partner?.relationship_status === "married";
 
   const triggerEmojiExplosion = (emoji) => {
     const newEmojis = [];

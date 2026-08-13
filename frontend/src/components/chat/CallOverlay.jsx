@@ -17,7 +17,8 @@ import {
   Maximize2,
   Minimize2,
   PictureInPicture,
-  Smile
+  Smile,
+  Heart
 } from "lucide-react";
 import Avatar from "../common/Avatar";
 import ReactionTray from "./ReactionTray";
@@ -108,6 +109,10 @@ export default function CallOverlay({
   const isCouple = ENABLE_COUPLE_MODE && checkIsCouple(
     call?.peerUserId, myPartnerId, coupleModeOn
   );
+  const chatPanelTitle = isCouple ? "Couple temp chat" : "Temp chat";
+  const chatPanelHint = isCouple
+    ? "Private couple space for this call. Messages stay temporary."
+    : "Messages sent here are only visible during this call.";
 
   const remoteVideoRef = useRef(null);
   const mainContainerRef = useRef(null);
@@ -224,6 +229,20 @@ export default function CallOverlay({
     const clientY = e.clientY || (e.touches && e.touches[0].clientY);
     dragStartRef.current = { x: clientX, y: clientY };
     posStartRef.current = { ...chatPosition };
+  };
+
+  const openTempChat = () => {
+    const width = typeof window !== "undefined" ? window.innerWidth : 800;
+    const height = typeof window !== "undefined" ? window.innerHeight : 700;
+    const panelWidth = Math.min(360, Math.max(300, width - 24));
+    const panelHeight = Math.min(500, Math.max(360, height - 150));
+
+    setChatPosition((pos) => ({
+      x: Math.max(12, Math.min(pos.x, width - panelWidth - 12)),
+      y: Math.max(72, Math.min(pos.y, height - panelHeight - 92))
+    }));
+    setChatOpen(true);
+    setControlsVisible(true);
   };
 
   useEffect(() => {
@@ -441,7 +460,7 @@ export default function CallOverlay({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setChatOpen((v) => !v)}
+                  onClick={() => (chatOpen ? setChatOpen(false) : openTempChat())}
                   className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
                     chatOpen ? "bg-white/20 text-white" : "bg-white/10 text-white/70 hover:bg-white/20"
                   }`}
@@ -565,7 +584,7 @@ export default function CallOverlay({
                 />
               )}
 
-              <div className="mx-auto flex max-w-lg items-center justify-center gap-3">
+              <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-3">
                 {/* Mic */}
                 <RoundControl
                   onClick={onToggleMic}
@@ -607,8 +626,16 @@ export default function CallOverlay({
                   />
                 )}
 
+                <RoundControl
+                  onClick={() => (chatOpen ? setChatOpen(false) : openTempChat())}
+                  label={isCouple ? "Couple chat" : "Temp chat"}
+                  active={chatOpen}
+                  icon={isCouple ? <Heart size={20} /> : <MessageSquareText size={20} />}
+                  accent={isCouple ? "rose" : "blue"}
+                />
+
                 {/* ── Moment Button ── */}
-                {ENABLE_CALL_MOMENTS && live && (
+                {ENABLE_CALL_MOMENTS && live && isCouple && (
                   <CallMomentButton
                     onMoment={handleMoment}
                     lastEmoji={lastEmoji}
@@ -652,14 +679,32 @@ export default function CallOverlay({
             top: `${chatPosition.y}px`,
             position: 'absolute'
           }}
-          className="z-40 flex w-[320px] h-[450px] flex-col rounded-2xl bg-slate-950/85 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden select-none"
+          className={`z-40 flex h-[min(500px,calc(100vh-150px))] w-[min(360px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl border shadow-2xl backdrop-blur-xl select-none ${
+            isCouple
+              ? "border-rose-300/25 bg-[#160712]/90 shadow-rose-950/40"
+              : "border-white/10 bg-slate-950/90 shadow-black/50"
+          }`}
         >
           <div
             onMouseDown={handleDragStart}
             onTouchStart={handleDragStart}
-            className="flex items-center justify-between border-b border-white/10 px-4 py-2.5 cursor-grab active:cursor-grabbing bg-white/5 select-none shrink-0"
+            className={`flex cursor-grab items-center justify-between border-b px-4 py-3 active:cursor-grabbing select-none shrink-0 ${
+              isCouple
+                ? "border-rose-200/15 bg-gradient-to-r from-rose-500/20 via-fuchsia-500/10 to-white/5"
+                : "border-white/10 bg-white/5"
+            }`}
           >
-            <p className="text-xs font-bold text-white select-none">In-call chat</p>
+            <div className="flex min-w-0 items-center gap-2">
+              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                isCouple ? "bg-rose-500/20 text-rose-200" : "bg-sky-500/15 text-sky-200"
+              }`}>
+                {isCouple ? <Heart size={15} className="fill-current" /> : <MessageSquareText size={15} />}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-bold text-white select-none">{chatPanelTitle}</p>
+                <p className="truncate text-[10px] text-white/45">{live ? fmtTime(elapsed) : "Call chat"}</p>
+              </div>
+            </div>
             <button
               type="button"
               onClick={() => setChatOpen(false)}
@@ -674,8 +719,12 @@ export default function CallOverlay({
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 space-y-3">
             {!compactMessages.length && (
               <div className="flex flex-col items-center gap-2 py-12 text-center">
-                <MessageSquareText size={28} className="text-white/20" />
-                <p className="text-xs text-white/40">Messages sent here are only visible during this call.</p>
+                <div className={`flex h-12 w-12 items-center justify-center rounded-full ${
+                  isCouple ? "bg-rose-500/15 text-rose-200" : "bg-white/10 text-white/35"
+                }`}>
+                  {isCouple ? <Heart size={24} className="fill-current" /> : <MessageSquareText size={24} />}
+                </div>
+                <p className="max-w-[220px] text-xs leading-relaxed text-white/45">{chatPanelHint}</p>
               </div>
             )}
             {compactMessages.map((msg) => {
@@ -684,7 +733,7 @@ export default function CallOverlay({
                 <div key={msg.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                   <div className={`max-w-[82%] rounded-2xl px-3 py-2 text-xs leading-relaxed ${
                     mine
-                      ? "bg-rose-600 text-white rounded-br-sm"
+                      ? `${isCouple ? "bg-rose-600" : "bg-sky-600"} text-white rounded-br-sm`
                       : "bg-white/15 text-white/90 rounded-bl-sm"
                   }`}>
                     {msg.body}
@@ -701,12 +750,14 @@ export default function CallOverlay({
                 value={chatText}
                 onChange={(e) => setChatText(e.target.value)}
                 className="h-10 flex-1 rounded-full border border-white/20 bg-white/10 px-4 text-xs text-white placeholder:text-white/40 outline-none focus:border-rose-500/60 transition"
-                placeholder="Message..."
+                placeholder={isCouple ? "Send a couple note..." : "Send temp message..."}
               />
               <button
                 type="submit"
                 disabled={!chatText.trim()}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-600 text-white transition hover:bg-rose-500 disabled:opacity-40"
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition disabled:opacity-40 ${
+                  isCouple ? "bg-rose-600 hover:bg-rose-500" : "bg-sky-600 hover:bg-sky-500"
+                }`}
               >
                 <SendHorizontal size={14} />
               </button>
@@ -872,6 +923,10 @@ function RoundControl({ icon, label, onClick, active = false, disabled = false, 
   const colors = active
     ? accent === "blue"
       ? "bg-sky-500/90 text-white shadow-[0_4px_20px_rgba(14,165,233,0.4)]"
+      : accent === "rose"
+        ? "bg-rose-500/90 text-white shadow-[0_4px_22px_rgba(244,63,94,0.45)]"
+        : accent === "violet"
+          ? "bg-violet-500/90 text-white shadow-[0_4px_22px_rgba(139,92,246,0.4)]"
       : "bg-white/25 text-white"
     : "bg-white/15 text-white/80 hover:bg-white/25";
 

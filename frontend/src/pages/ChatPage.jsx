@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, API_BASE_URL } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContextNew";
@@ -76,7 +76,9 @@ const DEFAULT_UI_SETTINGS = {
   showOnlineStatus: true,
   enterToSend: true,
   soundEffects: true,
-  notificationsEnabled: true
+  notificationsEnabled: true,
+  callEffectsEnabled: true,
+  autoReactionsEnabled: false
 };
 const CHAT_PIN_PATTERN = /^\d{4,8}$/;
 const RECIPIENT_CACHE_TTL_MS = 2 * 60 * 1000;
@@ -3501,8 +3503,8 @@ export default function ChatPage() {
         myName={user?.name || ""}
         myPartnerId={relationshipData?.partnerId || null}
         coupleModeOn={relationshipData?.coupleModeEnabled || false}
-        callEffectsEnabled={relationshipData?.callEffectsEnabled !== false}
-        autoReactionsEnabled={relationshipData?.autoReactionsEnabled || false}
+        callEffectsEnabled={uiSettings.callEffectsEnabled !== false}
+        autoReactionsEnabled={Boolean(uiSettings.autoReactionsEnabled)}
         onMoment={(moment) => setCallMoments((prev) => [...prev, moment])}
       />
 

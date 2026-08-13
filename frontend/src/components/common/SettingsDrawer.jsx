@@ -12,7 +12,9 @@ const DEFAULT_SETTINGS = {
   showOnlineStatus: true,
   enterToSend: true,
   soundEffects: true,
-  notificationsEnabled: true
+  notificationsEnabled: true,
+  callEffectsEnabled: true,
+  autoReactionsEnabled: false
 };
 
 export default function SettingsDrawer({
@@ -297,13 +299,19 @@ export default function SettingsDrawer({
                 label="Call effects & reactions"
                 description="Enable floating emoji reactions during active calls."
                 checked={settings.callEffectsEnabled !== false}
-                onChange={(value) => updateSetting("callEffectsEnabled", value)}
+                onChange={(value) => {
+                  updateSetting("callEffectsEnabled", value);
+                  onSave?.({ ...settings, callEffectsEnabled: value });
+                }}
               />
               <ToggleRow
                 label="Auto expression reactions"
                 description="Automatically react based on facial expression detection (local-only, off by default)."
                 checked={Boolean(settings.autoReactionsEnabled)}
-                onChange={(value) => updateSetting("autoReactionsEnabled", value)}
+                onChange={(value) => {
+                  updateSetting("autoReactionsEnabled", value);
+                  onSave?.({ ...settings, autoReactionsEnabled: value });
+                }}
               />
             </section>
 
