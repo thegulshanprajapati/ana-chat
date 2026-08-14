@@ -1,7 +1,7 @@
 {
   "name": "anachat",
   "private": true,
-  "version": "4.11.13",
+  "version": "4.11.14",
   "type": "module",
   "overrides": {
     "esbuild": "npm:esbuild-wasm@0.23.0"

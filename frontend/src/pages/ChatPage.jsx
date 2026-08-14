@@ -316,91 +316,6 @@ export default function ChatPage() {
   const [callSummary, setCallSummary] = useState(null);
   const [callSummaryOpen, setCallSummaryOpen] = useState(false);
 
-  // Relationship data & Pending requests
-  const [relationshipData, setRelationshipData] = useState(null);
-
-  const fetchRelationshipStatus = useCallback(() => {
-    if (!user?.id) return;
-    api.get("/users/relationship/status")
-      .then(({ data }) => setRelationshipData(data))
-      .catch(() => {});
-  }, [user?.id]);
-
-  useEffect(() => {
-    fetchRelationshipStatus();
-  }, [fetchRelationshipStatus]);
-
-  // Listen to socket for real-time relationship request notifications
-  useEffect(() => {
-    if (!socket) return;
-    const handleReqReceived = (data) => {
-      fetchRelationshipStatus();
-      notify({
-        type: "info",
-        title: "Relationship Request 💖",
-        message: `${data.requesterName || "Someone"} sent you a relationship request!`
-      });
-    };
-    const handleReqAccepted = (data) => {
-      fetchRelationshipStatus();
-      notify({
-        type: "success",
-        title: "Request Accepted! 💑",
-        message: `${data.partnerName || "Your partner"} accepted your relationship request!`
-      });
-    };
-
-    socket.on("relationship_request_received", handleReqReceived);
-    socket.on("relationship_request_accepted", handleReqAccepted);
-
-    return () => {
-      socket.off("relationship_request_received", handleReqReceived);
-      socket.off("relationship_request_accepted", handleReqAccepted);
-    };
-  }, [fetchRelationshipStatus, notify, socket]);
-
-  const activeChatIdRef = useRef(null);
-  const callRef = useRef(IDLE_CALL);
-  const callLogIdRef = useRef(null);
-  const callSnapshotRef = useRef(null); // captures call data before reset
-
-  // Poll real WebRTC stats during active call and patch call log
-  const callStats = useCallStats(peerConn, call.phase === "active");
-
-  // Patch call log whenever stats update
-  useEffect(() => {
-    if (!callStats || call.phase !== "active") return;
-    const logId = callRef.current?.logId || callLogIdRef.current;
-    if (!logId) return;
-    patchCallLog(user.id, logId, {
-      bytesSent:         callStats.bytesSent,
-      bytesReceived:     callStats.bytesReceived,
-      networkType:       callStats.networkType,
-      callQuality:       callStats.callQuality,
-      reconnectCount:    callStats.reconnectCount,
-      interruptionCount: callStats.interruptionCount,
-    });
-  }, [callStats, call.phase, user?.id]);
-
-
-
-  const chatsRef = useRef([]);
-  const peerRef = useRef(null);
-  const incomingOfferRef = useRef(null);
-  const localStreamRef = useRef(null);
-  const remoteStreamRef = useRef(null);
-  const audioSenderRef = useRef(null);
-  const videoSenderRef = useRef(null);
-  const cameraTrackRef = useRef(null);
-  const screenStreamRef = useRef(null);
-  const deliveredMessageIdsRef = useRef(new Set());
-  const typingTimer = useRef(null);
-  const toastTimers = useRef(new Map());
-  const settingsRef = useRef(userSettings);
-  const chatRecipientsCacheRef = useRef(new Map());
-  const chatUpdatedTimerRef = useRef(null);
-  const lastChatMessageEventAtRef = useRef(new Map());
-
   const notify = useCallback((toast) => {
     const id = `${Date.now()}-${Math.random()}`;
     const normalized = { id, type: "info", ...toast };
@@ -463,6 +378,91 @@ export default function ChatPage() {
     }, 3600);
     toastTimers.current.set(id, timer);
   }, []);
+
+  // Relationship data & Pending requests
+  const [relationshipData, setRelationshipData] = useState(null);
+
+  const fetchRelationshipStatus = useCallback(() => {
+    if (!user?.id) return;
+    api.get("/users/relationship/status")
+      .then(({ data }) => setRelationshipData(data))
+      .catch(() => {});
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchRelationshipStatus();
+  }, [fetchRelationshipStatus]);
+
+  // Listen to socket for real-time relationship request notifications
+  useEffect(() => {
+    if (!socket) return;
+    const handleReqReceived = (data) => {
+      fetchRelationshipStatus();
+      notify({
+        type: "info",
+        title: "Relationship Request 💖",
+        message: `${data.requesterName || "Someone"} sent you a relationship request!`
+      });
+    };
+    const handleReqAccepted = (data) => {
+      fetchRelationshipStatus();
+      notify({
+        type: "success",
+        title: "Request Accepted! 💑",
+        message: `${data.partnerName || "Your partner"} accepted your relationship request!`
+      });
+    };
+
+    socket.on("relationship_request_received", handleReqReceived);
+    socket.on("relationship_request_accepted", handleReqAccepted);
+
+    return () => {
+      socket.off("relationship_request_received", handleReqReceived);
+      socket.off("relationship_request_accepted", handleReqAccepted);
+    };
+  }, [fetchRelationshipStatus, notify, socket]);
+
+  const activeChatIdRef = useRef(null);
+  const callRef = useRef(IDLE_CALL);
+  const callLogIdRef = useRef(null);
+  const callSnapshotRef = useRef(null); // captures call data before reset
+
+  // Poll real WebRTC stats during active call and patch call log
+  const callStats = useCallStats(peerConn, call.phase === "active");
+
+  // Patch call log whenever stats update
+  useEffect(() => {
+    if (!callStats || call.phase !== "active" || !user?.id) return;
+    const logId = callRef.current?.logId || callLogIdRef.current;
+    if (!logId) return;
+    patchCallLog(user.id, logId, {
+      bytesSent:         callStats.bytesSent,
+      bytesReceived:     callStats.bytesReceived,
+      networkType:       callStats.networkType,
+      callQuality:       callStats.callQuality,
+      reconnectCount:    callStats.reconnectCount,
+      interruptionCount: callStats.interruptionCount,
+    });
+  }, [callStats, call.phase, user?.id]);
+
+
+
+  const chatsRef = useRef([]);
+  const peerRef = useRef(null);
+  const incomingOfferRef = useRef(null);
+  const localStreamRef = useRef(null);
+  const remoteStreamRef = useRef(null);
+  const audioSenderRef = useRef(null);
+  const videoSenderRef = useRef(null);
+  const cameraTrackRef = useRef(null);
+  const screenStreamRef = useRef(null);
+  const deliveredMessageIdsRef = useRef(new Set());
+  const typingTimer = useRef(null);
+  const toastTimers = useRef(new Map());
+  const settingsRef = useRef(userSettings);
+  const chatRecipientsCacheRef = useRef(new Map());
+  const chatUpdatedTimerRef = useRef(null);
+  const lastChatMessageEventAtRef = useRef(new Map());
 
   const dismissToast = useCallback((id) => {
     const timer = toastTimers.current.get(id);
