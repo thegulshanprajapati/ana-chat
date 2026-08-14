@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, lazy, Suspense, useCallback } from "react";
-import { Check, Copy, ImageUp, Loader2, Paintbrush2, Search, Star, Trash2, X, Forward, Download, Lock, ShieldCheck, Sparkles, MessageSquare, Pin, KeyRound, ArrowRight } from "lucide-react";
+import { Check, Copy, ImageUp, Loader2, Paintbrush2, Search, Star, Trash2, X, Forward, Download, Lock, ShieldCheck, Sparkles, MessageSquare, Pin, KeyRound, ArrowRight, Heart } from "lucide-react";
 import ChatHeader from "./ChatHeader";
 import MessageThread from "./MessageThread";
 import Composer from "./Composer";
